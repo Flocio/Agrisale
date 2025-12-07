@@ -12,12 +12,16 @@ class ProductScreen extends StatefulWidget {
 
 class _ProductScreenState extends State<ProductScreen> {
   List<Map<String, dynamic>> _products = [];
+  List<Map<String, dynamic>> _suppliers = []; // 添加供应商列表
   bool _showDeleteButtons = false;
 
   // 添加搜索相关的状态变量
   List<Map<String, dynamic>> _filteredProducts = [];
   TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  
+  // 添加供应商筛选
+  String? _selectedSupplierFilter;
 
   @override
   void initState() {
@@ -41,17 +45,40 @@ class _ProductScreenState extends State<ProductScreen> {
     final searchText = _searchController.text.trim().toLowerCase();
     
     setState(() {
-      if (searchText.isEmpty) {
-        _filteredProducts = List.from(_products);
-        _isSearching = false;
-      } else {
-        _filteredProducts = _products.where((product) {
+      List<Map<String, dynamic>> result = List.from(_products);
+      bool hasFilters = false;
+      
+      // 关键词搜索
+      if (searchText.isNotEmpty) {
+        hasFilters = true;
+        result = result.where((product) {
           final name = product['name'].toString().toLowerCase();
           final description = (product['description'] ?? '').toString().toLowerCase();
           return name.contains(searchText) || description.contains(searchText);
         }).toList();
-        _isSearching = true;
       }
+      
+      // 供应商筛选
+      if (_selectedSupplierFilter != null && _selectedSupplierFilter != '全部供应商') {
+        hasFilters = true;
+        final selectedSupplierId = _suppliers
+            .firstWhere(
+              (s) => s['name'] == _selectedSupplierFilter,
+              orElse: () => {'id': -1},
+            )['id'];
+        
+        if (selectedSupplierId == -1) {
+          // "未分配供应商"
+          result = result.where((product) => 
+            product['supplierId'] == null || product['supplierId'] == 0).toList();
+        } else {
+          result = result.where((product) => 
+            product['supplierId'] == selectedSupplierId).toList();
+        }
+      }
+      
+      _isSearching = hasFilters;
+      _filteredProducts = result;
     });
   }
 
@@ -64,9 +91,11 @@ class _ProductScreenState extends State<ProductScreen> {
       final userId = await DatabaseHelper().getCurrentUserId(username);
       if (userId != null) {
         final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
+        final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
         setState(() {
           _products = products;
-          _filteredProducts = products;
+          _suppliers = suppliers;
+          _filterProducts(); // 使用过滤方法代替直接赋值
         });
       }
     }
@@ -75,7 +104,7 @@ class _ProductScreenState extends State<ProductScreen> {
   Future<void> _addProduct() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => ProductDialog(),
+      builder: (context) => ProductDialog(suppliers: _suppliers),
     );
     if (result != null) {
       final db = await DatabaseHelper().database;
@@ -114,7 +143,7 @@ class _ProductScreenState extends State<ProductScreen> {
   Future<void> _editProduct(Map<String, dynamic> product) async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => ProductDialog(product: product),
+      builder: (context) => ProductDialog(product: product, suppliers: _suppliers),
     );
     if (result != null) {
       final db = await DatabaseHelper().database;
@@ -250,6 +279,57 @@ class _ProductScreenState extends State<ProductScreen> {
                 ],
               ),
             ),
+            // 添加供应商筛选下拉框
+            if (_suppliers.isNotEmpty)
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 16, vertical: 8),
+                child: Row(
+                  children: [
+                    Icon(Icons.filter_list, size: 18, color: Colors.green[700]),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 12),
+                        decoration: BoxDecoration(
+                          color: Colors.grey[50],
+                          borderRadius: BorderRadius.circular(8),
+                          border: Border.all(color: Colors.grey[300]!),
+                        ),
+                        child: DropdownButtonHideUnderline(
+                          child: DropdownButton<String>(
+                            value: _selectedSupplierFilter,
+                            hint: Text('按供应商筛选', style: TextStyle(fontSize: 14)),
+                            isExpanded: true,
+                            icon: Icon(Icons.arrow_drop_down, color: Colors.green),
+                            onChanged: (String? newValue) {
+                              setState(() {
+                                _selectedSupplierFilter = newValue;
+                                _filterProducts();
+                              });
+                            },
+                            items: [
+                              DropdownMenuItem<String>(
+                                value: null,
+                                child: Text('全部供应商'),
+                              ),
+                              DropdownMenuItem<String>(
+                                value: '未分配供应商',
+                                child: Text('未分配供应商', style: TextStyle(color: Colors.grey[600])),
+                              ),
+                              ..._suppliers.map<DropdownMenuItem<String>>((supplier) {
+                                return DropdownMenuItem<String>(
+                                  value: supplier['name'],
+                                  child: Text(supplier['name']),
+                                );
+                              }).toList(),
+                            ],
+                          ),
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           Expanded(
               child: _filteredProducts.isEmpty
@@ -328,12 +408,32 @@ class _ProductScreenState extends State<ProductScreen> {
                                         ),
                                         Padding(
                                           padding: const EdgeInsets.only(top: 4),
-                                          child: Text(
-                                            '库存: ${_formatNumber(product['stock'])} ${product['unit']}',
-                                            style: TextStyle(
-                                              fontSize: 14,
-                                              color: Colors.grey[700],
-                                            ),
+                                          child: Row(
+                                            children: [
+                                              Text(
+                                                '库存: ${_formatNumber(product['stock'])} ${product['unit']}',
+                                                style: TextStyle(
+                                                  fontSize: 14,
+                                                  color: Colors.grey[700],
+                                                ),
+                                              ),
+                                              // 显示供应商信息
+                                              if (product['supplierId'] != null && product['supplierId'] != 0) ...[
+                                                SizedBox(width: 8),
+                                                Icon(Icons.business, size: 12, color: Colors.blue[700]),
+                                                SizedBox(width: 2),
+                                                Expanded(
+                                                  child: Text(
+                                                    _getSupplierName(product['supplierId']),
+                                                    style: TextStyle(
+                                                      fontSize: 12,
+                                                      color: Colors.blue[700],
+                                                    ),
+                                                    overflow: TextOverflow.ellipsis,
+                                                  ),
+                                                ),
+                                              ],
+                                            ],
                                           ),
                                         ),
                                         // 无论是否有备注，都保留相同高度的区域
@@ -465,12 +565,23 @@ class _ProductScreenState extends State<ProductScreen> {
       return value.toString();
     }
   }
+  
+  // 获取供应商名称
+  String _getSupplierName(int? supplierId) {
+    if (supplierId == null || supplierId == 0) return '未分配';
+    final supplier = _suppliers.firstWhere(
+      (s) => s['id'] == supplierId,
+      orElse: () => {'name': '未知'},
+    );
+    return supplier['name'];
+  }
 }
 
 class ProductDialog extends StatefulWidget {
   final Map<String, dynamic>? product;
+  final List<Map<String, dynamic>> suppliers;
 
-  ProductDialog({this.product});
+  ProductDialog({this.product, required this.suppliers});
 
   @override
   _ProductDialogState createState() => _ProductDialogState();
@@ -482,6 +593,7 @@ class _ProductDialogState extends State<ProductDialog> {
   final _stockController = TextEditingController();
   final _formKey = GlobalKey<FormState>();
   String _selectedUnit = '斤'; // 默认单位
+  String? _selectedSupplierId; // 选中的供应商ID
 
   @override
   void initState() {
@@ -491,6 +603,10 @@ class _ProductDialogState extends State<ProductDialog> {
       _descriptionController.text = widget.product!['description'] ?? '';
       _stockController.text = widget.product!['stock'].toString();
       _selectedUnit = widget.product!['unit'];
+      // 加载供应商ID
+      if (widget.product!['supplierId'] != null && widget.product!['supplierId'] != 0) {
+        _selectedSupplierId = widget.product!['supplierId'].toString();
+      }
     }
   }
 
@@ -538,6 +654,49 @@ class _ProductDialogState extends State<ProductDialog> {
                   prefixIcon: Icon(Icons.description, color: Colors.green),
             ),
                 maxLines: 2,
+              ),
+              SizedBox(height: 16),
+              // 添加供应商选择
+              Container(
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
+                decoration: BoxDecoration(
+                  color: Colors.grey[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.grey[400]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.business, color: Colors.green, size: 20),
+                    SizedBox(width: 12),
+                    Expanded(
+                      child: DropdownButtonHideUnderline(
+                        child: DropdownButton<String>(
+                          value: _selectedSupplierId,
+                          hint: Text('选择供应商（可选）', style: TextStyle(fontSize: 14)),
+                          isExpanded: true,
+                          icon: Icon(Icons.arrow_drop_down, color: Colors.green),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedSupplierId = newValue;
+                            });
+                          },
+                          items: [
+                            DropdownMenuItem<String>(
+                              value: null,
+                              child: Text('未分配供应商', style: TextStyle(color: Colors.grey[600])),
+                            ),
+                            ...widget.suppliers.map<DropdownMenuItem<String>>((supplier) {
+                              return DropdownMenuItem<String>(
+                                value: supplier['id'].toString(),
+                                child: Text(supplier['name']),
+                              );
+                            }).toList(),
+                          ],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
               ),
               SizedBox(height: 16),
               Row(
@@ -623,6 +782,7 @@ class _ProductDialogState extends State<ProductDialog> {
                     'description': _descriptionController.text.trim(),
                   'stock': double.tryParse(_stockController.text) ?? 0.0,
                   'unit': _selectedUnit,
+                  'supplierId': _selectedSupplierId != null ? int.tryParse(_selectedSupplierId!) : null,
                 };
                   if (widget.product != null) {
                     product['id'] = widget.product!['id'];

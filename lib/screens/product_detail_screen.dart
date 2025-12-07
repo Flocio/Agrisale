@@ -22,6 +22,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   List<Map<String, dynamic>> _filteredRecords = []; // 存储筛选后的记录
   List<Map<String, dynamic>> _suppliers = [];
   List<Map<String, dynamic>> _customers = [];
+  String? _productSupplierName; // 产品关联的供应商名称
   bool _isDescending = true; // 默认按时间倒序排列
   bool _isSummaryExpanded = true; // 汇总信息是否展开
   
@@ -255,6 +256,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
         final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
         final customers = await db.query('customers', where: 'userId = ?', whereArgs: [userId]);
 
+        // 获取产品关联的供应商名称
+        String? productSupplierName;
+        final productSupplierId = widget.product['supplierId'];
+        if (productSupplierId != null) {
+          final productSupplier = suppliers.firstWhere(
+            (s) => s['id'] == productSupplierId,
+            orElse: () => {'name': '未知供应商'},
+          );
+          productSupplierName = productSupplier['name'] as String?;
+        }
+
     // 合并所有记录
     List<Map<String, dynamic>> allRecords = [];
     
@@ -348,6 +360,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           _filteredRecords = allRecords;
           _suppliers = suppliers;
           _customers = customers;
+          _productSupplierName = productSupplierName;
           _currentStock = (widget.product['stock'] as num).toDouble();
         });
       }
@@ -404,7 +417,11 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     
     String csvData = '产品详情报告 - 用户: $username\n';
     csvData += '导出时间: ${DateTime.now().toString().substring(0, 19)}\n';
-    csvData += '产品名称: ${widget.product['name']}\n\n';
+    csvData += '产品名称: ${widget.product['name']}\n';
+    if (_productSupplierName != null) {
+      csvData += '关联供应商: $_productSupplierName\n';
+    }
+    csvData += '\n';
     csvData += '日期,类型,产品,数量,单位,交易方,金额,备注\n';
     
     for (var record in _filteredRecords) {
@@ -710,19 +727,49 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
               mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // 产品信息
-                Row(
-                  children: [
-                    Icon(Icons.inventory_2, color: Colors.blue, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      '${widget.product['name']} (${widget.product['unit']})',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[800],
+                Expanded(
+                  child: Column(
+                    crossAxisAlignment: CrossAxisAlignment.start,
+                    children: [
+                      Row(
+                        children: [
+                          Icon(Icons.inventory_2, color: Colors.blue, size: 16),
+                          SizedBox(width: 8),
+                          Flexible(
+                            child: Text(
+                              '${widget.product['name']} (${widget.product['unit']})',
+                              style: TextStyle(
+                                fontSize: 16,
+                                fontWeight: FontWeight.bold,
+                                color: Colors.blue[800],
+                              ),
+                              overflow: TextOverflow.ellipsis,
+                            ),
+                          ),
+                        ],
                       ),
-                    ),
-                  ],
+                      // 显示供应商信息
+                      if (_productSupplierName != null) ...[
+                        SizedBox(height: 4),
+                        Row(
+                          children: [
+                            Icon(Icons.business, color: Colors.blue[600], size: 12),
+                            SizedBox(width: 4),
+                            Flexible(
+                              child: Text(
+                                '供应商: $_productSupplierName',
+                                style: TextStyle(
+                                  fontSize: 12,
+                                  color: Colors.blue[700],
+                                ),
+                                overflow: TextOverflow.ellipsis,
+                              ),
+                            ),
+                          ],
+                        ),
+                      ],
+                    ],
+                  ),
                 ),
                 // 汇总信息标题和折叠按钮
                 InkWell(

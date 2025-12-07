@@ -44,7 +44,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       path,
-      version: 10, // 更新版本号以触发数据库结构更新 - 添加进账表的discount字段
+      version: 11, // 更新版本号 - 在products表添加supplierId字段
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -66,7 +66,9 @@ class DatabaseHelper {
       description TEXT,
       stock REAL,
       unit TEXT NOT NULL CHECK(unit IN ('斤', '公斤', '袋')),
+      supplierId INTEGER,
       FOREIGN KEY (userId) REFERENCES users (id),
+      FOREIGN KEY (supplierId) REFERENCES suppliers (id),
       UNIQUE(userId, name)
     )
   ''');

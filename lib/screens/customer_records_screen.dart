@@ -451,6 +451,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                   child: Center(
                     child: Column(
                       mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
                       children: [
                         Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
                         SizedBox(height: 16),
@@ -470,6 +471,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                             fontSize: 14,
                             color: Colors.grey[500],
                           ),
+                          textAlign: TextAlign.center,
                         ),
                       ],
                     ),
@@ -521,67 +523,67 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                           rows: [
                             // 数据行
                             ..._records.map((record) {
-                              // 设置颜色，购买为绿色，退货为红色
-                              Color textColor = record['type'] == '购买' ? Colors.green : Colors.red;
-                              
-                              // 根据类型决定金额正负
-                              String amount = record['type'] == '购买' 
-                                  ? record['totalPrice'].toString() 
-                                  : '-${record['totalPrice']}';
-                              
-                              // 根据类型决定数量显示格式
-                              String quantity = record['type'] == '购买'
+                            // 设置颜色，购买为绿色，退货为红色
+                            Color textColor = record['type'] == '购买' ? Colors.green : Colors.red;
+                            
+                            // 根据类型决定金额正负
+                            String amount = record['type'] == '购买' 
+                                ? record['totalPrice'].toString() 
+                                : '-${record['totalPrice']}';
+                            
+                            // 根据类型决定数量显示格式
+                            String quantity = record['type'] == '购买'
                                   ? _formatNumber(record['quantity'])
                                   : '-${_formatNumber(record['quantity'])}';
-                                  
-                              return DataRow(
-                                cells: [
-                    DataCell(Text(record['date'])),
-                                  DataCell(
-                                    Container(
-                                      padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
-                                      decoration: BoxDecoration(
+                                
+                            return DataRow(
+                              cells: [
+                  DataCell(Text(record['date'])),
+                                DataCell(
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: record['type'] == '购买' 
+                                          ? Colors.green[50] 
+                                          : Colors.red[50],
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
                                         color: record['type'] == '购买' 
-                                            ? Colors.green[50] 
-                                            : Colors.red[50],
-                                        borderRadius: BorderRadius.circular(4),
-                                        border: Border.all(
-                                          color: record['type'] == '购买' 
-                                              ? Colors.green[300]! 
-                                              : Colors.red[300]!,
-                                          width: 1,
-                                        ),
-                                      ),
-                                      child: Text(
-                                        record['type'],
-                                        style: TextStyle(
-                                          fontSize: 12,
-                                          color: textColor,
-                                          fontWeight: FontWeight.bold,
-                                        ),
+                                            ? Colors.green[300]! 
+                                            : Colors.red[300]!,
+                                        width: 1,
                                       ),
                                     ),
-                                  ),
-                    DataCell(Text(record['productName'])),
-                                  DataCell(
-                                    Text(
-                                      quantity,
+                                    child: Text(
+                                      record['type'],
                                       style: TextStyle(
+                                        fontSize: 12,
                                         color: textColor,
                                         fontWeight: FontWeight.bold,
                                       ),
-                                    )
-                                  ),
-                    DataCell(Text(record['unit'] ?? '')),
-                                  DataCell(
-                                    Text(
-                                      amount,
-                                      style: TextStyle(
-                                        color: textColor, 
-                                        fontWeight: FontWeight.bold
-                                      ),
                                     ),
                                   ),
+                                ),
+                  DataCell(Text(record['productName'])),
+                                DataCell(
+                                  Text(
+                                    quantity,
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  )
+                                ),
+                  DataCell(Text(record['unit'] ?? '')),
+                                DataCell(
+                                  Text(
+                                    amount,
+                                    style: TextStyle(
+                                      color: textColor, 
+                                      fontWeight: FontWeight.bold
+                                    ),
+                                  ),
+                                ),
                                 DataCell(
                                   record['note'].toString().isNotEmpty
                                       ? Text(

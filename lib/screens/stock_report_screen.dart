@@ -14,6 +14,7 @@ class StockReportScreen extends StatefulWidget {
 class _StockReportScreenState extends State<StockReportScreen> {
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _filteredProducts = [];
+  List<Map<String, dynamic>> _suppliers = []; // 添加供应商列表
   TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
 
@@ -45,6 +46,16 @@ class _StockReportScreenState extends State<StockReportScreen> {
     }
   }
 
+  // 获取供应商名称
+  String _getSupplierName(int? supplierId) {
+    if (supplierId == null) return '未分配';
+    final supplier = _suppliers.firstWhere(
+      (s) => s['id'] == supplierId,
+      orElse: () => {'name': '未知'},
+    );
+    return supplier['name'] as String;
+  }
+
   Future<void> _fetchData() async {
     final db = await DatabaseHelper().database;
     final prefs = await SharedPreferences.getInstance();
@@ -53,11 +64,13 @@ class _StockReportScreenState extends State<StockReportScreen> {
     if (username != null) {
       final userId = await DatabaseHelper().getCurrentUserId(username);
       if (userId != null) {
-        // 只获取当前用户的产品
+        // 获取当前用户的产品和供应商
         final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
+        final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
         setState(() {
           _products = products;
           _filteredProducts = products;
+          _suppliers = suppliers;
         });
       }
     }
@@ -229,6 +242,21 @@ class _StockReportScreenState extends State<StockReportScreen> {
                                               fontSize: 14,
                                               fontWeight: FontWeight.bold,
                                               color: stockColor,
+                                            ),
+                                          ),
+                                        ],
+                                      ),
+                                      // 供应商信息
+                                      SizedBox(height: 2),
+                                      Row(
+                                        children: [
+                                          Icon(Icons.business, size: 12, color: Colors.blue[600]),
+                                          SizedBox(width: 4),
+                                          Text(
+                                            '供应商: ${_getSupplierName(product['supplierId'])}',
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.blue[700],
                                             ),
                                           ),
                                         ],

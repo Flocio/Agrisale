@@ -107,6 +107,15 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
     // 获取当前用户的供应商数据
     final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
     
+    // 获取当前用户的员工数据
+    final employees = await db.query('employees', where: 'userId = ?', whereArgs: [userId]);
+    
+    // 获取当前用户的进账数据
+    final income = await db.query('income', where: 'userId = ?', whereArgs: [userId]);
+    
+    // 获取当前用户的汇款数据
+    final remittance = await db.query('remittance', where: 'userId = ?', whereArgs: [userId]);
+    
     // 获取用户数据（出于安全考虑，不包含密码）
     final List<Map<String, dynamic>> users = await db.query('users', where: 'id = ?', whereArgs: [userId]);
     final safeUsers = users.map((user) => {
@@ -125,8 +134,8 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         },
         {
           'name': 'products',
-          'columns': ['id', 'userId', 'name', 'description', 'stock', 'unit'],
-          'description': '产品表，存储农资产品信息，单位可以是斤、公斤或袋，每个用户有独立的产品数据'
+          'columns': ['id', 'userId', 'name', 'description', 'stock', 'unit', 'supplierId'],
+          'description': '产品表，存储农资产品信息。stock为REAL类型支持小数。单位可以是斤、公斤或袋。supplierId为外键关联到suppliers表，表示产品的供应商。每个用户有独立的产品数据'
         },
         {
           'name': 'suppliers',
@@ -139,19 +148,34 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
           'description': '客户表，存储客户信息，每个用户有独立的客户数据'
         },
         {
+          'name': 'employees',
+          'columns': ['id', 'userId', 'name', 'note'],
+          'description': '员工表，存储员工信息，用于记录收款和汇款的经手人，每个用户有独立的员工数据'
+        },
+        {
           'name': 'purchases',
           'columns': ['id', 'userId', 'productName', 'quantity', 'purchaseDate', 'supplierId', 'totalPurchasePrice', 'note'],
-          'description': '采购记录表，记录产品进货信息，每个用户有独立的采购记录'
+          'description': '采购记录表，记录产品进货信息。quantity为REAL类型支持小数，可为负数表示采购退货。totalPurchasePrice为总进价。每个用户有独立的采购记录'
         },
         {
           'name': 'sales',
           'columns': ['id', 'userId', 'productName', 'quantity', 'customerId', 'saleDate', 'totalSalePrice', 'note'],
-          'description': '销售记录表，记录产品销售信息，每个用户有独立的销售记录'
+          'description': '销售记录表，记录产品销售信息。quantity为REAL类型支持小数。totalSalePrice为总售价。每个用户有独立的销售记录'
         },
         {
           'name': 'returns',
           'columns': ['id', 'userId', 'productName', 'quantity', 'customerId', 'returnDate', 'totalReturnPrice', 'note'],
-          'description': '退货记录表，记录产品退货信息，每个用户有独立的退货记录'
+          'description': '退货记录表，记录客户退货信息。quantity为REAL类型支持小数。totalReturnPrice为总退货金额。每个用户有独立的退货记录'
+        },
+        {
+          'name': 'income',
+          'columns': ['id', 'userId', 'incomeDate', 'customerId', 'amount', 'discount', 'employeeId', 'paymentMethod', 'note'],
+          'description': '进账记录表，记录客户付款信息。amount为REAL类型表示收款金额，discount为优惠金额（默认0）。employeeId关联到employees表表示经手人。paymentMethod可为现金、微信转账或银行卡。每个用户有独立的进账记录'
+        },
+        {
+          'name': 'remittance',
+          'columns': ['id', 'userId', 'remittanceDate', 'supplierId', 'amount', 'employeeId', 'paymentMethod', 'note'],
+          'description': '汇款记录表，记录向供应商付款信息。amount为REAL类型表示汇款金额。employeeId关联到employees表表示经手人。paymentMethod可为现金、微信转账或银行卡。每个用户有独立的汇款记录'
         }
       ]
     };
@@ -165,6 +189,9 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
       'returns': returns,
       'customers': customers,
       'suppliers': suppliers,
+      'employees': employees,
+      'income': income,
+      'remittance': remittance,
       'users': safeUsers,
       'currentUser': username,
     };
@@ -231,16 +258,27 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         {
           'role': 'system',
           'content': '''
-你是农资管理系统的数据分析助手。你可以分析系统中的产品、销售、采购、库存等数据，并回答用户的问题。
+你是农资管理系统的数据分析助手。你可以分析系统中的产品、销售、采购、库存、员工、进账、汇款等数据，并回答用户的问题。
 
 系统包含以下数据表：
 1. users - 系统用户表
-2. products - 产品表（包含名称、描述、库存、单位）
+2. products - 产品表（包含名称、描述、库存（REAL类型支持小数）、单位、供应商ID）
 3. suppliers - 供应商表
 4. customers - 客户表
-5. purchases - 采购记录表
-6. sales - 销售记录表
-7. returns - 退货记录表
+5. employees - 员工表（记录收款和汇款的经手人）
+6. purchases - 采购记录表（quantity支持小数和负数，负数表示采购退货）
+7. sales - 销售记录表（quantity支持小数）
+8. returns - 退货记录表（客户退货，quantity支持小数）
+9. income - 进账记录表（客户付款，包含优惠金额discount）
+10. remittance - 汇款记录表（向供应商付款）
+
+关键业务逻辑：
+- 产品的stock、采购/销售/退货的quantity、金额amount都是REAL类型，支持小数
+- 采购的quantity可为负数，表示采购退货（退货给供应商）
+- 产品表中的supplierId关联到供应商，表示该产品来自哪个供应商
+- income表记录客户的付款，可包含优惠discount
+- remittance表记录向供应商的汇款
+- employees表记录经手人，与income和remittance关联
 
 请根据用户提问，分析相关数据并提供专业、准确的回答。请以中文回复用户的所有问题，确保回复是有意义且可读的中文文本。
 

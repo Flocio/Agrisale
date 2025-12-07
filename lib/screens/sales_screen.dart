@@ -230,6 +230,106 @@ class _SalesScreenState extends State<SalesScreen> {
     }
   }
 
+  Future<void> _editSale(Map<String, dynamic> sale) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => SalesDialog(
+        products: _products,
+        customers: _customers,
+        existingSale: sale,
+      ),
+    );
+    
+    if (result != null) {
+      final db = await DatabaseHelper().database;
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('current_username');
+      
+      if (username != null) {
+        final userId = await DatabaseHelper().getCurrentUserId(username);
+        if (userId != null) {
+          final oldProductName = sale['productName'] as String;
+          final newProductName = result['productName'] as String;
+          final oldQuantity = sale['quantity'] as double;
+          final newQuantity = result['quantity'] as double;
+          
+          // 检查是否更改了产品
+          final isProductChanged = oldProductName != newProductName;
+          
+          if (isProductChanged) {
+            // 产品更改：需要分别处理两个产品的库存
+            final oldProduct = _products.firstWhere((p) => p['name'] == oldProductName);
+            final newProduct = _products.firstWhere((p) => p['name'] == newProductName);
+            
+            // 检查新产品库存是否足够
+            final newProductStock = newProduct['stock'] as double;
+            if (newProductStock < newQuantity) {
+              _showErrorDialog('库存不足！${newProduct['name']} 当前库存: ${_formatNumber(newProductStock)} ${newProduct['unit']}，无法销售 ${_formatNumber(newQuantity)} ${newProduct['unit']}');
+              return;
+            }
+            
+            // 恢复原产品库存（加上原数量）
+            final oldProductNewStock = oldProduct['stock'] + oldQuantity;
+            await db.update(
+              'products',
+              {'stock': oldProductNewStock},
+              where: 'id = ? AND userId = ?',
+              whereArgs: [oldProduct['id'], userId],
+            );
+            
+            // 更新新产品库存（减去新数量）
+            final newProductNewStock = newProduct['stock'] - newQuantity;
+            await db.update(
+              'products',
+              {'stock': newProductNewStock},
+              where: 'id = ? AND userId = ?',
+              whereArgs: [newProduct['id'], userId],
+            );
+          } else {
+            // 产品未更改：只需要处理数量差值
+            final product = _products.firstWhere((p) => p['name'] == newProductName);
+            final quantityDiff = newQuantity - oldQuantity;
+            
+            // 如果增加销售数量（quantityDiff > 0），需要检查库存是否足够
+            if (quantityDiff > 0) {
+              final currentStock = product['stock'] as double;
+              if (currentStock < quantityDiff) {
+                _showErrorDialog('库存不足！当前库存: ${_formatNumber(currentStock)} ${product['unit']}，无法增加 ${_formatNumber(quantityDiff)} ${product['unit']}');
+                return;
+              }
+            }
+            
+            // 更新产品库存 - 减去数量差值（销售减少库存）
+            final newStock = product['stock'] - quantityDiff;
+            await db.update(
+              'products',
+              {'stock': newStock},
+              where: 'id = ? AND userId = ?',
+              whereArgs: [product['id'], userId],
+            );
+          }
+          
+          // 更新销售记录
+          await db.update(
+            'sales',
+            {
+              'productName': result['productName'],
+              'quantity': result['quantity'],
+              'customerId': result['customerId'],
+              'saleDate': result['saleDate'],
+              'totalSalePrice': result['totalSalePrice'],
+              'note': result['note'],
+            },
+            where: 'id = ? AND userId = ?',
+            whereArgs: [sale['id'], userId],
+          );
+
+          _fetchData();
+        }
+      }
+    }
+  }
+
   void _showNoteDialog(Map<String, dynamic> sale) {
     final _noteController = TextEditingController(text: sale['note']);
     showDialog(
@@ -688,12 +788,23 @@ class _SalesScreenState extends State<SalesScreen> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             IconButton(
-                                              icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
-                                              tooltip: '编辑备注',
-                                              onPressed: () => _showNoteDialog(sale),
+                                              icon: Icon(Icons.edit, color: Colors.orange),
+                                              tooltip: '编辑',
+                                              onPressed: () => _editSale(sale),
                                               padding: EdgeInsets.zero,
                                               constraints: BoxConstraints(),
                                               iconSize: 18,
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 8),
+                                              child: IconButton(
+                                                icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
+                                                tooltip: '编辑备注',
+                                                onPressed: () => _showNoteDialog(sale),
+                                                padding: EdgeInsets.zero,
+                                                constraints: BoxConstraints(),
+                                                iconSize: 18,
+                                              ),
                                             ),
                                             if (_showDeleteButtons)
                                               Padding(
@@ -923,8 +1034,13 @@ class _SalesScreenState extends State<SalesScreen> {
 class SalesDialog extends StatefulWidget {
   final List<Map<String, dynamic>> products;
   final List<Map<String, dynamic>> customers;
+  final Map<String, dynamic>? existingSale; // 添加此参数用于编辑模式
 
-  SalesDialog({required this.products, required this.customers});
+  SalesDialog({
+    required this.products,
+    required this.customers,
+    this.existingSale,
+  });
 
   @override
   _SalesDialogState createState() => _SalesDialogState();
@@ -940,10 +1056,41 @@ class _SalesDialogState extends State<SalesDialog> {
   DateTime _selectedDate = DateTime.now();
   double _totalSalePrice = 0.0;
   double _availableStock = 0.0;
+  bool _isEditMode = false;
 
   @override
   void initState() {
     super.initState();
+    // 如果是编辑模式，预填充数据
+    if (widget.existingSale != null) {
+      _isEditMode = true;
+      final sale = widget.existingSale!;
+      _selectedProduct = sale['productName'];
+      _selectedCustomer = sale['customerId'].toString();
+      _quantityController.text = sale['quantity'].toString();
+      _noteController.text = sale['note'] ?? '';
+      _selectedDate = DateTime.parse(sale['saleDate']);
+      
+      // 根据总价和数量计算单价
+      final quantity = sale['quantity'] as double;
+      final totalPrice = sale['totalSalePrice'] as double;
+      if (quantity != 0) {
+        final unitPrice = totalPrice / quantity;
+        _salePriceController.text = unitPrice.toString();
+      }
+      _totalSalePrice = totalPrice;
+      
+      // 更新可用库存
+      _updateAvailableStock();
+    }
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _salePriceController.dispose();
+    _noteController.dispose();
+    super.dispose();
   }
 
   Future<void> _selectDate(BuildContext context) async {
@@ -979,9 +1126,23 @@ class _SalesDialogState extends State<SalesDialog> {
 
   void _updateAvailableStock() {
     if (_selectedProduct != null) {
-    final product = widget.products.firstWhere((p) => p['name'] == _selectedProduct);
+      final product = widget.products.firstWhere((p) => p['name'] == _selectedProduct);
       setState(() {
-        _availableStock = product['stock'];
+        // 如果是编辑模式，需要加上原来销售的数量（因为这部分可以"释放"出来）
+        if (_isEditMode && widget.existingSale != null) {
+          final oldProductName = widget.existingSale!['productName'] as String;
+          if (oldProductName == _selectedProduct) {
+            // 如果编辑时没有改变产品，加上原数量
+            final oldQuantity = widget.existingSale!['quantity'] as double;
+            _availableStock = product['stock'] + oldQuantity;
+          } else {
+            // 如果改变了产品，只显示新产品的库存
+            _availableStock = product['stock'];
+          }
+        } else {
+          // 添加模式，直接显示库存
+          _availableStock = product['stock'];
+        }
       });
     }
   }
@@ -1007,7 +1168,7 @@ class _SalesDialogState extends State<SalesDialog> {
 
     return AlertDialog(
       title: Text(
-        '添加销售',
+        _isEditMode ? '编辑销售' : '添加销售',
         style: TextStyle(fontWeight: FontWeight.bold),
       ),
       content: Form(

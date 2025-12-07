@@ -235,6 +235,108 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
     }
   }
 
+  Future<void> _editPurchase(Map<String, dynamic> purchase) async {
+    final result = await showDialog<Map<String, dynamic>>(
+      context: context,
+      builder: (context) => PurchaseDialog(
+        products: _products,
+        suppliers: _suppliers,
+        existingPurchase: purchase,
+      ),
+    );
+    
+    if (result != null) {
+      final db = await DatabaseHelper().database;
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('current_username');
+      
+      if (username != null) {
+        final userId = await DatabaseHelper().getCurrentUserId(username);
+        if (userId != null) {
+          final oldProductName = purchase['productName'] as String;
+          final newProductName = result['productName'] as String;
+          final oldQuantity = purchase['quantity'] as double;
+          final newQuantity = result['quantity'] as double;
+          
+          // 检查是否更改了产品
+          final isProductChanged = oldProductName != newProductName;
+          
+          if (isProductChanged) {
+            // 产品更改：需要分别处理两个产品的库存
+            final oldProduct = _products.firstWhere((p) => p['name'] == oldProductName);
+            final newProduct = _products.firstWhere((p) => p['name'] == newProductName);
+            
+            // 检查新产品库存是否足够（如果新数量为负）
+            if (newQuantity < 0) {
+              final newProductStock = newProduct['stock'] as double;
+              if (newProductStock < newQuantity.abs()) {
+                _showErrorDialog('库存不足！${newProduct['name']} 当前库存: ${_formatNumber(newProductStock)} ${newProduct['unit']}，无法退货 ${_formatNumber(newQuantity.abs())} ${newProduct['unit']}');
+                return;
+              }
+            }
+            
+            // 恢复原产品库存（减去原数量）
+            final oldProductNewStock = oldProduct['stock'] - oldQuantity;
+            await db.update(
+              'products',
+              {'stock': oldProductNewStock},
+              where: 'id = ? AND userId = ?',
+              whereArgs: [oldProduct['id'], userId],
+            );
+            
+            // 更新新产品库存（加上新数量）
+            final newProductNewStock = newProduct['stock'] + newQuantity;
+            await db.update(
+              'products',
+              {'stock': newProductNewStock},
+              where: 'id = ? AND userId = ?',
+              whereArgs: [newProduct['id'], userId],
+            );
+          } else {
+            // 产品未更改：只需要处理数量差值
+            final product = _products.firstWhere((p) => p['name'] == newProductName);
+            final quantityDiff = newQuantity - oldQuantity;
+            
+            // 如果数量差为负（减少库存），需要检查库存是否足够
+            if (quantityDiff < 0) {
+              final currentStock = product['stock'] as double;
+              if (currentStock < quantityDiff.abs()) {
+                _showErrorDialog('库存不足！当前库存: ${_formatNumber(currentStock)} ${product['unit']}，无法减少 ${_formatNumber(quantityDiff.abs())} ${product['unit']}');
+                return;
+              }
+            }
+            
+            // 更新产品库存 - 加上数量差值
+            final newStock = product['stock'] + quantityDiff;
+            await db.update(
+              'products',
+              {'stock': newStock},
+              where: 'id = ? AND userId = ?',
+              whereArgs: [product['id'], userId],
+            );
+          }
+          
+          // 更新采购记录
+          await db.update(
+            'purchases',
+            {
+              'productName': result['productName'],
+              'quantity': result['quantity'],
+              'supplierId': result['supplierId'],
+              'purchaseDate': result['purchaseDate'],
+              'totalPurchasePrice': result['totalPurchasePrice'],
+              'note': result['note'],
+            },
+            where: 'id = ? AND userId = ?',
+            whereArgs: [purchase['id'], userId],
+          );
+
+          _fetchData();
+        }
+      }
+    }
+  }
+
   void _showNoteDialog(Map<String, dynamic> purchase) {
     final _noteController = TextEditingController(text: purchase['note']);
     showDialog(
@@ -718,12 +820,23 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                                           mainAxisSize: MainAxisSize.min,
                                           children: [
                                             IconButton(
-                                              icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
-                                              tooltip: '编辑备注',
-                                              onPressed: () => _showNoteDialog(purchase),
+                                              icon: Icon(Icons.edit, color: Colors.orange),
+                                              tooltip: '编辑',
+                                              onPressed: () => _editPurchase(purchase),
                                               padding: EdgeInsets.zero,
                                               constraints: BoxConstraints(),
                                               iconSize: 18,
+                                            ),
+                                            Padding(
+                                              padding: const EdgeInsets.only(left: 8),
+                                              child: IconButton(
+                                                icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
+                                                tooltip: '编辑备注',
+                                                onPressed: () => _showNoteDialog(purchase),
+                                                padding: EdgeInsets.zero,
+                                                constraints: BoxConstraints(),
+                                                iconSize: 18,
+                                              ),
                                             ),
                                             if (_showDeleteButtons)
                                               Padding(
@@ -957,8 +1070,13 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
 class PurchaseDialog extends StatefulWidget {
   final List<Map<String, dynamic>> products;
   final List<Map<String, dynamic>> suppliers;
+  final Map<String, dynamic>? existingPurchase; // 添加此参数用于编辑模式
 
-  PurchaseDialog({required this.products, required this.suppliers});
+  PurchaseDialog({
+    required this.products,
+    required this.suppliers,
+    this.existingPurchase,
+  });
 
   @override
   _PurchaseDialogState createState() => _PurchaseDialogState();
@@ -973,6 +1091,39 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
   final _formKey = GlobalKey<FormState>();
   DateTime _selectedDate = DateTime.now();
   double _totalPurchasePrice = 0.0;
+  bool _isEditMode = false;
+
+  @override
+  void initState() {
+    super.initState();
+    // 如果是编辑模式，预填充数据
+    if (widget.existingPurchase != null) {
+      _isEditMode = true;
+      final purchase = widget.existingPurchase!;
+      _selectedProduct = purchase['productName'];
+      _selectedSupplier = purchase['supplierId'].toString();
+      _quantityController.text = purchase['quantity'].toString();
+      _noteController.text = purchase['note'] ?? '';
+      _selectedDate = DateTime.parse(purchase['purchaseDate']);
+      
+      // 根据总价和数量计算单价
+      final quantity = purchase['quantity'] as double;
+      final totalPrice = purchase['totalPurchasePrice'] as double;
+      if (quantity != 0) {
+        final unitPrice = totalPrice / quantity;
+        _purchasePriceController.text = unitPrice.abs().toString();
+      }
+      _totalPurchasePrice = totalPrice;
+    }
+  }
+
+  @override
+  void dispose() {
+    _quantityController.dispose();
+    _purchasePriceController.dispose();
+    _noteController.dispose();
+    super.dispose();
+  }
 
   Future<void> _selectDate(BuildContext context) async {
     final DateTime? picked = await showDatePicker(
@@ -1015,7 +1166,7 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
 
     return AlertDialog(
       title: Text(
-        '添加采购/退货',
+        _isEditMode ? '编辑采购/退货' : '添加采购/退货',
         style: TextStyle(fontWeight: FontWeight.bold),
       ),
       content: Form(
@@ -1052,40 +1203,63 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
               onChanged: (value) {
                 setState(() {
                   _selectedProduct = value;
+                  // 自动填充产品对应的供应商
+                  if (value != null) {
+                    final product = widget.products.firstWhere((p) => p['name'] == value);
+                    if (product['supplierId'] != null && product['supplierId'] != 0) {
+                      _selectedSupplier = product['supplierId'].toString();
+                    } else {
+                      _selectedSupplier = null;
+                    }
+                  }
                 });
               },
             ),
               SizedBox(height: 16),
               
-            DropdownButtonFormField<String>(
-              value: _selectedSupplier,
-                decoration: InputDecoration(
-                  labelText: '选择供应商',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+            // 供应商显示（只读，自动从产品获取）
+            Container(
+              padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
+              decoration: BoxDecoration(
+                color: Colors.blue[50],
+                borderRadius: BorderRadius.circular(8),
+                border: Border.all(color: Colors.blue[200]!),
+              ),
+              child: Row(
+                children: [
+                  Icon(Icons.business, color: Colors.blue[700], size: 20),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Text(
+                          '供应商',
+                          style: TextStyle(
+                            fontSize: 12,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          _selectedSupplier != null 
+                              ? widget.suppliers.firstWhere(
+                                  (s) => s['id'].toString() == _selectedSupplier,
+                                  orElse: () => {'name': '未知供应商'},
+                                )['name']
+                              : '未分配供应商',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: _selectedSupplier != null ? Colors.blue[900] : Colors.grey[600],
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  prefixIcon: Icon(Icons.business, color: Colors.green),
-                ),
-                isExpanded: true,
-              items: widget.suppliers.map((supplier) {
-                return DropdownMenuItem<String>(
-                  value: supplier['id'].toString(),
-                  child: Text(supplier['name']),
-                );
-              }).toList(),
-                validator: (value) {
-                  if (value == null || value.isEmpty) {
-                    return '请选择供应商';
-                  }
-                  return null;
-                },
-              onChanged: (value) {
-                setState(() {
-                  _selectedSupplier = value;
-                });
-              },
+                  Icon(Icons.info_outline, color: Colors.blue[400], size: 16),
+                ],
+              ),
             ),
               SizedBox(height: 16),
               
