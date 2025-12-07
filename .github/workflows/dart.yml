@@ -8,12 +8,12 @@ on:
 
 env:
   FLUTTER_VERSION: "3.24.0"
-  VERSION_TAG: "v2.0.0"
+  VERSION_TAG: "v2.1.0"
 
 jobs:
   # iOS 构建
   build-ios:
-    name: 🍎 iOS Build
+    name: iOS Build
     runs-on: macos-latest
     steps:
       - name: Checkout Repository
@@ -51,7 +51,7 @@ jobs:
 
   # Android 构建
   build-android:
-    name: 🤖 Android Build
+    name: Android Build
     runs-on: ubuntu-latest
     steps:
       - name: Checkout Repository
@@ -97,7 +97,7 @@ jobs:
 
   # macOS 构建
   build-macos:
-    name: 🖥️ macOS Build
+    name: macOS Build
     runs-on: macos-latest
     steps:
       - name: Checkout Repository
@@ -136,7 +136,7 @@ jobs:
 
   # Windows 构建
   build-windows:
-    name: 🪟 Windows Build
+    name: Windows Build
     runs-on: windows-latest
     steps:
       - name: Checkout Repository
@@ -169,7 +169,7 @@ jobs:
 
   # 创建 GitHub Release
   create-release:
-    name: 📦 Create Release
+    name: Create Release
     needs: [build-ios, build-android, build-macos, build-windows]
     runs-on: ubuntu-latest
     if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
@@ -188,38 +188,38 @@ jobs:
           tag_name: ${{ env.VERSION_TAG }}
           name: "Agrisale ${{ env.VERSION_TAG }}"
           body: |
-            ## 🎉 Agrisale ${{ env.VERSION_TAG }}
+            ## Agrisale ${{ env.VERSION_TAG }}
             
-            ### 📱 支持平台
-            - **iOS**: iPhone 和 iPad
-            - **Android**: 手机和平板
-            - **macOS**: Mac 桌面应用
-            - **Windows**: Windows 桌面应用
+            ### 支持平台
+            - iOS: iPhone 和 iPad
+            - Android: 手机和平板
+            - macOS: Mac 桌面应用
+            - Windows: Windows 桌面应用
             
-            ### 🆕 主要功能
-            - 📦 产品库存管理
-            - 🛒 采购销售管理
-            - 👥 客户供应商管理
-            - 📊 财务报表统计
-            - 🤖 AI 数据助手
-            - 💾 数据备份恢复
-            - 🔐 多用户系统
+            ### 主要功能
+            - 产品库存管理
+            - 采购销售管理
+            - 客户供应商管理
+            - 财务报表统计
+            - AI 数据助手
+            - 数据备份恢复
+            - 多用户系统
             
-            ### 📥 下载说明
-            - **iOS用户**: 下载 `agrisale-ios-${{ env.VERSION_TAG }}.ipa` 文件
-            - **Android用户**: 下载 `agrisale-android-${{ env.VERSION_TAG }}.apk` 文件
-            - **macOS用户**: 下载 `agrisale-macos-${{ env.VERSION_TAG }}.zip` 文件
-            - **Windows用户**: 下载 `agrisale-windows-${{ env.VERSION_TAG }}.zip` 文件
+            ### 下载说明
+            - iOS用户: 下载 `agrisale-ios-${{ env.VERSION_TAG }}.ipa` 文件
+            - Android用户: 下载 `agrisale-android-${{ env.VERSION_TAG }}.apk` 文件
+            - macOS用户: 下载 `agrisale-macos-${{ env.VERSION_TAG }}.zip` 文件
+            - Windows用户: 下载 `agrisale-windows-${{ env.VERSION_TAG }}.zip` 文件
             
-            ### 🔧 安装说明
-            - **iOS**: 需要使用第三方工具如 AltStore 或企业证书安装
-            - **Android**: 开启"未知来源应用"后直接安装
-            - **macOS**: 解压后拖拽到应用程序文件夹
-            - **Windows**: 解压后运行 agrisale.exe
+            ### 安装说明
+            - iOS: 需要使用第三方工具如 AltStore 或企业证书安装
+            - Android: 开启"未知来源应用"后直接安装
+            - macOS: 解压后拖拽到应用程序文件夹
+            - Windows: 解压后运行 agrisale.exe
             
             ---
             
-            **完整跨平台支持 | 原生用户体验 | 开源免费**
+            完整跨平台支持 | 原生用户体验 | 开源免费
           files: |
             artifacts/iOS-Build/agrisale-ios-${{ env.VERSION_TAG }}.ipa
             artifacts/Android-APK/agrisale-android-${{ env.VERSION_TAG }}.apk
@@ -230,3 +230,4 @@ jobs:
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+
