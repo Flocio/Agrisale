@@ -830,12 +830,12 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                                             Padding(
                                               padding: const EdgeInsets.only(left: 8),
                                               child: IconButton(
-                                                icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
-                                                tooltip: '编辑备注',
-                                                onPressed: () => _showNoteDialog(purchase),
-                                                padding: EdgeInsets.zero,
-                                                constraints: BoxConstraints(),
-                                                iconSize: 18,
+                                              icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
+                                              tooltip: '编辑备注',
+                                              onPressed: () => _showNoteDialog(purchase),
+                                              padding: EdgeInsets.zero,
+                                              constraints: BoxConstraints(),
+                                              iconSize: 18,
                                               ),
                                             ),
                                             if (_showDeleteButtons)
@@ -1222,7 +1222,7 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
               padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
               decoration: BoxDecoration(
                 color: Colors.blue[50],
-                borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(8),
                 border: Border.all(color: Colors.blue[200]!),
               ),
               child: Row(

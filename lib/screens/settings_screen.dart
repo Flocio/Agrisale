@@ -344,7 +344,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     }
   }
 
-  // 数据恢复功能
+  // 数据恢复功能（仅覆盖模式）
   Future<void> _importData() async {
     try {
       final prefs = await SharedPreferences.getInstance();
@@ -378,233 +378,170 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return;
         }
 
-        // 检查数据来源和冲突风险
+        // 检查数据来源
         final backupUsername = importData['exportInfo']['username'] ?? '未知';
         final backupVersion = importData['exportInfo']['version'] ?? '未知';
+        final backupTime = importData['exportInfo']['exportTime'] ?? '未知';
         final isFromDifferentUser = backupUsername != username;
         
-        // 检查数据量，用于冲突风险评估
+        // 检查数据量
         final data = importData['data'] as Map<String, dynamic>;
         final backupSupplierCount = (data['suppliers'] as List?)?.length ?? 0;
         final backupCustomerCount = (data['customers'] as List?)?.length ?? 0;
         final backupProductCount = (data['products'] as List?)?.length ?? 0;
         final backupEmployeeCount = (data['employees'] as List?)?.length ?? 0;
-        
-        // 获取当前用户的数据量
-        final db = await DatabaseHelper().database;
-        final userId = await DatabaseHelper().getCurrentUserId(username);
-        if (userId == null) {
-          ScaffoldMessenger.of(context).showSnackBar(
-            SnackBar(content: Text('用户信息错误')),
-          );
-          return;
-        }
-        
-        final currentSuppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
-        final currentCustomers = await db.query('customers', where: 'userId = ?', whereArgs: [userId]);
-        final currentProducts = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
-        final currentEmployees = await db.query('employees', where: 'userId = ?', whereArgs: [userId]);
-        
-        // 检测潜在的名称冲突（仅在合并模式下提示）
-        int potentialConflicts = 0;
-        List<String> conflictDetails = [];
-        
-        if (backupSupplierCount > 0 && currentSuppliers.isNotEmpty) {
-          final backupSupplierNames = (data['suppliers'] as List).map((s) => s['name'] as String).toSet();
-          final currentSupplierNames = currentSuppliers.map((s) => s['name'] as String).toSet();
-          final conflictingSuppliers = backupSupplierNames.intersection(currentSupplierNames);
-          if (conflictingSuppliers.isNotEmpty) {
-            potentialConflicts += conflictingSuppliers.length;
-            conflictDetails.add('供应商: ${conflictingSuppliers.length}个重名');
-          }
-        }
-        
-        if (backupCustomerCount > 0 && currentCustomers.isNotEmpty) {
-          final backupCustomerNames = (data['customers'] as List).map((c) => c['name'] as String).toSet();
-          final currentCustomerNames = currentCustomers.map((c) => c['name'] as String).toSet();
-          final conflictingCustomers = backupCustomerNames.intersection(currentCustomerNames);
-          if (conflictingCustomers.isNotEmpty) {
-            potentialConflicts += conflictingCustomers.length;
-            conflictDetails.add('客户: ${conflictingCustomers.length}个重名');
-          }
-        }
-        
-        if (backupProductCount > 0 && currentProducts.isNotEmpty) {
-          final backupProductNames = (data['products'] as List).map((p) => p['name'] as String).toSet();
-          final currentProductNames = currentProducts.map((p) => p['name'] as String).toSet();
-          final conflictingProducts = backupProductNames.intersection(currentProductNames);
-          if (conflictingProducts.isNotEmpty) {
-            potentialConflicts += conflictingProducts.length;
-            conflictDetails.add('产品: ${conflictingProducts.length}个重名');
-          }
-        }
-        
-        if (backupEmployeeCount > 0 && currentEmployees.isNotEmpty) {
-          final backupEmployeeNames = (data['employees'] as List).map((e) => e['name'] as String).toSet();
-          final currentEmployeeNames = currentEmployees.map((e) => e['name'] as String).toSet();
-          final conflictingEmployees = backupEmployeeNames.intersection(currentEmployeeNames);
-          if (conflictingEmployees.isNotEmpty) {
-            potentialConflicts += conflictingEmployees.length;
-            conflictDetails.add('员工: ${conflictingEmployees.length}个重名');
-          }
-        }
+        final backupPurchaseCount = (data['purchases'] as List?)?.length ?? 0;
+        final backupSaleCount = (data['sales'] as List?)?.length ?? 0;
+        final backupReturnCount = (data['returns'] as List?)?.length ?? 0;
+        final backupIncomeCount = (data['income'] as List?)?.length ?? 0;
+        final backupRemittanceCount = (data['remittance'] as List?)?.length ?? 0;
 
         // 显示确认对话框
-        String? importMode; // 'overwrite' 或 'merge'
         final confirm = await showDialog<bool>(
           context: context,
-          builder: (context) => StatefulBuilder(
-            builder: (context, setDialogState) => AlertDialog(
-              title: Text('确认数据导入'),
-              content: SingleChildScrollView(
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  crossAxisAlignment: CrossAxisAlignment.start,
-                  children: [
-                    // 数据来源信息
+          builder: (context) => AlertDialog(
+            title: Text('确认覆盖数据', style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.bold)),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  // 数据来源信息
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.blue[200]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.blue[700], size: 18),
+                            SizedBox(width: 8),
+                            Text('备份信息', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          ],
+                        ),
+                        Divider(height: 16),
+                        _buildInfoRow('来源用户', backupUsername),
+                        _buildInfoRow('导出时间', backupTime.split('T')[0]),
+                        _buildInfoRow('数据版本', backupVersion),
+                        Divider(height: 16),
+                        Text('数据统计:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
+                        SizedBox(height: 4),
+                        _buildDataCountRow('供应商', backupSupplierCount),
+                        _buildDataCountRow('客户', backupCustomerCount),
+                        _buildDataCountRow('产品', backupProductCount),
+                        _buildDataCountRow('员工', backupEmployeeCount),
+                        _buildDataCountRow('采购记录', backupPurchaseCount),
+                        _buildDataCountRow('销售记录', backupSaleCount),
+                        _buildDataCountRow('退货记录', backupReturnCount),
+                        _buildDataCountRow('进账记录', backupIncomeCount),
+                        _buildDataCountRow('汇款记录', backupRemittanceCount),
+                      ],
+                    ),
+                  ),
+                  
+                  // 不同用户警告
+                  if (isFromDifferentUser) ...[
+                    SizedBox(height: 12),
                     Container(
-                      padding: EdgeInsets.all(8),
+                      padding: EdgeInsets.all(12),
                       decoration: BoxDecoration(
-                        color: Colors.blue[50],
+                        color: Colors.orange[50],
                         borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.blue[200]!),
+                        border: Border.all(color: Colors.orange[300]!, width: 2),
                       ),
-                      child: Column(
-                        crossAxisAlignment: CrossAxisAlignment.start,
+                      child: Row(
                         children: [
-                          Text('📦 备份信息', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14)),
-                          SizedBox(height: 4),
-                          Text('来源用户: $backupUsername', style: TextStyle(fontSize: 12)),
-                          Text('导出时间: ${importData['exportInfo']['exportTime'] ?? '未知'}', style: TextStyle(fontSize: 12)),
-                          Text('数据版本: $backupVersion', style: TextStyle(fontSize: 12)),
-                          SizedBox(height: 4),
-                          Text('供应商: $backupSupplierCount | 客户: $backupCustomerCount', style: TextStyle(fontSize: 12)),
-                          Text('产品: $backupProductCount | 员工: $backupEmployeeCount', style: TextStyle(fontSize: 12)),
+                          Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
+                          SizedBox(width: 8),
+                          Expanded(
+                            child: Text(
+                              '警告：此备份来自不同用户（$backupUsername）！',
+                              style: TextStyle(fontSize: 13, color: Colors.orange[900], fontWeight: FontWeight.w500),
+                            ),
+                          ),
                         ],
                       ),
                     ),
-                    
-                    // 不同用户警告
-                    if (isFromDifferentUser) ...[
-                      SizedBox(height: 8),
-                      Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.orange[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.orange[300]!),
-                        ),
-                        child: Row(
+                  ],
+                  
+                  // 覆盖警告
+                  SizedBox(height: 12),
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.red[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.red[400]!, width: 2),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
                           children: [
-                            Icon(Icons.warning, color: Colors.orange[700], size: 16),
+                            Icon(Icons.error_outline, color: Colors.red[700], size: 20),
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                '警告：此备份来自不同用户（$backupUsername），请谨慎操作！',
-                                style: TextStyle(fontSize: 12, color: Colors.orange[900]),
+                                '覆盖模式',
+                                style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.red[900]),
                               ),
                             ),
                           ],
                         ),
-                      ),
-                    ],
-                    
-                    // 冲突检测结果（仅在有冲突时显示）
-                    if (potentialConflicts > 0) ...[
-                      SizedBox(height: 8),
-                      Container(
-                        padding: EdgeInsets.all(8),
-                        decoration: BoxDecoration(
-                          color: Colors.red[50],
-                          borderRadius: BorderRadius.circular(8),
-                          border: Border.all(color: Colors.red[300]!),
-                        ),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.error, color: Colors.red[700], size: 16),
-                                SizedBox(width: 8),
-                                Text(
-                                  '检测到 $potentialConflicts 个潜在冲突',
-                                  style: TextStyle(fontWeight: FontWeight.bold, fontSize: 13, color: Colors.red[900]),
+                        Divider(height: 12, color: Colors.red[300]),
+                        Text('• 将删除当前所有业务数据', style: TextStyle(fontSize: 13, color: Colors.red[800])),
+                        Text('• 完全替换为备份中的数据', style: TextStyle(fontSize: 13, color: Colors.red[800])),
+                        Text('• 此操作不可撤销！', style: TextStyle(fontSize: 13, color: Colors.red[900], fontWeight: FontWeight.bold)),
+                        SizedBox(height: 8),
+                        Container(
+                          padding: EdgeInsets.all(8),
+                          decoration: BoxDecoration(
+                            color: Colors.white,
+                            borderRadius: BorderRadius.circular(4),
+                          ),
+                          child: Row(
+                            children: [
+                              Icon(Icons.check_circle, color: Colors.green[600], size: 16),
+                              SizedBox(width: 8),
+                              Expanded(
+                                child: Text(
+                                  '您的个人设置（API Key等）不会改变',
+                                  style: TextStyle(fontSize: 12, color: Colors.green[800]),
                                 ),
-                              ],
-                            ),
-                            SizedBox(height: 4),
-                            ...conflictDetails.map((detail) => Padding(
-                              padding: EdgeInsets.only(left: 24, top: 2),
-                              child: Text('• $detail', style: TextStyle(fontSize: 11, color: Colors.red[800])),
-                            )),
-                            SizedBox(height: 4),
-                            Padding(
-                              padding: EdgeInsets.only(left: 24),
-                              child: Text(
-                                '合并模式将跳过重名项，覆盖模式将删除所有现有数据',
-                                style: TextStyle(fontSize: 11, color: Colors.red[700], fontStyle: FontStyle.italic),
                               ),
-                            ),
-                          ],
+                            ],
+                          ),
                         ),
-                      ),
-                    ],
-                    
-                    SizedBox(height: 16),
-                    Text(
-                      '请选择导入模式：',
-                      style: TextStyle(fontWeight: FontWeight.bold, fontSize: 16),
+                      ],
                     ),
-                    SizedBox(height: 8),
-                    RadioListTile<String>(
-                      title: Text('覆盖模式'),
-                      subtitle: Text('删除当前所有数据，替换为备份数据（不可撤销）', style: TextStyle(fontSize: 12, color: Colors.red)),
-                      value: 'overwrite',
-                      groupValue: importMode,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          importMode = value;
-                        });
-                      },
-                    ),
-                    RadioListTile<String>(
-                      title: Text('合并模式'),
-                      subtitle: Text(
-                        potentialConflicts > 0 
-                          ? '保留当前数据，新增备份数据（将跳过${potentialConflicts}个重名项）' 
-                          : '保留当前数据，新增备份中的数据',
-                        style: TextStyle(fontSize: 12, color: Colors.green),
-                      ),
-                      value: 'merge',
-                      groupValue: importMode,
-                      onChanged: (value) {
-                        setDialogState(() {
-                          importMode = value;
-                        });
-                      },
-                    ),
-                  ],
-                ),
-              ),
-              actions: [
-                TextButton(
-                  onPressed: () => Navigator.of(context).pop(false),
-                  child: Text('取消'),
-                ),
-                ElevatedButton(
-                  onPressed: importMode == null ? null : () => Navigator.of(context).pop(true),
-                  style: ElevatedButton.styleFrom(
-                    backgroundColor: importMode == 'overwrite' ? Colors.red : Colors.green,
-                    foregroundColor: Colors.white,
                   ),
-                  child: Text(importMode == 'overwrite' ? '确认覆盖' : importMode == 'merge' ? '确认合并' : '请选择模式'),
-                ),
-              ],
+                ],
+              ),
             ),
+            actions: [
+              TextButton(
+                onPressed: () => Navigator.of(context).pop(false),
+                child: Text('取消', style: TextStyle(fontSize: 16)),
+              ),
+              ElevatedButton(
+                onPressed: () => Navigator.of(context).pop(true),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.red,
+                  foregroundColor: Colors.white,
+                  padding: EdgeInsets.symmetric(horizontal: 24, vertical: 12),
+                ),
+                child: Text('确认覆盖', style: TextStyle(fontSize: 16, fontWeight: FontWeight.bold)),
+              ),
+            ],
           ),
         );
 
-        if (confirm != true || importMode == null) return;
+        if (confirm != true) return;
 
         // 显示加载对话框
         showDialog(
@@ -615,29 +552,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
               children: [
                 CircularProgressIndicator(),
                 SizedBox(width: 20),
-                Text(importMode == 'overwrite' ? '正在覆盖数据...' : '正在合并数据...'),
+                Text('正在覆盖数据...'),
               ],
             ),
           ),
         );
 
-        // db 和 userId 已经在上面获取过了，直接使用
+        final db = await DatabaseHelper().database;
+        final userId = await DatabaseHelper().getCurrentUserId(username);
+        
+        if (userId == null) {
+          Navigator.of(context).pop(); // 关闭加载对话框
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(content: Text('用户信息错误')),
+          );
+          return;
+        }
 
         // 在事务中执行数据恢复
         await db.transaction((txn) async {
-          // 如果是覆盖模式，删除当前用户的所有数据
-          if (importMode == 'overwrite') {
-            await txn.delete('products', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('suppliers', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('customers', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('employees', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('purchases', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('sales', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('returns', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('income', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('remittance', where: 'userId = ?', whereArgs: [userId]);
-            await txn.delete('user_settings', where: 'userId = ?', whereArgs: [userId]);
-          }
+          // 删除当前用户的业务数据（不包括 user_settings）
+          await txn.delete('products', where: 'userId = ?', whereArgs: [userId]);
+          await txn.delete('suppliers', where: 'userId = ?', whereArgs: [userId]);
+          await txn.delete('customers', where: 'userId = ?', whereArgs: [userId]);
+          await txn.delete('employees', where: 'userId = ?', whereArgs: [userId]);
+          await txn.delete('purchases', where: 'userId = ?', whereArgs: [userId]);
+          await txn.delete('sales', where: 'userId = ?', whereArgs: [userId]);
+          await txn.delete('returns', where: 'userId = ?', whereArgs: [userId]);
+          await txn.delete('income', where: 'userId = ?', whereArgs: [userId]);
+          await txn.delete('remittance', where: 'userId = ?', whereArgs: [userId]);
+          // 注意：不删除 user_settings，保留用户的个人设置和隐私数据
 
           // 创建ID映射表来保持关联关系（旧ID -> 新ID）
           Map<int, int> supplierIdMap = {};
@@ -645,131 +589,70 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Map<int, int> productIdMap = {};
           Map<int, int> employeeIdMap = {};
 
-          // 恢复suppliers数据（让数据库自动生成新ID）
+          // 恢复suppliers数据
           if (data['suppliers'] != null) {
             for (var supplier in data['suppliers']) {
               final supplierData = Map<String, dynamic>.from(supplier);
               final originalId = supplierData['id'] as int;
-              supplierData.remove('id'); // 移除原始ID，让数据库自动生成新ID
+              supplierData.remove('id');
               supplierData['userId'] = userId;
-              
-              // 合并模式：检查是否已存在同名供应商
-              if (importMode == 'merge') {
-                final existing = await txn.query(
-                  'suppliers',
-                  where: 'userId = ? AND name = ?',
-                  whereArgs: [userId, supplierData['name']],
-                );
-                if (existing.isNotEmpty) {
-                  // 已存在同名供应商，使用现有ID
-                  supplierIdMap[originalId] = existing.first['id'] as int;
-                  continue; // 跳过插入
-                }
-              }
-              
-              // 插入并获取新生成的ID
               final newId = await txn.insert('suppliers', supplierData);
-              supplierIdMap[originalId] = newId; // 建立映射关系
+              supplierIdMap[originalId] = newId;
             }
           }
 
-          // 恢复customers数据（让数据库自动生成新ID）
+          // 恢复customers数据
           if (data['customers'] != null) {
             for (var customer in data['customers']) {
               final customerData = Map<String, dynamic>.from(customer);
               final originalId = customerData['id'] as int;
-              customerData.remove('id'); // 移除原始ID
+              customerData.remove('id');
               customerData['userId'] = userId;
-              
-              // 合并模式：检查是否已存在同名客户
-              if (importMode == 'merge') {
-                final existing = await txn.query(
-                  'customers',
-                  where: 'userId = ? AND name = ?',
-                  whereArgs: [userId, customerData['name']],
-                );
-                if (existing.isNotEmpty) {
-                  customerIdMap[originalId] = existing.first['id'] as int;
-                  continue;
-                }
-              }
-              
-              // 插入并获取新生成的ID
               final newId = await txn.insert('customers', customerData);
-              customerIdMap[originalId] = newId; // 建立映射关系
+              customerIdMap[originalId] = newId;
             }
           }
 
-          // 恢复employees数据（让数据库自动生成新ID）
+          // 恢复employees数据
           if (data['employees'] != null) {
             for (var employee in data['employees']) {
               final employeeData = Map<String, dynamic>.from(employee);
               final originalId = employeeData['id'] as int;
-              employeeData.remove('id'); // 移除原始ID
+              employeeData.remove('id');
               employeeData['userId'] = userId;
-              
-              // 合并模式：检查是否已存在同名员工
-              if (importMode == 'merge') {
-                final existing = await txn.query(
-                  'employees',
-                  where: 'userId = ? AND name = ?',
-                  whereArgs: [userId, employeeData['name']],
-                );
-                if (existing.isNotEmpty) {
-                  employeeIdMap[originalId] = existing.first['id'] as int;
-                  continue;
-                }
-              }
-              
-              // 插入并获取新生成的ID
               final newId = await txn.insert('employees', employeeData);
-              employeeIdMap[originalId] = newId; // 建立映射关系
+              employeeIdMap[originalId] = newId;
             }
           }
 
-          // 恢复products数据（让数据库自动生成新ID）
+          // 恢复products数据
           if (data['products'] != null) {
             for (var product in data['products']) {
               final productData = Map<String, dynamic>.from(product);
               final originalId = productData['id'] as int;
-              productData.remove('id'); // 移除原始ID
+              productData.remove('id');
               productData['userId'] = userId;
               
-              // 更新supplierId关联关系（关键修复！）
+              // 更新supplierId关联关系
               if (productData['supplierId'] != null) {
                 final originalSupplierId = productData['supplierId'] as int;
                 if (supplierIdMap.containsKey(originalSupplierId)) {
                   productData['supplierId'] = supplierIdMap[originalSupplierId];
                 } else {
-                  // 如果找不到映射关系，设为null
                   productData['supplierId'] = null;
                 }
               }
               
-              // 合并模式：检查是否已存在同名产品
-              if (importMode == 'merge') {
-                final existing = await txn.query(
-                  'products',
-                  where: 'userId = ? AND name = ?',
-                  whereArgs: [userId, productData['name']],
-                );
-                if (existing.isNotEmpty) {
-                  productIdMap[originalId] = existing.first['id'] as int;
-                  continue; // 跳过插入，保留现有产品的库存和供应商信息
-                }
-              }
-              
-              // 插入并获取新生成的ID
               final newId = await txn.insert('products', productData);
-              productIdMap[originalId] = newId; // 建立映射关系
+              productIdMap[originalId] = newId;
             }
           }
 
-          // 恢复purchases数据（使用映射后的supplierID）
+          // 恢复purchases数据
           if (data['purchases'] != null) {
             for (var purchase in data['purchases']) {
               final purchaseData = Map<String, dynamic>.from(purchase);
-              purchaseData.remove('id'); // 移除原始ID，让数据库自动生成
+              purchaseData.remove('id');
               purchaseData['userId'] = userId;
               
               // 更新supplierId关联关系
@@ -778,7 +661,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (supplierIdMap.containsKey(originalSupplierId)) {
                   purchaseData['supplierId'] = supplierIdMap[originalSupplierId];
                 } else {
-                  // 如果找不到映射关系，设为null
                   purchaseData['supplierId'] = null;
                 }
               }
@@ -787,11 +669,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
           }
 
-          // 恢复sales数据（使用映射后的customerID）
+          // 恢复sales数据
           if (data['sales'] != null) {
             for (var sale in data['sales']) {
               final saleData = Map<String, dynamic>.from(sale);
-              saleData.remove('id'); // 移除原始ID
+              saleData.remove('id');
               saleData['userId'] = userId;
               
               // 更新customerId关联关系
@@ -800,7 +682,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (customerIdMap.containsKey(originalCustomerId)) {
                   saleData['customerId'] = customerIdMap[originalCustomerId];
                 } else {
-                  // 如果找不到映射关系，设为null
                   saleData['customerId'] = null;
                 }
               }
@@ -809,11 +690,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
           }
 
-          // 恢复returns数据（使用映射后的customerID）
+          // 恢复returns数据
           if (data['returns'] != null) {
             for (var returnItem in data['returns']) {
               final returnData = Map<String, dynamic>.from(returnItem);
-              returnData.remove('id'); // 移除原始ID
+              returnData.remove('id');
               returnData['userId'] = userId;
               
               // 更新customerId关联关系
@@ -822,7 +703,6 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 if (customerIdMap.containsKey(originalCustomerId)) {
                   returnData['customerId'] = customerIdMap[originalCustomerId];
                 } else {
-                  // 如果找不到映射关系，设为null
                   returnData['customerId'] = null;
                 }
               }
@@ -831,11 +711,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
           }
 
-          // 恢复income数据（进账记录）
+          // 恢复income数据
           if (data['income'] != null) {
             for (var incomeItem in data['income']) {
               final incomeData = Map<String, dynamic>.from(incomeItem);
-              incomeData.remove('id'); // 移除原始ID
+              incomeData.remove('id');
               incomeData['userId'] = userId;
               
               // 更新customerId关联关系
@@ -862,11 +742,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
           }
 
-          // 恢复remittance数据（汇款记录）
+          // 恢复remittance数据
           if (data['remittance'] != null) {
             for (var remittanceItem in data['remittance']) {
               final remittanceData = Map<String, dynamic>.from(remittanceItem);
-              remittanceData.remove('id'); // 移除原始ID
+              remittanceData.remove('id');
               remittanceData['userId'] = userId;
               
               // 更新supplierId关联关系
@@ -893,20 +773,16 @@ class _SettingsScreenState extends State<SettingsScreen> {
             }
           }
 
-          // 恢复用户设置数据
-          if (data['userSettings'] != null && (data['userSettings'] as List).isNotEmpty) {
-            final userSettingsData = Map<String, dynamic>.from((data['userSettings'] as List).first);
-            userSettingsData['userId'] = userId;
-            userSettingsData.remove('id'); // 移除原始ID，让数据库自动生成新ID
-            await txn.insert('user_settings', userSettingsData);
-          }
+          // 用户设置（user_settings）不导入
+          // 理由：用户设置包含个人隐私数据（API Key）和个人偏好
+          //       与业务数据无关，应该保留当前设置
         });
 
         Navigator.of(context).pop(); // 关闭加载对话框
 
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
-            content: Text(importMode == 'overwrite' ? '数据覆盖成功！' : '数据合并成功！'),
+            content: Text('数据覆盖成功！'),
             backgroundColor: Colors.green,
           ),
         );
@@ -921,14 +797,36 @@ class _SettingsScreenState extends State<SettingsScreen> {
       }
 
     } catch (e) {
-      Navigator.of(context).pop(); // 关闭加载对话框
+      if (Navigator.of(context).canPop()) {
+        Navigator.of(context).pop(); // 关闭加载对话框
+      }
     ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('数据恢复失败: $e')),
     );
     }
   }
   
-  // 重置模型设置为默认值
+  // 辅助方法：构建信息行
+  Widget _buildInfoRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        children: [
+          Text('$label: ', style: TextStyle(fontSize: 12, fontWeight: FontWeight.w500)),
+          Expanded(child: Text(value, style: TextStyle(fontSize: 12))),
+        ],
+      ),
+    );
+  }
+  
+  // 辅助方法：构建数据计数行
+  Widget _buildDataCountRow(String label, int count) {
+    return Padding(
+      padding: EdgeInsets.only(left: 8, top: 2),
+      child: Text('• $label: $count 条', style: TextStyle(fontSize: 12)),
+    );
+  }
+  
   void _resetModelSettings() {
     setState(() {
       _temperature = 0.7;
@@ -970,18 +868,12 @@ class _SettingsScreenState extends State<SettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          children: [
-                            Icon(Icons.storage, color: Colors.blue),
-                            SizedBox(width: 8),
-                            Text(
-                              '数据管理',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                          ],
+                        Text(
+                          '数据管理',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Divider(),
                         ListTile(
@@ -994,8 +886,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         Divider(),
                         ListTile(
                           leading: Icon(Icons.upload, color: Colors.orange),
-                          title: Text('导入数据'),
-                          subtitle: Text('从备份文件恢复数据（支持覆盖或合并模式）'),
+                          title: Text('导入数据（覆盖）'),
+                          subtitle: Text('从备份文件恢复数据，将完全替换当前业务数据'),
                           trailing: Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: _importData,
                         ),

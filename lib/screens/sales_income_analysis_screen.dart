@@ -67,23 +67,32 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
       if (username != null) {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId != null) {
-          // 构建日期和客户筛选条件
-          String dateFilter = '';
+          // 构建客户筛选条件
           String customerFilter = '';
-          List<dynamic> params = [userId];
+          List<dynamic> baseParams = [userId];
           
+          // 日期筛选参数
+          List<dynamic> dateParams = [];
           if (_selectedDateRange != null) {
-            dateFilter = 'AND DATE(s.saleDate) >= ? AND DATE(s.saleDate) <= ?';
-            params.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
-            params.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
+            dateParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
+            dateParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
           }
           
           if (_selectedCustomer != null && _selectedCustomer != '所有客户') {
             customerFilter = 'AND c.name = ?';
-            params.add(_selectedCustomer!);
           }
 
           // 查询销售数据（按日期和客户分组）
+          String salesDateFilter = '';
+          List<dynamic> salesParams = List.from(baseParams);
+          if (_selectedDateRange != null) {
+            salesDateFilter = 'AND DATE(s.saleDate) >= ? AND DATE(s.saleDate) <= ?';
+            salesParams.addAll(dateParams);
+          }
+          if (_selectedCustomer != null && _selectedCustomer != '所有客户') {
+            salesParams.add(_selectedCustomer!);
+          }
+          
           final salesQuery = '''
             SELECT 
               DATE(s.saleDate) as date,
@@ -92,13 +101,23 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
               SUM(s.totalSalePrice) as totalSales
             FROM sales s
             LEFT JOIN customers c ON s.customerId = c.id
-            WHERE s.userId = ? $dateFilter $customerFilter
+            WHERE s.userId = ? $salesDateFilter $customerFilter
             GROUP BY DATE(s.saleDate), s.customerId
           ''';
           
-          final salesData = await db.rawQuery(salesQuery, params);
+          final salesData = await db.rawQuery(salesQuery, salesParams);
 
           // 查询退货数据（按日期和客户分组）
+          String returnsDateFilter = '';
+          List<dynamic> returnsParams = List.from(baseParams);
+          if (_selectedDateRange != null) {
+            returnsDateFilter = 'AND DATE(r.returnDate) >= ? AND DATE(r.returnDate) <= ?';
+            returnsParams.addAll(dateParams);
+          }
+          if (_selectedCustomer != null && _selectedCustomer != '所有客户') {
+            returnsParams.add(_selectedCustomer!);
+          }
+          
           final returnsQuery = '''
             SELECT 
               DATE(r.returnDate) as date,
@@ -107,13 +126,23 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
               SUM(r.totalReturnPrice) as totalReturns
             FROM returns r
             LEFT JOIN customers c ON r.customerId = c.id
-            WHERE r.userId = ? $dateFilter $customerFilter
+            WHERE r.userId = ? $returnsDateFilter $customerFilter
             GROUP BY DATE(r.returnDate), r.customerId
           ''';
           
-          final returnsData = await db.rawQuery(returnsQuery, params);
+          final returnsData = await db.rawQuery(returnsQuery, returnsParams);
 
           // 查询进账数据（按日期和客户分组）
+          String incomeDateFilter = '';
+          List<dynamic> incomeParams = List.from(baseParams);
+          if (_selectedDateRange != null) {
+            incomeDateFilter = 'AND DATE(i.incomeDate) >= ? AND DATE(i.incomeDate) <= ?';
+            incomeParams.addAll(dateParams);
+          }
+          if (_selectedCustomer != null && _selectedCustomer != '所有客户') {
+            incomeParams.add(_selectedCustomer!);
+          }
+          
           final incomeQuery = '''
             SELECT 
               DATE(i.incomeDate) as date,
@@ -123,11 +152,11 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
               SUM(i.discount) as totalDiscount
             FROM income i
             LEFT JOIN customers c ON i.customerId = c.id
-            WHERE i.userId = ? $dateFilter $customerFilter
+            WHERE i.userId = ? $incomeDateFilter $customerFilter
             GROUP BY DATE(i.incomeDate), i.customerId
           ''';
           
-          final incomeData = await db.rawQuery(incomeQuery, params);
+          final incomeData = await db.rawQuery(incomeQuery, incomeParams);
 
           // 合并数据
           Map<String, Map<String, dynamic>> combinedData = {};

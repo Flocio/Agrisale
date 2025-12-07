@@ -259,7 +259,7 @@ class DatabaseHelper {
         print('✓ 已为products表添加supplierId列，现有产品的供应商设为未分配');
       } else {
         print('✓ products表已包含supplierId列，跳过');
-      }
+    }
     }
     
     print('数据库升级完成！所有数据已保留。');

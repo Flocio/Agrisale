@@ -731,18 +731,18 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                   child: Column(
                     crossAxisAlignment: CrossAxisAlignment.start,
                     children: [
-                      Row(
-                        children: [
-                          Icon(Icons.inventory_2, color: Colors.blue, size: 16),
-                          SizedBox(width: 8),
+                Row(
+                  children: [
+                    Icon(Icons.inventory_2, color: Colors.blue, size: 16),
+                    SizedBox(width: 8),
                           Flexible(
                             child: Text(
-                              '${widget.product['name']} (${widget.product['unit']})',
-                              style: TextStyle(
-                                fontSize: 16,
-                                fontWeight: FontWeight.bold,
-                                color: Colors.blue[800],
-                              ),
+                      '${widget.product['name']} (${widget.product['unit']})',
+                      style: TextStyle(
+                        fontSize: 16,
+                        fontWeight: FontWeight.bold,
+                        color: Colors.blue[800],
+                      ),
                               overflow: TextOverflow.ellipsis,
                             ),
                           ),
@@ -766,8 +766,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                               ),
                             ),
                           ],
-                        ),
-                      ],
+                    ),
+                  ],
                     ],
                   ),
                 ),

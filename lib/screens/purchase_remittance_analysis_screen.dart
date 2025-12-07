@@ -66,23 +66,32 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
       if (username != null) {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId != null) {
-          // 构建日期和供应商筛选条件
-          String dateFilter = '';
+          // 构建供应商筛选条件
           String supplierFilter = '';
-          List<dynamic> params = [userId];
+          List<dynamic> baseParams = [userId];
           
+          // 日期筛选参数
+          List<dynamic> dateParams = [];
           if (_selectedDateRange != null) {
-            dateFilter = 'AND DATE(p.purchaseDate) >= ? AND DATE(p.purchaseDate) <= ?';
-            params.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
-            params.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
+            dateParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
+            dateParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
           }
           
           if (_selectedSupplier != null && _selectedSupplier != '所有供应商') {
             supplierFilter = 'AND s.name = ?';
-            params.add(_selectedSupplier!);
           }
 
           // 查询采购数据（按日期和供应商分组）
+          String purchaseDateFilter = '';
+          List<dynamic> purchaseParams = List.from(baseParams);
+          if (_selectedDateRange != null) {
+            purchaseDateFilter = 'AND DATE(p.purchaseDate) >= ? AND DATE(p.purchaseDate) <= ?';
+            purchaseParams.addAll(dateParams);
+          }
+          if (_selectedSupplier != null && _selectedSupplier != '所有供应商') {
+            purchaseParams.add(_selectedSupplier!);
+          }
+          
           final purchasesQuery = '''
             SELECT 
               DATE(p.purchaseDate) as date,
@@ -91,13 +100,23 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
               SUM(p.totalPurchasePrice) as totalPurchases
             FROM purchases p
             LEFT JOIN suppliers s ON p.supplierId = s.id
-            WHERE p.userId = ? $dateFilter $supplierFilter
+            WHERE p.userId = ? $purchaseDateFilter $supplierFilter
             GROUP BY DATE(p.purchaseDate), p.supplierId
           ''';
           
-          final purchasesData = await db.rawQuery(purchasesQuery, params);
+          final purchasesData = await db.rawQuery(purchasesQuery, purchaseParams);
 
           // 查询汇款数据（按日期和供应商分组）
+          String remittanceDateFilter = '';
+          List<dynamic> remittanceParams = List.from(baseParams);
+          if (_selectedDateRange != null) {
+            remittanceDateFilter = 'AND DATE(r.remittanceDate) >= ? AND DATE(r.remittanceDate) <= ?';
+            remittanceParams.addAll(dateParams);
+          }
+          if (_selectedSupplier != null && _selectedSupplier != '所有供应商') {
+            remittanceParams.add(_selectedSupplier!);
+          }
+          
           final remittanceQuery = '''
             SELECT 
               DATE(r.remittanceDate) as date,
@@ -106,11 +125,11 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
               SUM(r.amount) as totalRemittances
             FROM remittance r
             LEFT JOIN suppliers s ON r.supplierId = s.id
-            WHERE r.userId = ? $dateFilter $supplierFilter
+            WHERE r.userId = ? $remittanceDateFilter $supplierFilter
             GROUP BY DATE(r.remittanceDate), r.supplierId
           ''';
           
-          final remittanceData = await db.rawQuery(remittanceQuery, params);
+          final remittanceData = await db.rawQuery(remittanceQuery, remittanceParams);
 
           // 合并数据
           Map<String, Map<String, dynamic>> combinedData = {};
