@@ -196,20 +196,73 @@ class DatabaseHelper {
   }
 
   Future _onUpgrade(Database db, int oldVersion, int newVersion) async {
-    if (oldVersion < newVersion) {
-      await db.execute('DROP TABLE IF EXISTS users');
-      await db.execute('DROP TABLE IF EXISTS products');
-      await db.execute('DROP TABLE IF EXISTS suppliers');
-      await db.execute('DROP TABLE IF EXISTS customers');
-      await db.execute('DROP TABLE IF EXISTS employees');
-      await db.execute('DROP TABLE IF EXISTS income');
-      await db.execute('DROP TABLE IF EXISTS remittance');
-      await db.execute('DROP TABLE IF EXISTS purchases');
-      await db.execute('DROP TABLE IF EXISTS sales');
-      await db.execute('DROP TABLE IF EXISTS returns');
-      await db.execute('DROP TABLE IF EXISTS user_settings');
-      await _onCreate(db, newVersion);
+    print('数据库升级: 从版本 $oldVersion 到版本 $newVersion');
+    
+    // 渐进式升级，根据旧版本逐步升级
+    if (oldVersion < 5) {
+      // 从版本1-4升级到5：添加employees, income, remittance表
+      print('升级到版本5: 添加employees, income, remittance表');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS employees (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          note TEXT,
+          FOREIGN KEY (userId) REFERENCES users (id),
+          UNIQUE(userId, name)
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS income (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          incomeDate TEXT NOT NULL,
+          customerId INTEGER,
+          amount REAL NOT NULL,
+          discount REAL DEFAULT 0,
+          employeeId INTEGER,
+          paymentMethod TEXT NOT NULL CHECK(paymentMethod IN ('现金', '微信转账', '银行卡')),
+          note TEXT,
+          FOREIGN KEY (userId) REFERENCES users (id),
+          FOREIGN KEY (customerId) REFERENCES customers (id),
+          FOREIGN KEY (employeeId) REFERENCES employees (id)
+        )
+      ''');
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS remittance (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          remittanceDate TEXT NOT NULL,
+          supplierId INTEGER,
+          amount REAL NOT NULL,
+          employeeId INTEGER,
+          paymentMethod TEXT NOT NULL CHECK(paymentMethod IN ('现金', '微信转账', '银行卡')),
+          note TEXT,
+          FOREIGN KEY (userId) REFERENCES users (id),
+          FOREIGN KEY (supplierId) REFERENCES suppliers (id),
+          FOREIGN KEY (employeeId) REFERENCES employees (id)
+        )
+      ''');
     }
+    
+    if (oldVersion < 11) {
+      // 从版本10或更早升级到11：为products表添加supplierId字段
+      print('升级到版本11: 为products表添加supplierId字段');
+      
+      // 检查products表是否已存在supplierId列
+      final tableInfo = await db.rawQuery('PRAGMA table_info(products)');
+      final hasSupplierIdColumn = tableInfo.any((column) => column['name'] == 'supplierId');
+      
+      if (!hasSupplierIdColumn) {
+        // 添加supplierId列，默认值为NULL（未分配供应商）
+        await db.execute('ALTER TABLE products ADD COLUMN supplierId INTEGER');
+        print('✓ 已为products表添加supplierId列，现有产品的供应商设为未分配');
+      } else {
+        print('✓ products表已包含supplierId列，跳过');
+      }
+    }
+    
+    print('数据库升级完成！所有数据已保留。');
   }
 
   // 获取当前用户ID的辅助方法
