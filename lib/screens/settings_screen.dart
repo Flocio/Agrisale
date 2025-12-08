@@ -243,7 +243,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'exportInfo': {
           'username': username,
           'exportTime': DateTime.now().toIso8601String(),
-          'version': '2.2.0', // 更新版本号 - 添加自动备份功能
+          'version': '2.3.0', // 更新版本号
         },
         'data': {
           'products': products,
@@ -287,7 +287,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
               content: Text('数据导出成功: $selectedPath'),
               duration: Duration(seconds: 3),
             ),
-          );
+    );
         } else {
           Navigator.of(context).pop(); // 关闭加载对话框
           ScaffoldMessenger.of(context).showSnackBar(
@@ -1251,13 +1251,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ListTile(
                           leading: Icon(Icons.info_outline, color: Colors.blue),
                           title: Text('系统信息'),
-                          subtitle: Text('农资管理系统 v2.2.0'),
+                          subtitle: Text('农资管理系统 v2.3.0'),
                           trailing: Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () {
                             showAboutDialog(
                               context: context,
                               applicationName: '农资管理系统',
-                              applicationVersion: 'v2.2.0',
+                              applicationVersion: 'v2.3.0',
                               applicationIcon: Image.asset(
                                 'assets/images/background.png',
                                 width: 50,

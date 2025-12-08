@@ -2,6 +2,7 @@ import 'dart:convert';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 导入剪贴板功能
 import 'package:http/http.dart' as http;
+import 'package:flutter_markdown/flutter_markdown.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
@@ -20,7 +21,118 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
   @override
   void initState() {
     super.initState();
+    _loadChatHistory();
+  }
+  
+  // 加载对话历史
+  Future<void> _loadChatHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('current_username');
+      
+      if (username == null) {
+        _addSystemMessage("欢迎使用数据分析助手！您可以询问关于系统中的产品、销售、采购、库存等数据的问题。");
+        return;
+      }
+      
+      final chatHistoryKey = 'chat_history_$username';
+      final chatHistoryJson = prefs.getString(chatHistoryKey);
+      
+      if (chatHistoryJson != null && chatHistoryJson.isNotEmpty) {
+        final List<dynamic> historyList = jsonDecode(chatHistoryJson);
+        setState(() {
+          _chatHistory = historyList.map((item) => Map<String, dynamic>.from(item)).toList();
+        });
+        
+        // 滚动到底部
+        Future.delayed(Duration(milliseconds: 300), () {
+          if (_scrollController.hasClients) {
+            _scrollController.jumpTo(_scrollController.position.maxScrollExtent);
+          }
+        });
+      } else {
+        // 如果没有历史记录，添加欢迎消息
+        _addSystemMessage("欢迎使用数据分析助手！您可以询问关于系统中的产品、销售、采购、库存等数据的问题。");
+      }
+    } catch (e) {
+      print('加载对话历史失败: $e');
     _addSystemMessage("欢迎使用数据分析助手！您可以询问关于系统中的产品、销售、采购、库存等数据的问题。");
+    }
+  }
+  
+  // 保存对话历史
+  Future<void> _saveChatHistory() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('current_username');
+      
+      if (username == null) return;
+      
+      final chatHistoryKey = 'chat_history_$username';
+      final chatHistoryJson = jsonEncode(_chatHistory);
+      await prefs.setString(chatHistoryKey, chatHistoryJson);
+    } catch (e) {
+      print('保存对话历史失败: $e');
+    }
+  }
+  
+  // 清空对话历史
+  Future<void> _clearChatHistory() async {
+    final confirmed = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('确认清空'),
+        content: Text('确定要清空所有对话记录吗？此操作不可恢复。'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('取消'),
+          ),
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            child: Text('确认', style: TextStyle(color: Colors.red)),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirmed == true) {
+      try {
+        final prefs = await SharedPreferences.getInstance();
+        final username = prefs.getString('current_username');
+        
+        if (username != null) {
+          final chatHistoryKey = 'chat_history_$username';
+          await prefs.remove(chatHistoryKey);
+        }
+        
+        setState(() {
+          _chatHistory = [];
+        });
+        
+        _addSystemMessage("欢迎使用数据分析助手！您可以询问关于系统中的产品、销售、采购、库存等数据的问题。");
+        
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('对话记录已清空'),
+              duration: Duration(seconds: 2),
+              backgroundColor: Colors.green,
+            ),
+          );
+        }
+      } catch (e) {
+        if (mounted) {
+          ScaffoldMessenger.of(context).showSnackBar(
+            SnackBar(
+              content: Text('清空失败: $e'),
+              duration: Duration(seconds: 2),
+              backgroundColor: Colors.red,
+            ),
+          );
+        }
+      }
+    }
   }
 
   void _addSystemMessage(String message) {
@@ -39,6 +151,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         'content': message,
       });
     });
+    _saveChatHistory(); // 自动保存
   }
 
   void _addAssistantMessage(String message) {
@@ -49,6 +162,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
       });
       _isLoading = false;
     });
+    _saveChatHistory(); // 自动保存
     
     // 滚动到底部
     Future.delayed(Duration(milliseconds: 100), () {
@@ -65,6 +179,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
   // 复制文本到剪贴板
   Future<void> _copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
+    if (mounted) {
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('文本已复制到剪贴板'),
@@ -72,6 +187,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         backgroundColor: Colors.green,
       ),
     );
+    }
   }
 
   Future<Map<String, dynamic>> _fetchSystemData() async {
@@ -334,11 +450,11 @@ $systemDataJson
       if (e.toString().contains('Connection failed') || 
           e.toString().contains('SocketException') ||
           e.toString().contains('Network is unreachable')) {
-        errorMessage += '网络连接失败，请检查：\n' +
-                       '1. 网络连接是否正常\n' +
-                       '2. 是否使用了代理服务器\n' +
-                       '3. API密钥是否正确\n' +
-                       '4. 防火墙是否阻止了连接\n\n' +
+        errorMessage += '网络连接失败，请检查：\n'
+                       '1. 网络连接是否正常\n'
+                       '2. 是否使用了代理服务器\n'
+                       '3. API密钥是否正确\n'
+                       '4. 防火墙是否阻止了连接\n\n'
                        '详细错误: $e';
       } else if (e.toString().contains('TimeoutException')) {
         errorMessage += '请求超时，请稍后重试。\n详细错误: $e';
@@ -366,6 +482,13 @@ $systemDataJson
             color: Colors.white,
           ),
         ),
+        actions: [
+          IconButton(
+            icon: Icon(Icons.delete_outline),
+            tooltip: '清空对话',
+            onPressed: _clearChatHistory,
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -379,6 +502,8 @@ $systemDataJson
                 itemBuilder: (context, index) {
                   final message = _chatHistory[index];
                   final isUser = message['role'] == 'user';
+                  final isSystem = message['role'] == 'system';
+                  final isAssistant = message['role'] == 'assistant';
                   
                   return Align(
                     alignment: isUser ? Alignment.centerRight : Alignment.centerLeft,
@@ -393,7 +518,11 @@ $systemDataJson
                           maxWidth: MediaQuery.of(context).size.width * 0.75,
                         ),
                         decoration: BoxDecoration(
-                          color: isUser ? Colors.green[100] : Colors.white,
+                          color: isUser 
+                              ? Colors.green[100] 
+                              : isSystem 
+                                  ? Colors.blue[50] 
+                                  : Colors.white,
                           borderRadius: BorderRadius.circular(12),
                           boxShadow: [
                             BoxShadow(
@@ -405,11 +534,65 @@ $systemDataJson
                         ),
                         child: Stack(
                           children: [
-                            SelectableText(  // 使用SelectableText代替Text，允许选择文本
+                            // 对 assistant 消息使用 Markdown 渲染，其他使用普通文本
+                            isAssistant
+                                ? MarkdownBody(
+                                    data: message['content'],
+                                    styleSheet: MarkdownStyleSheet(
+                                      p: TextStyle(
+                                        fontSize: 16,
+                                        color: Colors.black87,
+                                        height: 1.5,
+                                      ),
+                                      h1: TextStyle(
+                                        fontSize: 24,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      h2: TextStyle(
+                                        fontSize: 20,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      h3: TextStyle(
+                                        fontSize: 18,
+                                        fontWeight: FontWeight.bold,
+                                        color: Colors.black87,
+                                      ),
+                                      code: TextStyle(
+                                        fontSize: 14,
+                                        fontFamily: 'monospace',
+                                        backgroundColor: Colors.grey[200],
+                                      ),
+                                      codeblockDecoration: BoxDecoration(
+                                        color: Colors.grey[200],
+                                        borderRadius: BorderRadius.circular(4),
+                                      ),
+                                      listBullet: TextStyle(
+                                        color: Colors.black87,
+                                      ),
+                                      strong: TextStyle(
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                      em: TextStyle(
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                      blockquote: TextStyle(
+                                        color: Colors.grey[700],
+                                        fontStyle: FontStyle.italic,
+                                      ),
+                                    ),
+                                    selectable: true,
+                                  )
+                                : SelectableText(
                               message['content'],
                               style: TextStyle(
                                 fontSize: 16,
-                                color: isUser ? Colors.green[900] : Colors.black87,
+                                      color: isUser 
+                                          ? Colors.green[900] 
+                                          : isSystem 
+                                              ? Colors.blue[900] 
+                                              : Colors.black87,
                               ),
                             ),
                             Positioned(
@@ -493,9 +676,9 @@ $systemDataJson
                 SizedBox(width: 8),
                 FloatingActionButton(
                   onPressed: _sendQuestion,
-                  child: Icon(Icons.send),
                   mini: true,
                   backgroundColor: Colors.green,
+                  child: Icon(Icons.send),
                 ),
               ],
             ),

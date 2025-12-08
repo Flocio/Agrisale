@@ -1,6 +1,8 @@
 // lib/screens/main_screen.dart
 
 import 'package:flutter/material.dart';
+import '../services/update_service.dart';
+import 'update_dialog.dart';
 
 class MainScreen extends StatefulWidget {
   @override
@@ -57,10 +59,65 @@ class _MainScreenState extends State<MainScreen> {
       'items': [
         {'name': '数据备份', 'icon': Icons.backup, 'route': '/auto_backup'},
         {'name': '数据分析助手', 'icon': Icons.analytics, 'route': '/data_assistant'},
+        {'name': '检查更新', 'icon': Icons.system_update, 'route': null, 'action': 'check_update'},
         {'name': '设置', 'icon': Icons.settings, 'route': '/settings'},
       ]
     },
   ];
+
+  // 检查更新
+  Future<void> _checkForUpdate() async {
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('正在检查更新...'),
+          ],
+        ),
+      ),
+    );
+    
+    try {
+      final updateInfo = await UpdateService.checkForUpdate();
+      
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+      
+      if (updateInfo != null) {
+        // 有新版本，显示更新对话框
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => UpdateDialog(updateInfo: updateInfo),
+        );
+      } else {
+        // 已是最新版本
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('当前已是最新版本'),
+            backgroundColor: Colors.green,
+            duration: Duration(seconds: 2),
+          ),
+        );
+      }
+    } catch (e) {
+      // 关闭加载对话框
+      Navigator.of(context).pop();
+      
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('检查更新失败: $e'),
+          backgroundColor: Colors.red,
+          duration: Duration(seconds: 3),
+        ),
+      );
+    }
+  }
 
   // 构建功能页面
   Widget _buildPage(List<Map<String, dynamic>> menuItems) {
@@ -104,7 +161,11 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     trailing: Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () {
+                      if (item['action'] == 'check_update') {
+                        _checkForUpdate();
+                      } else if (item['route'] != null) {
                       Navigator.pushNamed(context, item['route']);
+                      }
                     },
                   );
                 },

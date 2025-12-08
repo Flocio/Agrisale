@@ -118,7 +118,7 @@ class AutoBackupService {
           'type': 'auto_backup',
           'username': username,
           'backupTime': DateTime.now().toIso8601String(),
-          'version': '2.2.0',
+          'version': '2.3.0',
         },
         'data': {
           'products': products,

@@ -51,7 +51,7 @@ class _LoginScreenState extends State<LoginScreen> {
       }
     } else {
       // 没有保存的登录状态，加载上次登录的用户名
-      _loadLastUsername();
+    _loadLastUsername();
     }
   }
 
