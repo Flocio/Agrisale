@@ -188,6 +188,10 @@ class DatabaseHelper {
       deepseek_temperature REAL DEFAULT 0.7,
       deepseek_max_tokens INTEGER DEFAULT 2000,
       dark_mode INTEGER DEFAULT 0,
+      auto_backup_enabled INTEGER DEFAULT 0,
+      auto_backup_interval INTEGER DEFAULT 15,
+      auto_backup_max_count INTEGER DEFAULT 20,
+      last_backup_time TEXT,
       FOREIGN KEY (userId) REFERENCES users (id)
     )
   ''');
@@ -262,23 +266,36 @@ class DatabaseHelper {
       }
     }
     
-    if (oldVersion < 12) {
-      // 从版本11或更早升级到12：为user_settings表添加自动备份字段
-      print('升级到版本12: 为user_settings表添加自动备份字段');
-      
-      // 检查user_settings表是否已存在自动备份相关列
-      final tableInfo = await db.rawQuery('PRAGMA table_info(user_settings)');
-      final hasAutoBackupEnabled = tableInfo.any((column) => column['name'] == 'auto_backup_enabled');
-      
-      if (!hasAutoBackupEnabled) {
-        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_enabled INTEGER DEFAULT 0');
-        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_interval INTEGER DEFAULT 15');
-        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_max_count INTEGER DEFAULT 20');
-        await db.execute('ALTER TABLE user_settings ADD COLUMN last_backup_time TEXT');
-        print('✓ 已为user_settings表添加自动备份字段');
-      } else {
-        print('✓ user_settings表已包含自动备份字段，跳过');
+    // 无论版本如何，都检查并添加缺失的自动备份字段（修复可能的不完整升级）
+    // 这样可以确保即使升级过程中出现问题，也能修复
+    final tableInfo = await db.rawQuery('PRAGMA table_info(user_settings)');
+    final columnNames = tableInfo.map((col) => col['name'] as String).toList();
+    
+    bool hasChanges = false;
+    
+    if (!columnNames.contains('auto_backup_enabled')) {
+      await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_enabled INTEGER DEFAULT 0');
+      print('✓ 已添加 auto_backup_enabled 列');
+      hasChanges = true;
     }
+    if (!columnNames.contains('auto_backup_interval')) {
+      await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_interval INTEGER DEFAULT 15');
+      print('✓ 已添加 auto_backup_interval 列');
+      hasChanges = true;
+    }
+    if (!columnNames.contains('auto_backup_max_count')) {
+      await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_max_count INTEGER DEFAULT 20');
+      print('✓ 已添加 auto_backup_max_count 列');
+      hasChanges = true;
+    }
+    if (!columnNames.contains('last_backup_time')) {
+      await db.execute('ALTER TABLE user_settings ADD COLUMN last_backup_time TEXT');
+      print('✓ 已添加 last_backup_time 列');
+      hasChanges = true;
+    }
+    
+    if (!hasChanges && oldVersion < 12) {
+      print('✓ user_settings表已包含所有自动备份字段');
     }
     
     print('数据库升级完成！所有数据已保留。');
