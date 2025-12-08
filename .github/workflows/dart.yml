@@ -72,53 +72,55 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Fix install_plugin namespace
+      - name: Fix install_plugin namespace and AndroidManifest
         run: |
-          FILE="$HOME/.pub-cache/hosted/pub.dev/install_plugin-2.1.0/android/build.gradle"
-          if [ -f "$FILE" ]; then
-            echo "找到 install_plugin build.gradle 文件"
-            # 检查是否已有 namespace
-            if ! grep -q "namespace" "$FILE"; then
-              echo "未找到 namespace，开始添加..."
-              # 使用 Python 来修改文件，更可靠
-              python3 << 'PYEOF'
+          python3 << 'PYEOF'
           import re
           import os
           
           home = os.environ.get('HOME', os.path.expanduser('~'))
-          file_path = os.path.join(home, '.pub-cache', 'hosted', 'pub.dev', 'install_plugin-2.1.0', 'android', 'build.gradle')
           
-          try:
-              with open(file_path, 'r', encoding='utf-8') as f:
+          # 修复 build.gradle - 添加 namespace
+          build_gradle_path = os.path.join(home, '.pub-cache', 'hosted', 'pub.dev', 'install_plugin-2.1.0', 'android', 'build.gradle')
+          if os.path.isfile(build_gradle_path):
+              print(f'找到 build.gradle: {build_gradle_path}')
+              with open(build_gradle_path, 'r', encoding='utf-8') as f:
                   content = f.read()
               
-              # 检查是否已有 namespace
               if 'namespace' not in content:
-                  # 在 android { 后面添加 namespace（处理可能的空格）
                   pattern = r'(android\s*\{)'
                   replacement = r'\1\n    namespace "com.crazecoder.openfile"'
-                  new_content = re.sub(pattern, replacement, content, count=1)
+                  content = re.sub(pattern, replacement, content, count=1)
                   
-                  with open(file_path, 'w', encoding='utf-8') as f:
-                      f.write(new_content)
-                  print('✓ 已添加 namespace 到 install_plugin')
+                  with open(build_gradle_path, 'w', encoding='utf-8') as f:
+                      f.write(content)
+                  print('✓ 已添加 namespace 到 build.gradle')
               else:
-                  print('✓ install_plugin 已包含 namespace')
-          except Exception as e:
-              print(f'错误: {e}')
-              import traceback
-              traceback.print_exc()
-              exit(1)
+                  print('✓ build.gradle 已包含 namespace')
+          else:
+              print(f'警告: 未找到 build.gradle: {build_gradle_path}')
+          
+          # 修复 AndroidManifest.xml - 移除 package 属性
+          manifest_path = os.path.join(home, '.pub-cache', 'hosted', 'pub.dev', 'install_plugin-2.1.0', 'android', 'src', 'main', 'AndroidManifest.xml')
+          if os.path.isfile(manifest_path):
+              print(f'找到 AndroidManifest.xml: {manifest_path}')
+              with open(manifest_path, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              
+              # 移除 package 属性
+              if 'package=' in content:
+                  # 匹配 package="..." 或 package='...'
+                  pattern = r'\s*package\s*=\s*["\'][^"\']*["\']'
+                  new_content = re.sub(pattern, '', content)
+                  
+                  with open(manifest_path, 'w', encoding='utf-8') as f:
+                      f.write(new_content)
+                  print('✓ 已移除 AndroidManifest.xml 中的 package 属性')
+              else:
+                  print('✓ AndroidManifest.xml 中已无 package 属性')
+          else:
+              print(f'警告: 未找到 AndroidManifest.xml: {manifest_path}')
           PYEOF
-            else
-              echo "install_plugin 已包含 namespace"
-            fi
-          else
-            echo "警告: 未找到 install_plugin 的 build.gradle 文件"
-            echo "文件路径: $FILE"
-            echo "尝试查找文件..."
-            find "$HOME/.pub-cache" -name "build.gradle" -path "*/install_plugin*" 2>/dev/null | head -5 || true
-          fi
 
       - name: Build Android APK
         run: flutter build apk --release
