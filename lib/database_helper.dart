@@ -44,7 +44,7 @@ class DatabaseHelper {
     
     return await openDatabase(
       path,
-      version: 11, // 更新版本号 - 在products表添加supplierId字段
+      version: 12, // 更新版本号 - 添加自动备份功能字段
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -259,6 +259,25 @@ class DatabaseHelper {
         print('✓ 已为products表添加supplierId列，现有产品的供应商设为未分配');
       } else {
         print('✓ products表已包含supplierId列，跳过');
+      }
+    }
+    
+    if (oldVersion < 12) {
+      // 从版本11或更早升级到12：为user_settings表添加自动备份字段
+      print('升级到版本12: 为user_settings表添加自动备份字段');
+      
+      // 检查user_settings表是否已存在自动备份相关列
+      final tableInfo = await db.rawQuery('PRAGMA table_info(user_settings)');
+      final hasAutoBackupEnabled = tableInfo.any((column) => column['name'] == 'auto_backup_enabled');
+      
+      if (!hasAutoBackupEnabled) {
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_enabled INTEGER DEFAULT 0');
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_interval INTEGER DEFAULT 15');
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_max_count INTEGER DEFAULT 20');
+        await db.execute('ALTER TABLE user_settings ADD COLUMN last_backup_time TEXT');
+        print('✓ 已为user_settings表添加自动备份字段');
+      } else {
+        print('✓ user_settings表已包含自动备份字段，跳过');
     }
     }
     

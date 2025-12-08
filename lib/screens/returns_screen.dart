@@ -791,14 +791,14 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                                             Padding(
                                               padding: const EdgeInsets.only(left: 8),
                                               child: IconButton(
-                                                icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
-                                                tooltip: '编辑备注',
+                                            icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
+                                            tooltip: '编辑备注',
                         onPressed: () => _showNoteDialog(returnItem),
-                                                padding: EdgeInsets.zero,
-                                                constraints: BoxConstraints(),
-                                                iconSize: 18,
+                                            padding: EdgeInsets.zero,
+                                            constraints: BoxConstraints(),
+                                            iconSize: 18,
                                               ),
-                                            ),
+                      ),
                       if (_showDeleteButtons)
                                             Padding(
                                               padding: const EdgeInsets.only(left: 8),

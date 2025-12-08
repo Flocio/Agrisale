@@ -9,6 +9,7 @@ import 'dart:convert';
 import 'dart:io';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../services/auto_backup_service.dart';
 
 class SettingsScreen extends StatefulWidget {
   @override
@@ -235,14 +236,14 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final returns = await db.query('returns', where: 'userId = ?', whereArgs: [userId]);
       final income = await db.query('income', where: 'userId = ?', whereArgs: [userId]);
       final remittance = await db.query('remittance', where: 'userId = ?', whereArgs: [userId]);
-      final userSettings = await db.query('user_settings', where: 'userId = ?', whereArgs: [userId]);
+      // 不导出 user_settings（包含个人隐私数据如 API Key）
       
       // 构建导出数据
       final exportData = {
         'exportInfo': {
           'username': username,
           'exportTime': DateTime.now().toIso8601String(),
-          'version': '2.1.0', // 更新版本号 - 支持合并模式和冲突检测
+          'version': '2.2.0', // 更新版本号 - 添加自动备份功能
         },
         'data': {
           'products': products,
@@ -254,7 +255,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           'returns': returns,
           'income': income,
           'remittance': remittance,
-          'userSettings': userSettings,
+          // 用户设置（user_settings）不导出
+          // 理由：包含个人隐私数据（API Key）和个人偏好，与业务数据无关
         }
       };
 
@@ -290,8 +292,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
           Navigator.of(context).pop(); // 关闭加载对话框
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('已取消导出')),
-          );
-        }
+    );
+  }
         return;
       }
 
@@ -827,6 +829,43 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
   }
   
+  // 退出登录
+  Future<void> _logout() async {
+    final confirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Text('确认退出'),
+        content: Text('确定要退出登录吗？'),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('取消'),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+            ),
+            child: Text('退出'),
+          ),
+        ],
+      ),
+    );
+    
+    if (confirm == true) {
+      // 停止自动备份服务
+      await AutoBackupService().stopAutoBackup();
+      
+      // 清除当前用户名（保留 last_username 用于下次登录）
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('current_username');
+      
+      // 跳转到登录界面
+      Navigator.of(context).pushReplacementNamed('/');
+    }
+  }
+  
   void _resetModelSettings() {
     setState(() {
       _temperature = 0.7;
@@ -1212,13 +1251,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ListTile(
                           leading: Icon(Icons.info_outline, color: Colors.blue),
                           title: Text('系统信息'),
-                          subtitle: Text('农资管理系统 v2.1.0'),
+                          subtitle: Text('农资管理系统 v2.2.0'),
                           trailing: Icon(Icons.arrow_forward_ios, size: 16),
                           onTap: () {
                             showAboutDialog(
                               context: context,
                               applicationName: '农资管理系统',
-                              applicationVersion: 'v2.1.0',
+                              applicationVersion: 'v2.2.0',
                               applicationIcon: Image.asset(
                                 'assets/images/background.png',
                                 width: 50,
@@ -1234,9 +1273,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
                 ),
                 SizedBox(height: 16),
                 ElevatedButton(
-                  onPressed: () {
-                    Navigator.of(context).pushReplacementNamed('/');
-                  },
+                  onPressed: _logout,
                   child: Text('退出登录'),
                   style: ElevatedButton.styleFrom(
                     backgroundColor: Colors.red[100],

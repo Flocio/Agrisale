@@ -798,12 +798,12 @@ class _SalesScreenState extends State<SalesScreen> {
                                             Padding(
                                               padding: const EdgeInsets.only(left: 8),
                                               child: IconButton(
-                                                icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
-                                                tooltip: '编辑备注',
-                                                onPressed: () => _showNoteDialog(sale),
-                                                padding: EdgeInsets.zero,
-                                                constraints: BoxConstraints(),
-                                                iconSize: 18,
+                                              icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
+                                              tooltip: '编辑备注',
+                                              onPressed: () => _showNoteDialog(sale),
+                                              padding: EdgeInsets.zero,
+                                              constraints: BoxConstraints(),
+                                              iconSize: 18,
                                               ),
                                             ),
                                             if (_showDeleteButtons)
@@ -1126,7 +1126,7 @@ class _SalesDialogState extends State<SalesDialog> {
 
   void _updateAvailableStock() {
     if (_selectedProduct != null) {
-      final product = widget.products.firstWhere((p) => p['name'] == _selectedProduct);
+    final product = widget.products.firstWhere((p) => p['name'] == _selectedProduct);
       setState(() {
         // 如果是编辑模式，需要加上原来销售的数量（因为这部分可以"释放"出来）
         if (_isEditMode && widget.existingSale != null) {
@@ -1137,7 +1137,7 @@ class _SalesDialogState extends State<SalesDialog> {
             _availableStock = product['stock'] + oldQuantity;
           } else {
             // 如果改变了产品，只显示新产品的库存
-            _availableStock = product['stock'];
+        _availableStock = product['stock'];
           }
         } else {
           // 添加模式，直接显示库存

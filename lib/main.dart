@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:flutter/material.dart';
 import 'package:sqflite_common_ffi/sqflite_ffi.dart';
 import 'package:google_fonts/google_fonts.dart';
+import 'package:flutter_localizations/flutter_localizations.dart';
 import 'screens/login_screen.dart';
 import 'screens/main_screen.dart';
 import 'screens/product_screen.dart';
@@ -25,6 +26,8 @@ import 'screens/sales_income_analysis_screen.dart';
 import 'screens/purchase_remittance_analysis_screen.dart';
 import 'screens/settings_screen.dart';
 import 'screens/data_assistant_screen.dart';
+import 'screens/auto_backup_screen.dart';
+import 'screens/auto_backup_list_screen.dart';
 
 void main() {
   // 为桌面平台初始化SQLite
@@ -43,6 +46,16 @@ class MyApp extends StatelessWidget {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: '农资管理系统',
+      // 配置中文本地化
+      localizationsDelegates: [
+        GlobalMaterialLocalizations.delegate,
+        GlobalWidgetsLocalizations.delegate,
+        GlobalCupertinoLocalizations.delegate,
+      ],
+      supportedLocales: [
+        const Locale('zh', 'CN'), // 简体中文
+      ],
+      locale: const Locale('zh', 'CN'), // 设置默认语言为中文
       theme: ThemeData(
         primarySwatch: Colors.green, // 使用绿色作为主色调，与农资主题相符
         colorScheme: ColorScheme.fromSwatch(
@@ -110,6 +123,8 @@ class MyApp extends StatelessWidget {
         '/employees': (context) => EmployeeScreen(),
         '/settings': (context) => SettingsScreen(),
         '/data_assistant': (context) => DataAssistantScreen(),
+        '/auto_backup': (context) => AutoBackupScreen(),
+        '/auto_backup_list': (context) => AutoBackupListScreen(),
       },
     );
   }

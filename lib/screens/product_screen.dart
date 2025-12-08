@@ -74,7 +74,7 @@ class _ProductScreenState extends State<ProductScreen> {
         } else {
           result = result.where((product) => 
             product['supplierId'] == selectedSupplierId).toList();
-        }
+      }
       }
       
       _isSearching = hasFilters;
@@ -325,11 +325,11 @@ class _ProductScreenState extends State<ProductScreen> {
                             ],
                           ),
                         ),
-                      ),
                     ),
-                  ],
-                ),
+                  ),
+                ],
               ),
+            ),
             Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           Expanded(
               child: _filteredProducts.isEmpty
@@ -412,10 +412,10 @@ class _ProductScreenState extends State<ProductScreen> {
                                             children: [
                                               Text(
                                                 '库存: ${_formatNumber(product['stock'])} ${product['unit']}',
-                                                style: TextStyle(
-                                                  fontSize: 14,
-                                                  color: Colors.grey[700],
-                                                ),
+                                            style: TextStyle(
+                                              fontSize: 14,
+                                              color: Colors.grey[700],
+                                            ),
                                               ),
                                               // 显示供应商信息
                                               if (product['supplierId'] != null && product['supplierId'] != 0) ...[

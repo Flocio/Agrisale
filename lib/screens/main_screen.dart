@@ -55,6 +55,7 @@ class _MainScreenState extends State<MainScreen> {
     {
       'title': '系统工具',
       'items': [
+        {'name': '数据备份', 'icon': Icons.backup, 'route': '/auto_backup'},
         {'name': '数据分析助手', 'icon': Icons.analytics, 'route': '/data_assistant'},
         {'name': '设置', 'icon': Icons.settings, 'route': '/settings'},
       ]

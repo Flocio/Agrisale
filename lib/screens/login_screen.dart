@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/auto_backup_service.dart';
 
 class LoginScreen extends StatefulWidget {
   @override
@@ -22,7 +23,36 @@ class _LoginScreenState extends State<LoginScreen> {
   @override
   void initState() {
     super.initState();
-    _loadLastUsername();
+    _checkLoginStatus(); // 检查是否已登录
+  }
+  
+  // 检查登录状态，如果已登录则自动跳转
+  Future<void> _checkLoginStatus() async {
+    final prefs = await SharedPreferences.getInstance();
+    final currentUsername = prefs.getString('current_username');
+    
+    if (currentUsername != null && currentUsername.isNotEmpty) {
+      // 验证用户是否存在
+      final db = await DatabaseHelper().database;
+      final result = await db.query(
+        'users',
+        where: 'username = ?',
+        whereArgs: [currentUsername],
+      );
+      
+      if (result.isNotEmpty) {
+        // 用户存在，自动登录
+        // 启动自动备份服务
+        await _startAutoBackupService(currentUsername);
+        
+        WidgetsBinding.instance.addPostFrameCallback((_) {
+          Navigator.pushReplacementNamed(context, '/main');
+        });
+      }
+    } else {
+      // 没有保存的登录状态，加载上次登录的用户名
+      _loadLastUsername();
+    }
   }
 
   // 加载上次登录的用户名
@@ -40,6 +70,31 @@ class _LoginScreenState extends State<LoginScreen> {
       _isLoginMode = !_isLoginMode;
       _confirmPasswordController.clear(); // 切换时清空确认密码
     });
+  }
+  
+  // 启动自动备份服务
+  Future<void> _startAutoBackupService(String username) async {
+    final db = await DatabaseHelper().database;
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    
+    if (userId != null) {
+      final result = await db.query(
+        'user_settings',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      if (result.isNotEmpty) {
+        final settings = result.first;
+        final autoBackupEnabled = (settings['auto_backup_enabled'] as int?) == 1;
+        final autoBackupInterval = (settings['auto_backup_interval'] as int?) ?? 15;
+        
+        if (autoBackupEnabled) {
+          await AutoBackupService().startAutoBackup(autoBackupInterval);
+          print('自动备份服务已启动，间隔: $autoBackupInterval 分钟');
+        }
+      }
+    }
   }
 
   Future<void> _login() async {
@@ -70,6 +125,9 @@ class _LoginScreenState extends State<LoginScreen> {
         final prefs = await SharedPreferences.getInstance();
         await prefs.setString('current_username', username);
         await prefs.setString('last_username', username);
+        
+        // 启动自动备份服务
+        await _startAutoBackupService(username);
         
         Navigator.pushReplacementNamed(context, '/main');
       } else {
@@ -148,6 +206,9 @@ class _LoginScreenState extends State<LoginScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.setString('current_username', username);
       await prefs.setString('last_username', username);
+      
+      // 启动自动备份服务（新用户默认未开启，所以这里不会实际启动）
+      await _startAutoBackupService(username);
 
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
