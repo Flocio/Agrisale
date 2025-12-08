@@ -7,7 +7,7 @@ plugins {
 
 android {
     namespace = "com.yikang.agrisale"
-    compileSdk = flutter.compileSdkVersion
+    compileSdk = 35  // 明确设置为 35 以满足插件要求
     ndkVersion = "27.0.12077973"
 
     compileOptions {
