@@ -80,23 +80,64 @@ jobs:
           
           home = os.environ.get('HOME', os.path.expanduser('~'))
           
-          # 修复 build.gradle - 添加 namespace
+          # 修复 build.gradle - 添加 namespace 和统一 JVM 目标版本
           build_gradle_path = os.path.join(home, '.pub-cache', 'hosted', 'pub.dev', 'install_plugin-2.1.0', 'android', 'build.gradle')
           if os.path.isfile(build_gradle_path):
               print(f'找到 build.gradle: {build_gradle_path}')
               with open(build_gradle_path, 'r', encoding='utf-8') as f:
                   content = f.read()
               
+              has_changes = False
+              
+              # 添加 namespace
               if 'namespace' not in content:
                   pattern = r'(android\s*\{)'
                   replacement = r'\1\n    namespace "com.crazecoder.openfile"'
                   content = re.sub(pattern, replacement, content, count=1)
-                  
-                  with open(build_gradle_path, 'w', encoding='utf-8') as f:
-                      f.write(content)
+                  has_changes = True
                   print('✓ 已添加 namespace 到 build.gradle')
               else:
                   print('✓ build.gradle 已包含 namespace')
+              
+              # 统一 JVM 目标版本为 11（与项目配置一致）
+              # 修复 compileOptions - 将 Java 1.8 改为 11
+              if 'VERSION_1_8' in content:
+                  content = re.sub(r'VERSION_1_8', 'VERSION_11', content)
+                  has_changes = True
+                  print('✓ 已更新 Java 版本从 1.8 到 11')
+              
+              # 修复 kotlinOptions - 将 jvmTarget 1.8 改为 11
+              if 'jvmTarget' in content:
+                  # 匹配 jvmTarget = "1.8" 或 jvmTarget = '1.8'
+                  content = re.sub(r'jvmTarget\s*=\s*["\']1\.8["\']', 'jvmTarget = "11"', content)
+                  if 'jvmTarget = "11"' in content or "jvmTarget = '11'" in content:
+                      print('✓ kotlinOptions jvmTarget 已设置为 11')
+                  else:
+                      has_changes = True
+                      print('✓ 已更新 kotlinOptions jvmTarget 到 11')
+              
+              # 如果没有 compileOptions，添加它
+              if 'compileOptions' not in content and 'android {' in content:
+                  # 在 android { 后添加 compileOptions
+                  pattern = r'(android\s*\{)'
+                  replacement = r'\1\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_11\n        targetCompatibility JavaVersion.VERSION_11\n    }'
+                  content = re.sub(pattern, replacement, content, count=1)
+                  has_changes = True
+                  print('✓ 已添加 compileOptions 配置')
+              
+              # 如果没有 kotlinOptions，添加它
+              if 'kotlinOptions' not in content and 'compileOptions' in content:
+                  # 在 compileOptions 后添加 kotlinOptions
+                  pattern = r'(compileOptions\s*\{[^\}]*?\})'
+                  replacement = r'\1\n    kotlinOptions {\n        jvmTarget = "11"\n    }'
+                  content = re.sub(pattern, replacement, content, count=1)
+                  has_changes = True
+                  print('✓ 已添加 kotlinOptions 配置')
+              
+              if has_changes:
+                  with open(build_gradle_path, 'w', encoding='utf-8') as f:
+                      f.write(content)
+                  print('✓ build.gradle 修复完成')
           else:
               print(f'警告: 未找到 build.gradle: {build_gradle_path}')
           
