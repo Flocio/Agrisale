@@ -99,6 +99,38 @@ jobs:
               else:
                   print('✓ build.gradle 已包含 namespace')
               
+              # 修复 compileSdkVersion - 确保至少为 30（Java 9+ 要求），最好设置为 35
+              if 'compileSdkVersion' in content:
+                  # 检查当前的 compileSdkVersion 值
+                  match = re.search(r'compileSdkVersion\s+(\d+)', content)
+                  if match:
+                      current_sdk = int(match.group(1))
+                      if current_sdk < 35:
+                          content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 35', content)
+                          has_changes = True
+                          print(f'✓ 已更新 compileSdkVersion 从 {current_sdk} 到 35')
+                      else:
+                          print(f'✓ compileSdkVersion 已设置为 {current_sdk}')
+                  else:
+                      # 如果格式不同，尝试替换
+                      content = re.sub(r'compileSdkVersion\s*[^\n]+', 'compileSdkVersion 35', content)
+                      has_changes = True
+                      print('✓ 已设置 compileSdkVersion 为 35')
+              else:
+                  # 如果没有 compileSdkVersion，添加它（在 namespace 之后）
+                  if 'namespace' in content:
+                      pattern = r'(namespace\s+"[^"]+"\s*\n)'
+                      replacement = r'\1    compileSdkVersion 35\n'
+                      content = re.sub(pattern, replacement, content, count=1)
+                      has_changes = True
+                      print('✓ 已添加 compileSdkVersion 35')
+                  elif 'android {' in content:
+                      pattern = r'(android\s*\{)'
+                      replacement = r'\1\n    compileSdkVersion 35'
+                      content = re.sub(pattern, replacement, content, count=1)
+                      has_changes = True
+                      print('✓ 已添加 compileSdkVersion 35')
+              
               # 统一 JVM 目标版本为 11（与项目配置一致）
               # 修复 compileOptions - 将 Java 1.8 改为 11
               if 'VERSION_1_8' in content:
