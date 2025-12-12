@@ -703,28 +703,35 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
         children: <Widget>[
           Expanded(
             child: _filteredReturns.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.assignment_return, size: 64, color: Colors.grey[400]),
-                        SizedBox(height: 16),
-                        Text(
-                          _isSearching ? '没有匹配的退货记录' : '暂无退货记录',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
+                ? SingleChildScrollView(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.assignment_return, size: 64, color: Colors.grey[400]),
+                            SizedBox(height: 16),
+                            Text(
+                              _isSearching ? '没有匹配的退货记录' : '暂无退货记录',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              _isSearching ? '请尝试其他搜索条件' : '点击下方 + 按钮添加退货记录',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 8),
-                        Text(
-                          _isSearching ? '请尝试其他搜索条件' : '点击下方 + 按钮添加退货记录',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   )
                 : ListView.builder(
@@ -787,17 +794,6 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                                             padding: EdgeInsets.zero,
                                             constraints: BoxConstraints(),
                                             iconSize: 18,
-                      ),
-                                            Padding(
-                                              padding: const EdgeInsets.only(left: 8),
-                                              child: IconButton(
-                                            icon: Icon(Icons.note_alt_outlined, color: Colors.blue),
-                                            tooltip: '编辑备注',
-                        onPressed: () => _showNoteDialog(returnItem),
-                                            padding: EdgeInsets.zero,
-                                            constraints: BoxConstraints(),
-                                            iconSize: 18,
-                                              ),
                       ),
                       if (_showDeleteButtons)
                                             Padding(

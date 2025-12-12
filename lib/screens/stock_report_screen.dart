@@ -125,7 +125,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('库存报告', style: TextStyle(
+          title: Text('库存统计', style: TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
           )),
@@ -145,28 +145,35 @@ class _StockReportScreenState extends State<StockReportScreen> {
             ),
           Expanded(
               child: _filteredProducts.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.inventory, size: 64, color: Colors.grey[400]),
-                          SizedBox(height: 16),
-                          Text(
-                            _isSearching ? '没有匹配的产品' : '暂无产品库存信息',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                            ),
+                  ? SingleChildScrollView(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.inventory, size: 64, color: Colors.grey[400]),
+                              SizedBox(height: 16),
+                              Text(
+                                _isSearching ? '没有匹配的产品' : '暂无产品库存信息',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                _isSearching ? '请尝试其他搜索条件' : '请先添加产品',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            _isSearching ? '请尝试其他搜索条件' : '请先添加产品',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     )
                   : ListView.builder(

@@ -567,7 +567,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
       },
       child: Scaffold(
       appBar: AppBar(
-        title: Text('进账管理', style: TextStyle(
+        title: Text('进账', style: TextStyle(
           fontWeight: FontWeight.bold,
           color: Colors.white,
         )),
@@ -613,28 +613,35 @@ class _IncomeScreenState extends State<IncomeScreen> {
           Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           Expanded(
             child: _filteredIncomes.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.account_balance_wallet_outlined, size: 64, color: Colors.grey[400]),
-                        SizedBox(height: 16),
-                        Text(
-                          _isSearching ? '没有匹配的进账记录' : '暂无进账记录',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
+                ? SingleChildScrollView(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.account_balance_wallet_outlined, size: 64, color: Colors.grey[400]),
+                            SizedBox(height: 16),
+                            Text(
+                              _isSearching ? '没有匹配的进账记录' : '暂无进账记录',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              _isSearching ? '请尝试其他搜索条件' : '点击右下角 + 按钮添加进账记录',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 8),
-                        Text(
-                          _isSearching ? '请尝试其他搜索条件' : '点击右下角 + 按钮添加进账记录',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   )
                 : ListView.builder(

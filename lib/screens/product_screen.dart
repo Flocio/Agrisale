@@ -236,7 +236,7 @@ class _ProductScreenState extends State<ProductScreen> {
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text('农资产品', style: TextStyle(
+          title: Text('产品', style: TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
           )),
@@ -333,28 +333,35 @@ class _ProductScreenState extends State<ProductScreen> {
             Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           Expanded(
               child: _filteredProducts.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                          Icon(Icons.inventory, size: 64, color: Colors.grey[400]),
-                          SizedBox(height: 16),
-                          Text(
-                            _isSearching ? '没有匹配的产品' : '暂无产品',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                            ),
+                  ? SingleChildScrollView(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.inventory, size: 64, color: Colors.grey[400]),
+                              SizedBox(height: 16),
+                              Text(
+                                _isSearching ? '没有匹配的产品' : '暂无产品',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                _isSearching ? '请尝试其他搜索条件' : '点击下方 + 按钮添加产品',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            _isSearching ? '请尝试其他搜索条件' : '点击下方 + 按钮添加产品',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     )
                   : ListView.builder(

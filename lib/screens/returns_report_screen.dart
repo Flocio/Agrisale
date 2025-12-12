@@ -411,7 +411,7 @@ class _ReturnsReportScreenState extends State<ReturnsReportScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('退货报告', style: TextStyle(
+        title: Text('退货统计', style: TextStyle(
           fontWeight: FontWeight.bold,
           color: Colors.white,
         )),
@@ -471,40 +471,47 @@ class _ReturnsReportScreenState extends State<ReturnsReportScreen> {
           Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           Expanded(
             child: _returns.isEmpty
-                ? Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.assignment_return, size: 64, color: Colors.grey[400]),
-                        SizedBox(height: 16),
-                        Text(
-                          _allReturns.isEmpty ? '暂无退货记录' : '没有符合条件的记录',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
-                        ),
-                        SizedBox(height: 8),
-                        Text(
-                          _allReturns.isEmpty ? '添加退货记录后会显示在这里' : '请尝试更改筛选条件',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                        if (!_allReturns.isEmpty)
-                          Padding(
-                            padding: const EdgeInsets.only(top: 16),
-                            child: ElevatedButton.icon(
-                              icon: Icon(Icons.clear),
-                              label: Text('清除筛选条件'),
-                              onPressed: _resetFilters,
-                              style: ElevatedButton.styleFrom(
-                                backgroundColor: Colors.orange,
+                ? SingleChildScrollView(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.assignment_return, size: 64, color: Colors.grey[400]),
+                            SizedBox(height: 16),
+                            Text(
+                              _allReturns.isEmpty ? '暂无退货记录' : '没有符合条件的记录',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
                               ),
                             ),
-                          ),
-                      ],
+                            SizedBox(height: 8),
+                            Text(
+                              _allReturns.isEmpty ? '添加退货记录后会显示在这里' : '请尝试更改筛选条件',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                            if (!_allReturns.isEmpty)
+                              Padding(
+                                padding: const EdgeInsets.only(top: 16),
+                                child: ElevatedButton.icon(
+                                  icon: Icon(Icons.clear),
+                                  label: Text('清除筛选条件'),
+                                  onPressed: _resetFilters,
+                                  style: ElevatedButton.styleFrom(
+                                    backgroundColor: Colors.orange,
+                                  ),
+                                ),
+                              ),
+                          ],
+                        ),
+                      ),
                     ),
                   )
                 : RefreshIndicator(

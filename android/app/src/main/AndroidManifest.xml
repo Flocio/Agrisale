@@ -10,7 +10,7 @@
     <!-- 安装应用权限 - 自动更新功能 -->
     <uses-permission android:name="android.permission.REQUEST_INSTALL_PACKAGES"/>
     <application
-        android:label="agrisale"
+        android:label="Agrisale"
         android:name="${applicationName}"
         android:icon="@mipmap/ic_launcher">
         <activity

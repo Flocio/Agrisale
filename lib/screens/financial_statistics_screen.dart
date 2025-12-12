@@ -9,6 +9,7 @@ import 'package:file_picker/file_picker.dart';
 import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:table_calendar/table_calendar.dart';
+import 'package:intl/intl.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 
@@ -342,11 +343,12 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
         builder: (context, setState) {
           return AlertDialog(
             title: Text(_currentIndex == 0 ? '选择日期' : '选择月份'),
-            content: Container(
-              width: double.maxFinite,
-              child: Column(
-                mainAxisSize: MainAxisSize.min,
-                children: [
+            content: SingleChildScrollView(
+              child: Container(
+                width: double.maxFinite,
+                child: Column(
+                  mainAxisSize: MainAxisSize.min,
+                  children: [
                   if (_currentIndex == 0)
                   // 每日统计使用常规日历
                   TableCalendar(
@@ -363,6 +365,7 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
                       });
                     },
                     calendarFormat: calendarFormat,
+                    locale: 'zh_CN',
                     headerStyle: HeaderStyle(
                       formatButtonVisible: false,
                       titleCentered: true,
@@ -496,7 +499,8 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
                       fontStyle: FontStyle.italic,
                     ),
                   ),
-                ],
+                  ],
+                ),
               ),
             ),
             actions: [

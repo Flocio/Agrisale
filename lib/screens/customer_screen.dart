@@ -290,28 +290,35 @@ class _CustomerScreenState extends State<CustomerScreen> {
             Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           Expanded(
               child: _filteredCustomers.isEmpty
-                  ? Center(
-                      child: Column(
-                        mainAxisAlignment: MainAxisAlignment.center,
-                        children: [
-                          Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
-                          SizedBox(height: 16),
-                          Text(
-                            _isSearching ? '没有匹配的客户' : '暂无客户',
-                            style: TextStyle(
-                              fontSize: 18,
-                              color: Colors.grey[600],
-                            ),
+                  ? SingleChildScrollView(
+                      child: Center(
+                        child: Padding(
+                          padding: const EdgeInsets.all(16.0),
+                          child: Column(
+                            mainAxisAlignment: MainAxisAlignment.center,
+                            mainAxisSize: MainAxisSize.min,
+                            children: [
+                              Icon(Icons.people_outline, size: 64, color: Colors.grey[400]),
+                              SizedBox(height: 16),
+                              Text(
+                                _isSearching ? '没有匹配的客户' : '暂无客户',
+                                style: TextStyle(
+                                  fontSize: 18,
+                                  color: Colors.grey[600],
+                                ),
+                              ),
+                              SizedBox(height: 8),
+                              Text(
+                                _isSearching ? '请尝试其他搜索条件' : '点击下方 + 按钮添加客户',
+                                style: TextStyle(
+                                  fontSize: 14,
+                                  color: Colors.grey[500],
+                                ),
+                                textAlign: TextAlign.center,
+                              ),
+                            ],
                           ),
-                          SizedBox(height: 8),
-                          Text(
-                            _isSearching ? '请尝试其他搜索条件' : '点击下方 + 按钮添加客户',
-                            style: TextStyle(
-                              fontSize: 14,
-                              color: Colors.grey[500],
-                            ),
-                          ),
-                        ],
+                        ),
                       ),
                     )
                   : ListView.builder(

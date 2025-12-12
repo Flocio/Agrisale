@@ -108,7 +108,7 @@ class UpdateService {
         Uri.parse(source.apiUrl),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'AgriSale-Update-Checker/2.3.0',
+          'User-Agent': 'AgriSale-Update-Checker/2.4.0',
         },
       ).timeout(Duration(seconds: 20)); // 增加到20秒超时
       

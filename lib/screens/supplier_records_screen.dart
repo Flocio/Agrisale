@@ -368,30 +368,37 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
           Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           _purchases.isEmpty
               ? Expanded(
-                  child: Center(
-                    child: Column(
-                      mainAxisAlignment: MainAxisAlignment.center,
-                      children: [
-                        Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey[400]),
-                        SizedBox(height: 16),
-                        Text(
-                          '暂无采购记录',
-                          style: TextStyle(
-                            fontSize: 18,
-                            color: Colors.grey[600],
-                          ),
+                  child: SingleChildScrollView(
+                    child: Center(
+                      child: Padding(
+                        padding: const EdgeInsets.all(16.0),
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
+                          mainAxisSize: MainAxisSize.min,
+                          children: [
+                            Icon(Icons.shopping_cart_outlined, size: 64, color: Colors.grey[400]),
+                            SizedBox(height: 16),
+                            Text(
+                              '暂无采购记录',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            SizedBox(height: 8),
+                            Text(
+                              _selectedProduct == '所有产品' 
+                                  ? '该供应商还没有采购记录'
+                                  : '该供应商还没有采购 $_selectedProduct 的记录',
+                              style: TextStyle(
+                                fontSize: 14,
+                                color: Colors.grey[500],
+                              ),
+                              textAlign: TextAlign.center,
+                            ),
+                          ],
                         ),
-                        SizedBox(height: 8),
-                        Text(
-                          _selectedProduct == '所有产品' 
-                              ? '该供应商还没有采购记录'
-                              : '该供应商还没有采购 $_selectedProduct 的记录',
-                          style: TextStyle(
-                            fontSize: 14,
-                            color: Colors.grey[500],
-                          ),
-                        ),
-                      ],
+                      ),
                     ),
                   ),
                 )

@@ -1,4 +1,5 @@
 import 'dart:convert';
+import 'dart:async';
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart'; // 导入剪贴板功能
 import 'package:http/http.dart' as http;
@@ -176,6 +177,31 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
     });
   }
 
+  // 更新助手消息内容（用于流式输出）
+  void _updateAssistantMessage(String newContent) {
+    setState(() {
+      if (_chatHistory.isNotEmpty && _chatHistory.last['role'] == 'assistant') {
+        _chatHistory.last['content'] = newContent;
+      } else {
+        _chatHistory.add({
+          'role': 'assistant',
+          'content': newContent,
+        });
+      }
+    });
+    
+    // 滚动到底部
+    Future.delayed(Duration(milliseconds: 50), () {
+      if (_scrollController.hasClients) {
+        _scrollController.animateTo(
+          _scrollController.position.maxScrollExtent,
+          duration: Duration(milliseconds: 100),
+          curve: Curves.easeOut,
+        );
+      }
+    });
+  }
+
   // 复制文本到剪贴板
   Future<void> _copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
@@ -292,9 +318,30 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
           'name': 'remittance',
           'columns': ['id', 'userId', 'remittanceDate', 'supplierId', 'amount', 'employeeId', 'paymentMethod', 'note'],
           'description': '汇款记录表，记录向供应商付款信息。amount为REAL类型表示汇款金额。employeeId关联到employees表表示经手人。paymentMethod可为现金、微信转账或银行卡。每个用户有独立的汇款记录'
+        },
+        {
+          'name': 'user_settings',
+          'columns': ['id', 'userId', 'deepseek_api_key', 'deepseek_model', 'deepseek_temperature', 'deepseek_max_tokens', 'dark_mode', 'auto_backup_enabled', 'auto_backup_interval', 'auto_backup_max_count', 'last_backup_time'],
+          'description': '用户设置表，存储每个用户的个人设置，包括DeepSeek模型配置、自动备份设置等。每个用户有独立的设置记录'
         }
       ]
     };
+    
+    // 获取当前用户的设置数据（出于隐私考虑，不包含API Key）
+    final userSettings = await db.query('user_settings', where: 'userId = ?', whereArgs: [userId]);
+    final safeUserSettings = userSettings.map((setting) => {
+      'id': setting['id'],
+      'userId': setting['userId'],
+      'deepseek_model': setting['deepseek_model'],
+      'deepseek_temperature': setting['deepseek_temperature'],
+      'deepseek_max_tokens': setting['deepseek_max_tokens'],
+      'dark_mode': setting['dark_mode'],
+      'auto_backup_enabled': setting['auto_backup_enabled'],
+      'auto_backup_interval': setting['auto_backup_interval'],
+      'auto_backup_max_count': setting['auto_backup_max_count'],
+      'last_backup_time': setting['last_backup_time'],
+      // 不包含 deepseek_api_key（隐私数据）
+    }).toList();
     
     // 构建系统数据摘要
     return {
@@ -309,6 +356,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
       'income': income,
       'remittance': remittance,
       'users': safeUsers,
+      'user_settings': safeUserSettings,
       'currentUser': username,
     };
   }
@@ -349,7 +397,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
       );
       
       if (settingsResult.isEmpty) {
-        _addAssistantMessage('请先在设置中配置您的DeepSeek API Key。');
+        _addAssistantMessage('请先在模型设置中配置您的DeepSeek API Key。');
         return;
       }
       
@@ -361,7 +409,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
       
       // 验证API Key是否存在
       if (apiKey.isEmpty) {
-        _addAssistantMessage('请先在设置中配置您的DeepSeek API Key。');
+        _addAssistantMessage('请先在模型设置中配置您的DeepSeek API Key。');
         return;
       }
       
@@ -374,10 +422,10 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         {
           'role': 'system',
           'content': '''
-你是农资管理系统的数据分析助手。你可以分析系统中的产品、销售、采购、库存、员工、进账、汇款等数据，并回答用户的问题。
+你是Agrisale的数据分析助手。你可以分析系统中的产品、销售、采购、库存、员工、进账、汇款等数据，并回答用户的问题。
 
 系统包含以下数据表：
-1. users - 系统用户表
+1. users - 系统用户表（存储登录凭证）
 2. products - 产品表（包含名称、描述、库存（REAL类型支持小数）、单位、供应商ID）
 3. suppliers - 供应商表
 4. customers - 客户表
@@ -387,6 +435,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
 8. returns - 退货记录表（客户退货，quantity支持小数）
 9. income - 进账记录表（客户付款，包含优惠金额discount）
 10. remittance - 汇款记录表（向供应商付款）
+11. user_settings - 用户设置表（存储用户的个人设置，包括模型配置、自动备份设置等）
 
 关键业务逻辑：
 - 产品的stock、采购/销售/退货的quantity、金额amount都是REAL类型，支持小数
@@ -414,34 +463,114 @@ $systemDataJson
         }
       }
       
-      // 发送API请求，使用用户设置的参数
-      final response = await http.post(
+      // 创建流式请求
+      final requestBody = jsonEncode({
+        'model': model,
+        'messages': messages,
+        'temperature': temperature,
+        'max_tokens': maxTokens,
+        'stream': true, // 启用流式输出
+      });
+      
+      final request = http.StreamedRequest(
+        'POST',
         Uri.parse('https://api.deepseek.com/v1/chat/completions'),
-        headers: {
-          'Content-Type': 'application/json; charset=utf-8',
-          'Authorization': 'Bearer $apiKey',
-        },
-        body: jsonEncode({
-          'model': model,
-          'messages': messages,
-          'temperature': temperature,
-          'max_tokens': maxTokens,
-          'response_format': {'type': 'text'}, // 确保响应为纯文本
-        }),
-      ).timeout(
-        Duration(seconds: 30), // 30秒超时
-        onTimeout: () {
-          throw Exception('请求超时：DeepSeek API响应时间过长，请稍后重试');
-        },
       );
       
-      if (response.statusCode == 200) {
-        final data = jsonDecode(utf8.decode(response.bodyBytes));
-        final assistantResponse = data['choices'][0]['message']['content'];
-        _addAssistantMessage(assistantResponse);
-      } else {
-        final errorBody = utf8.decode(response.bodyBytes);
-        _addAssistantMessage('抱歉，API请求失败。\n错误代码: ${response.statusCode}\n错误详情: $errorBody');
+      request.headers.addAll({
+        'Content-Type': 'application/json; charset=utf-8',
+        'Authorization': 'Bearer $apiKey',
+      });
+      
+      // 写入请求体
+      request.sink.add(utf8.encode(requestBody));
+      request.sink.close();
+      
+      // 发送请求并处理流式响应
+      final client = http.Client();
+      String accumulatedContent = '';
+      
+      try {
+        final response = await client.send(request).timeout(
+          Duration(seconds: 60), // 增加超时时间到60秒
+          onTimeout: () {
+            throw Exception('请求超时：DeepSeek API响应时间过长，请稍后重试');
+          },
+        );
+        
+        if (response.statusCode == 200) {
+          // 初始化助手消息（创建空消息，流式输出时会逐步更新）
+          setState(() {
+            _isLoading = true; // 保持加载状态直到流式输出完成
+          });
+          _updateAssistantMessage('');
+          
+          // 处理流式响应
+          await for (var chunk in response.stream.transform(utf8.decoder)) {
+            // 按行分割SSE数据
+            final lines = chunk.split('\n');
+            
+            for (var line in lines) {
+              line = line.trim();
+              
+              // 跳过空行和注释
+              if (line.isEmpty || line.startsWith(':')) continue;
+              
+              // 解析SSE格式: data: {...}
+              if (line.startsWith('data: ')) {
+                final dataStr = line.substring(6);
+                
+                // 检查是否是结束标记
+                if (dataStr == '[DONE]') {
+                  break;
+                }
+                
+                try {
+                  final data = jsonDecode(dataStr);
+                  final choices = data['choices'] as List?;
+                  
+                  if (choices != null && choices.isNotEmpty) {
+                    final delta = choices[0]['delta'] as Map<String, dynamic>?;
+                    final content = delta?['content'] as String?;
+                    
+                    if (content != null && content.isNotEmpty) {
+                      accumulatedContent += content;
+                      _updateAssistantMessage(accumulatedContent);
+                    }
+                  }
+                } catch (e) {
+                  // 忽略JSON解析错误，继续处理下一个数据块
+                  print('解析SSE数据错误: $e');
+                }
+              }
+            }
+          }
+          
+          // 流式输出完成，保存最终消息（如果消息已存在则只保存，不重复添加）
+          if (accumulatedContent.isNotEmpty) {
+            setState(() {
+              if (_chatHistory.isNotEmpty && _chatHistory.last['role'] == 'assistant') {
+                _chatHistory.last['content'] = accumulatedContent;
+              } else {
+                _chatHistory.add({
+                  'role': 'assistant',
+                  'content': accumulatedContent,
+                });
+              }
+              _isLoading = false;
+            });
+            _saveChatHistory(); // 保存对话历史
+          } else {
+            setState(() {
+              _isLoading = false;
+            });
+          }
+        } else {
+          final errorBody = await response.stream.transform(utf8.decoder).join();
+          _addAssistantMessage('抱歉，API请求失败。\n错误代码: ${response.statusCode}\n错误详情: $errorBody');
+        }
+      } finally {
+        client.close();
       }
     } catch (e) {
       String errorMessage = '抱歉，发生了错误: ';
@@ -456,18 +585,19 @@ $systemDataJson
                        '3. API密钥是否正确\n'
                        '4. 防火墙是否阻止了连接\n\n'
                        '详细错误: $e';
-      } else if (e.toString().contains('TimeoutException')) {
+      } else if (e.toString().contains('TimeoutException') || e.toString().contains('请求超时')) {
         errorMessage += '请求超时，请稍后重试。\n详细错误: $e';
       } else if (e.toString().contains('FormatException')) {
         errorMessage += 'API响应格式错误。\n详细错误: $e';
       } else {
         errorMessage += '$e';
-             }
-       
-       _addAssistantMessage(errorMessage);
+      }
+      
       setState(() {
         _isLoading = false;
       });
+      
+      _addAssistantMessage(errorMessage);
     }
   }
 

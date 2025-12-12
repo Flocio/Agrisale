@@ -442,15 +442,11 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('总销售-进账明细', style: TextStyle(
+        title: Text('销售与进账', style: TextStyle(
           fontWeight: FontWeight.bold,
           color: Colors.white,
         )),
         actions: [
-          IconButton(
-            icon: Icon(Icons.refresh),
-            onPressed: _fetchAnalysisData,
-          ),
           IconButton(
             icon: Icon(Icons.download),
             tooltip: '导出 CSV',

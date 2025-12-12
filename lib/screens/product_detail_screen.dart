@@ -567,20 +567,26 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           
           _filteredRecords.isEmpty 
             ? Expanded(
-                child: Center(
-                  child: Column(
-                    mainAxisAlignment: MainAxisAlignment.center,
-                    children: [
-                      Icon(Icons.inventory_2, size: 64, color: Colors.grey[400]),
-                      SizedBox(height: 16),
-                      Text(
-                        '暂无交易记录',
-                        style: TextStyle(
-                          fontSize: 18,
-                          color: Colors.grey[600],
-                        ),
+                child: SingleChildScrollView(
+                  child: Center(
+                    child: Padding(
+                      padding: const EdgeInsets.all(16.0),
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
+                        mainAxisSize: MainAxisSize.min,
+                        children: [
+                          Icon(Icons.inventory_2, size: 64, color: Colors.grey[400]),
+                          SizedBox(height: 16),
+                          Text(
+                            '暂无交易记录',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                        ],
                       ),
-                    ],
+                    ),
                   ),
                 ),
               )

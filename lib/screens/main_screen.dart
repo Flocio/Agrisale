@@ -1,8 +1,6 @@
 // lib/screens/main_screen.dart
 
 import 'package:flutter/material.dart';
-import '../services/update_service.dart';
-import 'update_dialog.dart';
 
 class MainScreen extends StatefulWidget {
   @override
@@ -17,7 +15,6 @@ class _MainScreenState extends State<MainScreen> {
     {
       'title': '基础功能',
       'items': [
-        {'name': '农资产品', 'icon': Icons.inventory, 'route': '/products'},
         {'name': '采购', 'icon': Icons.shopping_cart, 'route': '/purchases'},
         {'name': '销售', 'icon': Icons.point_of_sale, 'route': '/sales'},
         {'name': '退货', 'icon': Icons.assignment_return, 'route': '/returns'},
@@ -26,8 +23,9 @@ class _MainScreenState extends State<MainScreen> {
       ]
     },
     {
-      'title': '客户与供应商',
+      'title': '基础信息',
       'items': [
+        {'name': '产品', 'icon': Icons.inventory, 'route': '/products'},
         {'name': '客户', 'icon': Icons.people, 'route': '/customers'},
         {'name': '供应商', 'icon': Icons.business, 'route': '/suppliers'},
         {'name': '员工', 'icon': Icons.badge, 'route': '/employees'},
@@ -38,16 +36,27 @@ class _MainScreenState extends State<MainScreen> {
   // 定义第二页的功能项
   final List<Map<String, dynamic>> _page2Items = [
     {
-      'title': '报告统计',
+      'title': '基础统计',
       'items': [
-        {'name': '库存报告', 'icon': Icons.assessment, 'route': '/stock_report'},
-        {'name': '采购报告', 'icon': Icons.receipt_long, 'route': '/purchase_report'},
-        {'name': '销售报告', 'icon': Icons.bar_chart, 'route': '/sales_report'},
-        {'name': '退货报告', 'icon': Icons.assignment_return, 'route': '/returns_report'},
-        {'name': '总销售报告', 'icon': Icons.bar_chart, 'route': '/total_sales_report'},
-        {'name': '总销售-进账明细', 'icon': Icons.compare_arrows, 'route': '/sales_income_analysis'},
-        {'name': '采购-汇款明细', 'icon': Icons.sync_alt, 'route': '/purchase_remittance_analysis'},
+        {'name': '库存', 'icon': Icons.assessment, 'route': '/stock_report'},
+        {'name': '采购', 'icon': Icons.receipt_long, 'route': '/purchase_report'},
+        {'name': '销售', 'icon': Icons.bar_chart, 'route': '/sales_report'},
+        {'name': '退货', 'icon': Icons.assignment_return, 'route': '/returns_report'},
+      ]
+    },
+    {
+      'title': '综合分析',
+      'items': [
+        {'name': '销售汇总', 'icon': Icons.bar_chart, 'route': '/total_sales_report'},
+        {'name': '销售与进账', 'icon': Icons.compare_arrows, 'route': '/sales_income_analysis'},
+        {'name': '采购与汇款', 'icon': Icons.sync_alt, 'route': '/purchase_remittance_analysis'},
         {'name': '财务统计', 'icon': Icons.attach_money, 'route': '/financial_statistics'},
+      ]
+    },
+    {
+      'title': '智能分析',
+      'items': [
+        {'name': '数据分析助手', 'icon': Icons.analytics, 'route': '/data_assistant'},
       ]
     },
   ];
@@ -57,67 +66,14 @@ class _MainScreenState extends State<MainScreen> {
     {
       'title': '系统工具',
       'items': [
+        {'name': '账户设置', 'icon': Icons.settings, 'route': '/settings'},
+        {'name': '模型设置', 'icon': Icons.tune, 'route': '/model_settings'},
         {'name': '数据备份', 'icon': Icons.backup, 'route': '/auto_backup'},
-        {'name': '数据分析助手', 'icon': Icons.analytics, 'route': '/data_assistant'},
-        {'name': '检查更新', 'icon': Icons.system_update, 'route': null, 'action': 'check_update'},
-        {'name': '设置', 'icon': Icons.settings, 'route': '/settings'},
+        {'name': '关于系统', 'icon': Icons.info_outline, 'route': '/version_info'},
       ]
     },
   ];
 
-  // 检查更新
-  Future<void> _checkForUpdate() async {
-    // 显示加载对话框
-    showDialog(
-      context: context,
-      barrierDismissible: false,
-      builder: (context) => AlertDialog(
-        content: Row(
-          children: [
-            CircularProgressIndicator(),
-            SizedBox(width: 20),
-            Text('正在检查更新...'),
-          ],
-        ),
-      ),
-    );
-    
-    try {
-      final updateInfo = await UpdateService.checkForUpdate();
-      
-      // 关闭加载对话框
-      Navigator.of(context).pop();
-      
-      if (updateInfo != null) {
-        // 有新版本，显示更新对话框
-        showDialog(
-          context: context,
-          barrierDismissible: false,
-          builder: (context) => UpdateDialog(updateInfo: updateInfo),
-        );
-      } else {
-        // 已是最新版本
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('当前已是最新版本'),
-            backgroundColor: Colors.green,
-            duration: Duration(seconds: 2),
-          ),
-        );
-      }
-    } catch (e) {
-      // 关闭加载对话框
-      Navigator.of(context).pop();
-      
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(
-          content: Text('检查更新失败: $e'),
-          backgroundColor: Colors.red,
-          duration: Duration(seconds: 3),
-        ),
-      );
-    }
-  }
 
   // 构建功能页面
   Widget _buildPage(List<Map<String, dynamic>> menuItems) {
@@ -161,10 +117,8 @@ class _MainScreenState extends State<MainScreen> {
                     ),
                     trailing: Icon(Icons.arrow_forward_ios, size: 16),
                     onTap: () {
-                      if (item['action'] == 'check_update') {
-                        _checkForUpdate();
-                      } else if (item['route'] != null) {
-                      Navigator.pushNamed(context, item['route']);
+                      if (item['route'] != null) {
+                        Navigator.pushNamed(context, item['route']);
                       }
                     },
                   );
@@ -193,7 +147,7 @@ class _MainScreenState extends State<MainScreen> {
             ),
             SizedBox(width: 10),
             Text(
-              '农资管理系统',
+              'Agrisale',
               style: TextStyle(
                 fontSize: 20,
                 fontWeight: FontWeight.bold,
