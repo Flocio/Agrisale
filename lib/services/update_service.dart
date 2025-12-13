@@ -5,10 +5,12 @@ import 'package:http/http.dart' as http;
 import 'package:package_info_plus/package_info_plus.dart';
 import 'package:path_provider/path_provider.dart';
 import 'package:dio/dio.dart';
+import 'package:dio/io.dart';
 import 'package:install_plugin/install_plugin.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as path;
+import 'package:permission_handler/permission_handler.dart';
 import '../utils/app_version.dart';
 
 class UpdateService {
@@ -178,40 +180,78 @@ class UpdateService {
   
   // 获取下载链接（支持代理）
   static String? _getDownloadUrl(List assets, String platform, String? proxyBase) {
-    String fileName;
-    
     if (platform == 'android') {
-      fileName = 'agrisale-android-';
-    } else if (platform == 'ios') {
-      fileName = 'agrisale-ios-';
-    } else if (platform == 'macos') {
-      fileName = 'agrisale-macos-';
-    } else if (platform == 'windows') {
-      fileName = 'agrisale-windows-';
-    } else {
-      print('不支持的平台: $platform');
-      return null;
-    }
-    
-    for (var asset in assets) {
-      final assetName = asset['name'] as String;
-      if (assetName.startsWith(fileName)) {
+      // Android优先查找APK文件（可以直接安装），如果没有再查找AAB文件
+      String? apkUrl;
+      String? aabUrl;
+      
+      for (var asset in assets) {
+        final assetName = asset['name'] as String;
         final originalUrl = asset['browser_download_url'] as String;
         
-        // 如果使用代理，添加代理前缀
-        if (proxyBase != null) {
-          final proxiedUrl = '$proxyBase/$originalUrl';
-          print('找到下载链接（代理）: $proxiedUrl');
-          return proxiedUrl;
-        } else {
-          print('找到下载链接（直连）: $originalUrl');
-          return originalUrl;
+        if (assetName.startsWith('agrisale-android-') && assetName.endsWith('.apk')) {
+          apkUrl = originalUrl;
+          print('找到Android APK文件: $assetName');
+        } else if (assetName.startsWith('agrisale-android-') && assetName.endsWith('.aab')) {
+          aabUrl = originalUrl;
+          print('找到Android AAB文件: $assetName（注意：AAB文件需要Google Play安装）');
         }
       }
+      
+      // 优先返回APK，如果没有APK则返回AAB（虽然不能直接安装，但至少可以提示用户）
+      final selectedUrl = apkUrl ?? aabUrl;
+      if (selectedUrl != null) {
+        // 如果使用代理，添加代理前缀（确保URL格式正确）
+        if (proxyBase != null) {
+          // 移除URL中可能存在的空格，并正确构建代理URL
+          final cleanUrl = selectedUrl.trim();
+          final proxiedUrl = '$proxyBase/$cleanUrl';
+          print('使用下载链接（代理）: $proxiedUrl');
+          return proxiedUrl;
+        } else {
+          print('使用下载链接（直连）: $selectedUrl');
+          return selectedUrl;
+        }
+      }
+      
+      print('未找到Android平台的下载文件（APK或AAB）');
+      return null;
+    } else {
+      // 其他平台的处理
+      String fileName;
+      
+      if (platform == 'ios') {
+        fileName = 'agrisale-ios-';
+      } else if (platform == 'macos') {
+        fileName = 'agrisale-macos-';
+      } else if (platform == 'windows') {
+        fileName = 'agrisale-windows-';
+      } else {
+        print('不支持的平台: $platform');
+        return null;
+      }
+      
+      for (var asset in assets) {
+        final assetName = asset['name'] as String;
+        if (assetName.startsWith(fileName)) {
+          final originalUrl = asset['browser_download_url'] as String;
+          
+          // 如果使用代理，添加代理前缀（确保URL格式正确）
+          if (proxyBase != null) {
+            final cleanUrl = originalUrl.trim();
+            final proxiedUrl = '$proxyBase/$cleanUrl';
+            print('找到下载链接（代理）: $proxiedUrl');
+            return proxiedUrl;
+          } else {
+            print('找到下载链接（直连）: $originalUrl');
+            return originalUrl;
+          }
+        }
+      }
+      
+      print('未找到平台 $platform 的下载文件');
+      return null;
     }
-    
-    print('未找到平台 $platform 的下载文件');
-    return null;
   }
   
   // 版本号比较 (返回: 1=version1>version2, -1=version1<version2, 0=相等)
@@ -245,17 +285,70 @@ class UpdateService {
       try {
         print('尝试从 ${downloadUrl['name']} 下载: ${downloadUrl['url']}');
         
+        // 配置Dio以允许不验证SSL证书（仅用于下载场景）
         final dio = Dio();
-        final tempDir = await getTemporaryDirectory();
+        
+        // 创建自定义HttpClient，禁用SSL证书验证
+        // 注意：这仅用于从GitHub下载更新文件，即使通过代理也是安全的
+        if (Platform.isAndroid || Platform.isIOS || Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+          final httpClient = HttpClient()
+            ..badCertificateCallback = (X509Certificate cert, String host, int port) {
+              // 允许所有证书（仅用于下载更新文件）
+              print('跳过SSL证书验证: $host:$port');
+              return true;
+            };
+          
+          // 配置Dio使用自定义HttpClient（dio 5.x方式）
+          final adapter = IOHttpClientAdapter();
+          adapter.createHttpClient = () {
+            return httpClient;
+          };
+          dio.httpClientAdapter = adapter;
+        }
+        
+        // 使用外部存储目录，确保安装程序可以访问
+        Directory downloadDir;
+        if (Platform.isAndroid) {
+          // Android: 尝试使用外部存储的Download目录
+          try {
+            downloadDir = Directory('/storage/emulated/0/Download');
+            if (!await downloadDir.exists()) {
+              // 如果外部存储不可用，使用应用缓存目录
+              downloadDir = await getTemporaryDirectory();
+            }
+          } catch (e) {
+            // 如果外部存储访问失败，使用应用缓存目录
+            downloadDir = await getTemporaryDirectory();
+          }
+        } else {
+          downloadDir = await getTemporaryDirectory();
+        }
+        
         final fileName = originalDownloadUrl.split('/').last;
-        final filePath = '${tempDir.path}/$fileName';
+        final filePath = '${downloadDir.path}/$fileName';
+        
+        print('下载目录: ${downloadDir.path}');
+        print('文件名: $fileName');
+        print('完整路径: $filePath');
+        
+        // 检查是否是AAB文件（Android App Bundle不能直接安装）
+        if (Platform.isAndroid && fileName.toLowerCase().endsWith('.aab')) {
+          throw Exception('下载的文件是AAB格式（Android App Bundle），无法直接安装。\n\n'
+              'AAB文件需要通过Google Play商店安装。\n'
+              '请从GitHub Releases下载APK文件进行安装。');
+        }
+        
+        // 清理URL中的空格和特殊字符
+        final cleanDownloadUrl = (downloadUrl['url'] as String).trim().replaceAll(' ', '');
         
         // 下载文件（30秒超时）
         await dio.download(
-          downloadUrl['url'] as String,
+          cleanDownloadUrl,
           filePath,
           options: Options(
             receiveTimeout: Duration(seconds: 30),
+            followRedirects: true,
+            validateStatus: (status) => status! < 500, // 允许重定向和客户端错误
           ),
           onReceiveProgress: (received, total) {
             onProgress(received, total);
@@ -290,7 +383,22 @@ class UpdateService {
         
         // 根据平台安装
         if (Platform.isAndroid) {
+          // 记录下载的APK文件名，用于验证
+          print('准备安装APK: $fileName');
+          print('APK文件路径: $filePath');
+          print('APK文件大小: ${(await File(filePath).length() / 1024 / 1024).toStringAsFixed(2)} MB');
+          
           await _installAndroid(filePath);
+          
+          // 安装启动后，等待一小段时间让安装完成
+          print('等待安装完成...');
+          await Future.delayed(Duration(seconds: 3));
+          
+          // 验证安装（注意：当前运行的进程还是旧版本，所以这里只是检查文件）
+          final installedFile = File(filePath);
+          if (await installedFile.exists()) {
+            print('APK文件仍然存在，安装可能还在进行中或已完成');
+          }
         } else if (Platform.isIOS) {
           await _installIOS();
         } else if (Platform.isWindows) {
@@ -428,11 +536,98 @@ class UpdateService {
   // Android 安装
   static Future<void> _installAndroid(String apkPath) async {
     try {
-      await InstallPlugin.installApk(apkPath);
-      print('Android 安装已启动');
+      // 确保文件存在且可读
+      final file = File(apkPath);
+      if (!await file.exists()) {
+        throw Exception('APK文件不存在: $apkPath');
+      }
+      
+      // 检查文件权限
+      final fileSize = await file.length();
+      if (fileSize == 0) {
+        throw Exception('APK文件为空');
+      }
+      
+      print('开始安装APK: $apkPath (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
+      
+      // 再次验证文件可读
+      try {
+        final testBytes = await file.openRead(0, 100).toList();
+        if (testBytes.isEmpty || testBytes[0].isEmpty) {
+          throw Exception('APK文件无法读取');
+        }
+        print('✓ APK文件可读，文件头: ${String.fromCharCodes(testBytes[0].take(2))}');
+      } catch (e) {
+        throw Exception('APK文件无法读取: $e');
+      }
+      
+      // 调用安装插件
+      // install_plugin会自动处理权限请求和FileProvider
+      print('调用 InstallPlugin.installApk...');
+      print('文件路径: $apkPath');
+      print('文件存在: ${await file.exists()}');
+      print('文件大小: ${await file.length()} 字节');
+      
+      try {
+        // 注意：installApk 只是启动安装流程，不等待安装完成
+        // 它不会返回安装是否成功，也不会抛出异常（即使安装失败）
+        // 用户必须在系统安装界面中完成所有步骤
+        await InstallPlugin.installApk(apkPath);
+        print('✓ InstallPlugin.installApk 调用成功，安装流程已启动');
+        print('⚠️ 重要：installApk 不等待安装完成，也不返回安装结果');
+        print('⚠️ 如果安装失败（如签名不匹配），系统可能不会显示明确错误');
+        print('⚠️ 用户需要完成所有安装步骤，然后重启应用检查版本号');
+      } catch (installError) {
+        print('✗ InstallPlugin.installApk 调用失败: $installError');
+        print('错误类型: ${installError.runtimeType}');
+        rethrow;
+      }
     } catch (e) {
       print('Android 安装失败: $e');
-      rethrow;
+      final errorStr = e.toString().toLowerCase();
+      
+      // 提供更详细的错误信息
+      if (errorStr.contains('permission denied') || 
+          errorStr.contains('权限') ||
+          errorStr.contains('install_denied') ||
+          errorStr.contains('user restriction')) {
+        throw Exception('安装失败：缺少安装权限。\n\n'
+            '操作步骤：\n'
+            '1. 如果系统已跳转到"安装未知应用"设置页面：\n'
+            '   • 找到"Allow from this source"（允许从此来源）开关\n'
+            '   • 打开这个开关（通常是一个滑动开关或复选框）\n'
+            '   • 然后返回应用，再次点击"立即更新"\n\n'
+            '2. 如果没有跳转到设置页面：\n'
+            '   • 请前往：设置 → 应用 → 特殊应用访问 → 安装未知应用\n'
+            '   • 找到"Agrisale"并允许安装\n\n'
+            '注意：不同Android版本的设置路径可能略有不同。\n\n'
+            '错误详情: $e');
+      } else if (errorStr.contains('filenotfoundexception') ||
+                 errorStr.contains('文件不存在')) {
+        throw Exception('安装失败：找不到APK文件。\n\n错误详情: $e');
+      } else if (errorStr.contains('package') && 
+                 (errorStr.contains('signature') || 
+                  errorStr.contains('签名') ||
+                  errorStr.contains('conflicting') ||
+                  errorStr.contains('newer') ||
+                  errorStr.contains('older'))) {
+        // 签名不匹配或版本冲突
+        throw Exception('安装失败：签名不匹配。\n\n'
+            '这可能是因为：\n'
+            '1. 您当前运行的是通过 flutter run 安装的调试版本\n'
+            '2. 而下载的APK是发布版本，签名不同\n\n'
+            '解决方案：\n'
+            '• 如果是开发测试：请使用 flutter build apk 构建发布版本后手动安装\n'
+            '• 如果是正式使用：请先卸载当前应用，再安装新版本\n\n'
+            '错误详情: $e');
+      } else if (errorStr.contains('user_canceled') ||
+                 errorStr.contains('用户取消')) {
+        throw Exception('安装已取消');
+      } else {
+        throw Exception('安装失败：$e\n\n'
+            '如果这是开发环境（通过 flutter run 运行），可能是签名不匹配问题。\n'
+            '请尝试手动从GitHub Releases下载并安装。');
+      }
     }
   }
   

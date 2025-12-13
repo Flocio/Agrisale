@@ -26,7 +26,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
   String? _username;
-  
+
   @override
   void initState() {
     super.initState();

@@ -1,5 +1,6 @@
 import 'package:flutter/material.dart';
 import 'package:url_launcher/url_launcher.dart';
+import 'package:package_info_plus/package_info_plus.dart';
 import '../services/update_service.dart';
 
 class UpdateDialog extends StatefulWidget {
@@ -45,11 +46,191 @@ class _UpdateDialogState extends State<UpdateDialog> {
       
       if (mounted) {
         Navigator.of(context).pop();
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(
-            content: Text('更新已开始安装，请按照提示完成安装'),
-            duration: Duration(seconds: 5),
-            backgroundColor: Colors.green,
+        
+        // 显示安装完成提示
+        // 注意：InstallPlugin.installApk() 只是启动安装流程，不等待安装完成
+        // 用户需要在系统安装界面中完成所有步骤
+        final currentVersion = (await PackageInfo.fromPlatform()).version;
+        final targetVersion = widget.updateInfo.version.replaceAll('v', '');
+        
+        showDialog(
+          context: context,
+          barrierDismissible: false,
+          builder: (context) => AlertDialog(
+            title: Row(
+              children: [
+                Icon(Icons.system_update, color: Colors.blue),
+                SizedBox(width: 8),
+                Text('安装提示'),
+              ],
+            ),
+            content: SingleChildScrollView(
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Text(
+                    '安装流程已启动。请按照以下步骤完成安装：',
+                    style: TextStyle(fontWeight: FontWeight.bold, fontSize: 14),
+                  ),
+                  SizedBox(height: 16),
+                  _buildInstallStep('1', '在系统安装界面完成安装'),
+                  SizedBox(height: 8),
+                  Padding(
+                    padding: EdgeInsets.only(left: 24),
+                    child: Text(
+                      '• 如果看到"安装未知应用"设置页面：\n'
+                      '  打开"Allow from this source"开关，然后返回\n'
+                      '• 如果看到安装确认对话框：\n'
+                      '  点击"Install"按钮\n'
+                      '• 如果看到Google Play Protect提示：\n'
+                      '  点击"Install without scanning"\n'
+                      '• 如果看到"应用未安装"或安装失败：\n'
+                      '  说明需要先卸载旧版本（见下方说明）',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.blue[50],
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.blue[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.info_outline, color: Colors.blue[700], size: 16),
+                            SizedBox(width: 8),
+                            Text(
+                              'Android更新说明',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.blue[900]),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          'Android覆盖安装要求：\n'
+                          '• 新版本的构建号（versionCode）必须大于旧版本\n'
+                          '• 如果构建号相同或更小，会显示"App not installed"\n'
+                          '• 这种情况下需要先卸载旧版本再安装\n\n'
+                          '如果看到"应用未安装"或"App not installed"：\n'
+                          '1. 卸载当前应用\n'
+                          '2. 手动从GitHub下载并安装新版本',
+                          style: TextStyle(fontSize: 10, color: Colors.blue[900]),
+                        ),
+                      ],
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  _buildInstallStep('2', '等待安装完成'),
+                  SizedBox(height: 8),
+                  Padding(
+                    padding: EdgeInsets.only(left: 24),
+                    child: Text(
+                      '• 观察安装进度条\n'
+                      '• 等待看到"应用已安装"或类似提示\n'
+                      '• 如果看到"应用未安装"或安装失败，说明需要先卸载旧版本',
+                      style: TextStyle(fontSize: 12),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  _buildInstallStep('3', '完全关闭并重新打开应用'),
+                  SizedBox(height: 8),
+                  Padding(
+                    padding: EdgeInsets.only(left: 24),
+                    child: Text(
+                      '• 按返回键完全退出应用\n'
+                      '• 从应用列表重新打开应用\n'
+                      '• 在"关于系统"页面检查版本号',
+                      style: TextStyle(color: Colors.green[700], fontWeight: FontWeight.bold, fontSize: 12),
+                    ),
+                  ),
+                  SizedBox(height: 16),
+                  Container(
+                    padding: EdgeInsets.all(8),
+                    decoration: BoxDecoration(
+                      color: Colors.orange[50],
+                      borderRadius: BorderRadius.circular(4),
+                      border: Border.all(color: Colors.orange[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.warning_amber, color: Colors.orange[700], size: 16),
+                            SizedBox(width: 8),
+                            Text(
+                              '重要：验证安装是否成功',
+                              style: TextStyle(fontSize: 11, fontWeight: FontWeight.bold, color: Colors.orange[900]),
+                            ),
+                          ],
+                        ),
+                        SizedBox(height: 4),
+                        Text(
+                          '重启应用后，请到"关于系统"页面检查版本号。\n\n'
+                          '⚠️ 如果版本还是 $currentVersion（应该是 $targetVersion）：\n'
+                          '说明安装失败了。可能的原因：\n'
+                          '1. 构建号（versionCode）没有递增\n'
+                          '2. 签名不匹配\n'
+                          '3. 其他系统限制\n\n'
+                          '💡 解决方法：\n'
+                          '如果看到"App not installed"，说明构建号问题。\n'
+                          '请先卸载当前应用，然后手动从GitHub下载并安装新版本。',
+                          style: TextStyle(fontSize: 10, color: Colors.orange[900], fontWeight: FontWeight.bold),
+                        ),
+                      ],
+                    ),
+                  ),
+                ],
+              ),
+            ),
+            actions: [
+              TextButton(
+                onPressed: () {
+                  Navigator.of(context).pop();
+                },
+                child: Text('我知道了'),
+              ),
+              ElevatedButton.icon(
+                onPressed: () async {
+                  Navigator.of(context).pop();
+                  // 打开GitHub Releases页面，让用户手动下载安装
+                  final url = widget.updateInfo.githubReleasesUrl ?? 
+                              'https://github.com/Flocio/Agrisale/releases/latest';
+                  try {
+                    final uri = Uri.parse(url);
+                    if (await canLaunchUrl(uri)) {
+                      await launchUrl(uri, mode: LaunchMode.externalApplication);
+                      ScaffoldMessenger.of(context).showSnackBar(
+                        SnackBar(
+                          content: Text('已打开GitHub Releases页面，请手动下载并安装APK'),
+                          duration: Duration(seconds: 3),
+                          backgroundColor: Colors.blue,
+                        ),
+                      );
+                    }
+                  } catch (e) {
+                    ScaffoldMessenger.of(context).showSnackBar(
+                      SnackBar(
+                        content: Text('无法打开链接: $e'),
+                        backgroundColor: Colors.red,
+                      ),
+                    );
+                  }
+                },
+                icon: Icon(Icons.download, size: 18),
+                label: Text('手动下载安装'),
+                style: ElevatedButton.styleFrom(
+                  backgroundColor: Colors.orange,
+                  foregroundColor: Colors.white,
+                ),
+              ),
+            ],
           ),
         );
       }
@@ -242,6 +423,39 @@ class _UpdateDialogState extends State<UpdateDialog> {
               child: Text('立即更新'),
             ),
         ],
+      ],
+    );
+  }
+  
+  Widget _buildInstallStep(String number, String text) {
+    return Row(
+      crossAxisAlignment: CrossAxisAlignment.start,
+      children: [
+        Container(
+          width: 24,
+          height: 24,
+          decoration: BoxDecoration(
+            color: Colors.blue,
+            shape: BoxShape.circle,
+          ),
+          child: Center(
+            child: Text(
+              number,
+              style: TextStyle(
+                color: Colors.white,
+                fontSize: 12,
+                fontWeight: FontWeight.bold,
+              ),
+            ),
+          ),
+        ),
+        SizedBox(width: 8),
+        Expanded(
+          child: Text(
+            text,
+            style: TextStyle(fontWeight: FontWeight.w500),
+          ),
+        ),
       ],
     );
   }
