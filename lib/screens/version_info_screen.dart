@@ -126,58 +126,6 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                     ),
                   ),
                   
-                  // 版本介绍（如果有更新信息）
-                  if (_updateInfo != null && _updateInfo!.releaseNotes.isNotEmpty) ...[
-                    SizedBox(height: 20),
-                    Card(
-                      elevation: 2,
-                      shape: RoundedRectangleBorder(
-                        borderRadius: BorderRadius.circular(12),
-                      ),
-                      child: Padding(
-                        padding: EdgeInsets.all(20),
-                        child: Column(
-                          crossAxisAlignment: CrossAxisAlignment.start,
-                          children: [
-                            Row(
-                              children: [
-                                Icon(Icons.description, color: Colors.blue[700], size: 24),
-                                SizedBox(width: 12),
-                                Text(
-                                  '版本 ${_updateInfo!.version} 更新内容',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                    color: Colors.blue[700],
-                                  ),
-                                ),
-                              ],
-                            ),
-                            SizedBox(height: 16),
-                            Container(
-                              constraints: BoxConstraints(maxHeight: 200),
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.grey[100],
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: SingleChildScrollView(
-                                child: Text(
-                                  _updateInfo!.releaseNotes,
-                                  style: TextStyle(
-                                    fontSize: 13,
-                                    color: Colors.grey[700],
-                                    height: 1.5,
-                                  ),
-                                ),
-                              ),
-                            ),
-                          ],
-                        ),
-                      ),
-                    ),
-                  ],
-                  
                   SizedBox(height: 20),
                   
                   // 检查更新按钮
