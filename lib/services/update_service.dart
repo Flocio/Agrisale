@@ -264,6 +264,30 @@ class UpdateService {
         
         print('下载完成: $filePath');
         
+        // 验证下载的文件
+        try {
+          if (Platform.isAndroid) {
+            await _validateApkFile(filePath);
+          } else if (Platform.isWindows) {
+            await _validateZipFile(filePath);
+          } else if (Platform.isMacOS) {
+            await _validateZipFile(filePath);
+          }
+        } catch (validationError) {
+          // 验证失败，删除无效文件
+          try {
+            final file = File(filePath);
+            if (await file.exists()) {
+              await file.delete();
+              print('已删除无效的下载文件: $filePath');
+            }
+          } catch (deleteError) {
+            print('删除无效文件失败: $deleteError');
+          }
+          // 重新抛出验证错误，让外层catch处理
+          throw validationError;
+        }
+        
         // 根据平台安装
         if (Platform.isAndroid) {
           await _installAndroid(filePath);
@@ -313,6 +337,92 @@ class UpdateService {
     }
     
     return urls;
+  }
+  
+  // 验证APK文件
+  static Future<void> _validateApkFile(String filePath) async {
+    final file = File(filePath);
+    
+    // 检查文件是否存在
+    if (!await file.exists()) {
+      throw Exception('下载的文件不存在');
+    }
+    
+    // 检查文件大小（APK文件应该至少1MB）
+    final fileSize = await file.length();
+    if (fileSize < 1024 * 1024) {
+      throw Exception('下载的文件太小（${(fileSize / 1024).toStringAsFixed(1)} KB），可能下载不完整');
+    }
+    
+    // 检查文件扩展名
+    if (!filePath.toLowerCase().endsWith('.apk')) {
+      throw Exception('下载的文件不是APK格式: $filePath');
+    }
+    
+    // 检查文件头（APK文件是ZIP格式，ZIP文件头是"PK"）
+    final bytes = await file.openRead(0, 2).toList();
+    if (bytes.isEmpty || bytes[0].isEmpty) {
+      throw Exception('无法读取文件内容');
+    }
+    
+    final fileHeader = String.fromCharCodes(bytes[0].take(2));
+    if (fileHeader != 'PK') {
+      // 检查是否是HTML错误页面
+      final firstBytes = await file.openRead(0, 100).toList();
+      if (firstBytes.isNotEmpty && firstBytes[0].isNotEmpty) {
+        final content = String.fromCharCodes(firstBytes[0].take(50));
+        if (content.trim().toLowerCase().startsWith('<!doctype') || 
+            content.trim().toLowerCase().startsWith('<html')) {
+          throw Exception('下载的文件是HTML错误页面，不是有效的APK文件。请检查网络连接或尝试手动下载。');
+        }
+      }
+      throw Exception('下载的文件格式不正确（不是有效的APK/ZIP文件）。文件头: $fileHeader');
+    }
+    
+    print('APK文件验证通过: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
+  }
+  
+  // 验证ZIP文件
+  static Future<void> _validateZipFile(String filePath) async {
+    final file = File(filePath);
+    
+    // 检查文件是否存在
+    if (!await file.exists()) {
+      throw Exception('下载的文件不存在');
+    }
+    
+    // 检查文件大小（ZIP文件应该至少1MB）
+    final fileSize = await file.length();
+    if (fileSize < 1024 * 1024) {
+      throw Exception('下载的文件太小（${(fileSize / 1024).toStringAsFixed(1)} KB），可能下载不完整');
+    }
+    
+    // 检查文件扩展名
+    if (!filePath.toLowerCase().endsWith('.zip')) {
+      throw Exception('下载的文件不是ZIP格式: $filePath');
+    }
+    
+    // 检查文件头（ZIP文件头是"PK"）
+    final bytes = await file.openRead(0, 2).toList();
+    if (bytes.isEmpty || bytes[0].isEmpty) {
+      throw Exception('无法读取文件内容');
+    }
+    
+    final fileHeader = String.fromCharCodes(bytes[0].take(2));
+    if (fileHeader != 'PK') {
+      // 检查是否是HTML错误页面
+      final firstBytes = await file.openRead(0, 100).toList();
+      if (firstBytes.isNotEmpty && firstBytes[0].isNotEmpty) {
+        final content = String.fromCharCodes(firstBytes[0].take(50));
+        if (content.trim().toLowerCase().startsWith('<!doctype') || 
+            content.trim().toLowerCase().startsWith('<html')) {
+          throw Exception('下载的文件是HTML错误页面，不是有效的ZIP文件。请检查网络连接或尝试手动下载。');
+        }
+      }
+      throw Exception('下载的文件格式不正确（不是有效的ZIP文件）。文件头: $fileHeader');
+    }
+    
+    print('ZIP文件验证通过: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
   }
   
   // Android 安装
