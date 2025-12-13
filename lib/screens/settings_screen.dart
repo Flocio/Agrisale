@@ -7,6 +7,7 @@ import 'package:file_picker/file_picker.dart';
 import 'package:sqflite/sqflite.dart';
 import 'dart:convert';
 import 'dart:io';
+import '../utils/app_version.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import '../services/auto_backup_service.dart';
@@ -159,7 +160,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         'exportInfo': {
           'username': username,
           'exportTime': DateTime.now().toIso8601String(),
-          'version': '2.4.0', // 更新版本号
+          'version': AppVersion.version, // 统一版本号管理
         },
         'data': {
           'products': products,

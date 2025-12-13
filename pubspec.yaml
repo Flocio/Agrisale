@@ -16,7 +16,11 @@ publish_to: 'none' # Remove this line if you wish to publish to pub.dev
 # https://developer.apple.com/library/archive/documentation/General/Reference/InfoPlistKeyReference/Articles/CoreFoundationKeys.html
 # In Windows, build-name is used as the major, minor, and patch parts
 # of the product and file versions while build-number is used as the build suffix.
-version: 2.4.0+1
+#
+# ⚠️ 重要：更新版本号时，必须同时更新 lib/utils/app_version.dart 中的 version 常量
+# 格式：x.y.z+buildNumber（如：2.4.1+1）
+# 其中 x.y.z 必须与 AppVersion.version 保持一致
+version: 2.4.1+1
 
 environment:
   sdk: '>=3.5.0 <4.0.0'

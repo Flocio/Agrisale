@@ -9,6 +9,7 @@ import 'package:install_plugin/install_plugin.dart';
 import 'package:url_launcher/url_launcher.dart';
 import 'package:archive/archive.dart';
 import 'package:path/path.dart' as path;
+import '../utils/app_version.dart';
 
 class UpdateService {
   // GitHub 仓库地址
@@ -108,7 +109,7 @@ class UpdateService {
         Uri.parse(source.apiUrl),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'AgriSale-Update-Checker/2.4.0',
+          'User-Agent': 'AgriSale-Update-Checker/${AppVersion.versionForUserAgent}',
         },
       ).timeout(Duration(seconds: 20)); // 增加到20秒超时
       

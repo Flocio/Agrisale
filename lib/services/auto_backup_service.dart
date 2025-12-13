@@ -4,6 +4,7 @@ import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../database_helper.dart';
+import '../utils/app_version.dart';
 
 class AutoBackupService {
   static final AutoBackupService _instance = AutoBackupService._internal();
@@ -118,7 +119,7 @@ class AutoBackupService {
           'type': 'auto_backup',
           'username': username,
           'backupTime': DateTime.now().toIso8601String(),
-          'version': '2.4.0',
+          'version': AppVersion.version,
         },
         'data': {
           'products': products,
