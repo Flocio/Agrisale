@@ -18,6 +18,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   String _apiKey = '';
   final _apiKeyController = TextEditingController();
   bool _obscureApiKey = true;
+  bool _isLoading = true; // 添加加载状态
   
   final List<String> _availableModels = [
     'deepseek-chat',
@@ -32,6 +33,10 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   }
 
   Future<void> _loadModelSettings() async {
+    setState(() {
+      _isLoading = true; // 开始加载
+    });
+    
     final prefs = await SharedPreferences.getInstance();
     final username = prefs.getString('current_username');
     
@@ -54,12 +59,24 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
             _selectedModel = (settings['deepseek_model'] as String?) ?? 'deepseek-chat';
             _apiKey = (settings['deepseek_api_key'] as String?) ?? '';
             _apiKeyController.text = _apiKey;
+            _isLoading = false; // 加载完成
           });
         } else {
           // 如果没有设置记录，创建一个
           await DatabaseHelper().createUserSettings(userId);
+          setState(() {
+            _isLoading = false; // 加载完成
+          });
         }
+      } else {
+        setState(() {
+          _isLoading = false; // 加载完成（即使没有userId）
+        });
       }
+    } else {
+      setState(() {
+        _isLoading = false; // 加载完成（即使没有username）
+      });
     }
   }
 
@@ -120,6 +137,23 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
 
   @override
   Widget build(BuildContext context) {
+    // 如果正在加载，显示加载指示器
+    if (_isLoading) {
+      return Scaffold(
+        appBar: AppBar(
+          title: Text('模型设置', 
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            )
+          ),
+        ),
+        body: Center(
+          child: CircularProgressIndicator(),
+        ),
+      );
+    }
+    
     return Scaffold(
       appBar: AppBar(
         title: Text('模型设置', 

@@ -888,32 +888,32 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
                         child: Center(
                           child: Padding(
                             padding: const EdgeInsets.all(16.0),
-                            child: Column(
-                              mainAxisAlignment: MainAxisAlignment.center,
+                        child: Column(
+                          mainAxisAlignment: MainAxisAlignment.center,
                               mainAxisSize: MainAxisSize.min,
-                              children: [
-                                Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
-                                SizedBox(height: 16),
-                                Text(
-                                  _transactions.isEmpty ? '暂无往来记录' : '没有符合条件的记录',
+                          children: [
+                            Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                            SizedBox(height: 16),
+                            Text(
+                              _transactions.isEmpty ? '暂无往来记录' : '没有符合条件的记录',
+                              style: TextStyle(
+                                fontSize: 18,
+                                color: Colors.grey[600],
+                              ),
+                            ),
+                            if (_transactions.isNotEmpty && _filteredTransactions.isEmpty)
+                              Padding(
+                                padding: EdgeInsets.only(top: 8),
+                                child: Text(
+                                  '请尝试调整搜索或筛选条件',
                                   style: TextStyle(
-                                    fontSize: 18,
-                                    color: Colors.grey[600],
+                                    fontSize: 14,
+                                    color: Colors.grey[500],
                                   ),
-                                ),
-                                if (_transactions.isNotEmpty && _filteredTransactions.isEmpty)
-                                  Padding(
-                                    padding: EdgeInsets.only(top: 8),
-                                    child: Text(
-                                      '请尝试调整搜索或筛选条件',
-                                      style: TextStyle(
-                                        fontSize: 14,
-                                        color: Colors.grey[500],
-                                      ),
                                       textAlign: TextAlign.center,
-                                    ),
-                                  ),
-                              ],
+                                ),
+                              ),
+                          ],
                             ),
                           ),
                         ),

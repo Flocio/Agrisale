@@ -465,10 +465,10 @@ $systemDataJson
       
       // 创建流式请求
       final requestBody = jsonEncode({
-        'model': model,
-        'messages': messages,
-        'temperature': temperature,
-        'max_tokens': maxTokens,
+          'model': model,
+          'messages': messages,
+          'temperature': temperature,
+          'max_tokens': maxTokens,
         'stream': true, // 启用流式输出
       });
       
@@ -493,12 +493,12 @@ $systemDataJson
       try {
         final response = await client.send(request).timeout(
           Duration(seconds: 60), // 增加超时时间到60秒
-          onTimeout: () {
-            throw Exception('请求超时：DeepSeek API响应时间过长，请稍后重试');
-          },
-        );
-        
-        if (response.statusCode == 200) {
+        onTimeout: () {
+          throw Exception('请求超时：DeepSeek API响应时间过长，请稍后重试');
+        },
+      );
+      
+      if (response.statusCode == 200) {
           // 初始化助手消息（创建空消息，流式输出时会逐步更新）
           setState(() {
             _isLoading = true; // 保持加载状态直到流式输出完成
@@ -565,9 +565,9 @@ $systemDataJson
               _isLoading = false;
             });
           }
-        } else {
+      } else {
           final errorBody = await response.stream.transform(utf8.decoder).join();
-          _addAssistantMessage('抱歉，API请求失败。\n错误代码: ${response.statusCode}\n错误详情: $errorBody');
+        _addAssistantMessage('抱歉，API请求失败。\n错误代码: ${response.statusCode}\n错误详情: $errorBody');
         }
       } finally {
         client.close();
@@ -591,8 +591,8 @@ $systemDataJson
         errorMessage += 'API响应格式错误。\n详细错误: $e';
       } else {
         errorMessage += '$e';
-      }
-      
+             }
+       
       setState(() {
         _isLoading = false;
       });

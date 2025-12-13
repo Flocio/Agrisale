@@ -449,34 +449,34 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
           _records.isEmpty 
               ? Expanded(
                   child: SingleChildScrollView(
-                    child: Center(
+                  child: Center(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
-                          mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
-                            SizedBox(height: 16),
-                            Text(
-                              '暂无交易记录',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              _selectedProduct == '所有产品' 
-                                  ? '该客户还没有购买或退货记录'
-                                  : '该客户还没有购买或退货 $_selectedProduct 的记录',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
-                              textAlign: TextAlign.center,
-                            ),
-                          ],
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
+                      mainAxisSize: MainAxisSize.min,
+                      children: [
+                        Icon(Icons.receipt_long, size: 64, color: Colors.grey[400]),
+                        SizedBox(height: 16),
+                        Text(
+                          '暂无交易记录',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          _selectedProduct == '所有产品' 
+                              ? '该客户还没有购买或退货记录'
+                              : '该客户还没有购买或退货 $_selectedProduct 的记录',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
+                          textAlign: TextAlign.center,
+                        ),
+                      ],
                         ),
                       ),
                     ),

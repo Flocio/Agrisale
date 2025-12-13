@@ -25,7 +25,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
   String? _username;
-
+  
   @override
   void initState() {
     super.initState();
@@ -62,7 +62,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       _username = prefs.getString('current_username') ?? '未登录';
     });
   }
-
+  
 
   Future<void> _changePassword() async {
     if (!_formKey.currentState!.validate()) {

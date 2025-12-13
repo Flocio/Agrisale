@@ -271,26 +271,26 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                       child: Center(
                         child: Padding(
                           padding: const EdgeInsets.all(16.0),
-                          child: Column(
-                            mainAxisAlignment: MainAxisAlignment.center,
+                      child: Column(
+                        mainAxisAlignment: MainAxisAlignment.center,
                             mainAxisSize: MainAxisSize.min,
-                            children: [
-                              Icon(Icons.badge_outlined, size: 64, color: Colors.grey[400]),
-                              SizedBox(height: 16),
-                              Text(
-                                _isSearching ? '没有匹配的员工' : '暂无员工',
-                                style: TextStyle(
-                                  fontSize: 18,
-                                  color: Colors.grey[600],
-                                ),
-                              ),
-                              SizedBox(height: 8),
-                              Text(
-                                _isSearching ? '请尝试其他搜索条件' : '点击下方 + 按钮添加员工',
-                                style: TextStyle(
-                                  fontSize: 14,
-                                  color: Colors.grey[500],
-                                ),
+                        children: [
+                          Icon(Icons.badge_outlined, size: 64, color: Colors.grey[400]),
+                          SizedBox(height: 16),
+                          Text(
+                            _isSearching ? '没有匹配的员工' : '暂无员工',
+                            style: TextStyle(
+                              fontSize: 18,
+                              color: Colors.grey[600],
+                            ),
+                          ),
+                          SizedBox(height: 8),
+                          Text(
+                            _isSearching ? '请尝试其他搜索条件' : '点击下方 + 按钮添加员工',
+                            style: TextStyle(
+                              fontSize: 14,
+                              color: Colors.grey[500],
+                            ),
                                 textAlign: TextAlign.center,
                               ),
                             ],

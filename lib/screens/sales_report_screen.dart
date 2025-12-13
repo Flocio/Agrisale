@@ -465,41 +465,41 @@ class _SalesReportScreenState extends State<SalesReportScreen> {
                     child: Center(
                       child: Padding(
                         padding: const EdgeInsets.all(16.0),
-                        child: Column(
-                          mainAxisAlignment: MainAxisAlignment.center,
+                    child: Column(
+                      mainAxisAlignment: MainAxisAlignment.center,
                           mainAxisSize: MainAxisSize.min,
-                          children: [
-                            Icon(Icons.point_of_sale, size: 64, color: Colors.grey[400]),
-                            SizedBox(height: 16),
-                            Text(
-                              _allSales.isEmpty ? '暂无销售记录' : '没有符合条件的记录',
-                              style: TextStyle(
-                                fontSize: 18,
-                                color: Colors.grey[600],
-                              ),
-                            ),
-                            SizedBox(height: 8),
-                            Text(
-                              _allSales.isEmpty ? '添加销售记录后会显示在这里' : '请尝试更改筛选条件',
-                              style: TextStyle(
-                                fontSize: 14,
-                                color: Colors.grey[500],
-                              ),
+                      children: [
+                        Icon(Icons.point_of_sale, size: 64, color: Colors.grey[400]),
+                        SizedBox(height: 16),
+                        Text(
+                          _allSales.isEmpty ? '暂无销售记录' : '没有符合条件的记录',
+                          style: TextStyle(
+                            fontSize: 18,
+                            color: Colors.grey[600],
+                          ),
+                        ),
+                        SizedBox(height: 8),
+                        Text(
+                          _allSales.isEmpty ? '添加销售记录后会显示在这里' : '请尝试更改筛选条件',
+                          style: TextStyle(
+                            fontSize: 14,
+                            color: Colors.grey[500],
+                          ),
                               textAlign: TextAlign.center,
-                            ),
-                            if (!_allSales.isEmpty)
-                              Padding(
-                                padding: const EdgeInsets.only(top: 16),
-                                child: ElevatedButton.icon(
-                                  icon: Icon(Icons.clear),
-                                  label: Text('清除筛选条件'),
-                                  onPressed: _resetFilters,
-                                  style: ElevatedButton.styleFrom(
-                                    backgroundColor: Colors.orange,
-                                  ),
-                                ),
+                        ),
+                        if (!_allSales.isEmpty)
+                          Padding(
+                            padding: const EdgeInsets.only(top: 16),
+                            child: ElevatedButton.icon(
+                              icon: Icon(Icons.clear),
+                              label: Text('清除筛选条件'),
+                              onPressed: _resetFilters,
+                              style: ElevatedButton.styleFrom(
+                                backgroundColor: Colors.orange,
                               ),
-                          ],
+                            ),
+                          ),
+                      ],
                         ),
                       ),
                     ),
