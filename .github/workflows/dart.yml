@@ -8,7 +8,7 @@ on:
 
 env:
   FLUTTER_VERSION: "3.24.0"
-  VERSION_TAG: "v2.4.4"
+  VERSION_TAG: "v2.4.5"
 
 jobs:
   # iOS 构建
@@ -194,6 +194,29 @@ jobs:
           else:
               print(f'警告: 未找到 AndroidManifest.xml: {manifest_path}')
           PYEOF
+
+      - name: Restore Android keystore
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/agrisale-release.jks
+            echo "✓ Keystore restored to android/app/agrisale-release.jks"
+          else
+            echo "⚠️ Warning: ANDROID_KEYSTORE_BASE64 secret not set, will use debug signing"
+          fi
+
+      - name: Create key.properties
+        run: |
+          if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
+            cat <<EOF > android/key.properties
+          storePassword=${{ secrets.ANDROID_STORE_PASSWORD }}
+          keyPassword=${{ secrets.ANDROID_KEY_PASSWORD }}
+          keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
+          storeFile=agrisale-release.jks
+          EOF
+            echo "✓ key.properties created in android/ directory"
+          else
+            echo "⚠️ Warning: key.properties not created, will use debug signing"
+          fi
 
       - name: Build Android APK
         run: flutter build apk --release

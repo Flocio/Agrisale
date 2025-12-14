@@ -113,11 +113,12 @@ class _UpdateDialogState extends State<UpdateDialog> {
                         ),
                         SizedBox(height: 4),
                         Text(
-                          'Android覆盖安装要求：\n'
-                          '• 新版本的构建号（versionCode）必须大于旧版本\n'
-                          '• 如果构建号相同或更小，会显示"App not installed"\n'
-                          '• 这种情况下需要先卸载旧版本再安装\n\n'
+                          'Android覆盖安装要求（必须同时满足）：\n'
+                          '1. 新版本的构建号（versionCode）必须大于旧版本\n'
+                          '2. 新版本的签名必须与旧版本完全匹配\n\n'
+                          '⚠️ 如果签名不匹配，即使构建号递增也会显示"App not installed"\n\n'
                           '如果看到"应用未安装"或"App not installed"：\n'
+                          '说明签名不匹配，需要先卸载旧版本再安装新版本\n'
                           '1. 卸载当前应用\n'
                           '2. 手动从GitHub下载并安装新版本',
                           style: TextStyle(fontSize: 10, color: Colors.blue[900]),
@@ -174,12 +175,14 @@ class _UpdateDialogState extends State<UpdateDialog> {
                         Text(
                           '重启应用后，请到"关于系统"页面检查版本号。\n\n'
                           '⚠️ 如果版本还是 $currentVersion（应该是 $targetVersion）：\n'
-                          '说明安装失败了。可能的原因：\n'
-                          '1. 构建号（versionCode）没有递增\n'
-                          '2. 签名不匹配\n'
+                          '说明安装失败了。\n\n'
+                          '🔍 可能的原因：\n'
+                          '1. 签名不匹配（最常见）- 即使构建号递增也会失败\n'
+                          '2. 构建号（versionCode）没有递增\n'
                           '3. 其他系统限制\n\n'
                           '💡 解决方法：\n'
-                          '如果看到"App not installed"，说明构建号问题。\n'
+                          '如果看到"App not installed"，通常是签名不匹配。\n'
+                          'Android要求签名完全匹配才能覆盖安装。\n'
                           '请先卸载当前应用，然后手动从GitHub下载并安装新版本。',
                           style: TextStyle(fontSize: 10, color: Colors.orange[900], fontWeight: FontWeight.bold),
                         ),
