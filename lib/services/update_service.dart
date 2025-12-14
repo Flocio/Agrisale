@@ -57,42 +57,22 @@ class UpdateService {
     final packageInfo = await PackageInfo.fromPlatform();
     final currentVersion = packageInfo.version;
     
-    print('当前版本: $currentVersion');
-    print('开始检查更新，尝试多个下载源...');
-    
     // 按优先级尝试每个下载源
     for (var source in DOWNLOAD_SOURCES) {
       try {
-        print('尝试 ${source.name}...');
         final updateInfo = await _checkFromSource(source, currentVersion);
         
         if (updateInfo != null) {
-          print('✓ ${source.name} 检查成功，发现新版本: ${updateInfo.version}');
           return updateInfo;
         } else {
-          print('✓ ${source.name} 检查成功，当前已是最新版本');
           return null; // 已是最新版本，不需要继续尝试其他源
         }
       } catch (e) {
-        print('✗ ${source.name} 检查失败: $e');
-        // 打印详细错误信息（仅在调试时）
-        if (e.toString().contains('TimeoutException') || 
-            e.toString().contains('超时')) {
-          print('  原因: 连接超时（可能网络较慢或被墙）');
-        } else if (e.toString().contains('HandshakeException')) {
-          print('  原因: SSL握手失败（可能代理服务不稳定）');
-        } else if (e.toString().contains('FormatException') || 
-                   e.toString().contains('非JSON')) {
-          print('  原因: 服务器返回了错误页面（可能代理服务异常）');
-        } else if (e.toString().contains('SocketException')) {
-          print('  原因: 网络连接失败（请检查网络连接）');
-        }
         continue; // 尝试下一个源
       }
     }
     
     // 所有源都失败，返回 GitHub Releases 链接
-    print('所有下载源都失败，返回 GitHub Releases 链接');
     return UpdateInfo(
       version: '未知',
       currentVersion: currentVersion,
@@ -105,8 +85,6 @@ class UpdateService {
   // 从指定源检查更新
   static Future<UpdateInfo?> _checkFromSource(DownloadSource source, String currentVersion) async {
     try {
-      print('正在连接: ${source.apiUrl}');
-      
       final response = await http.get(
         Uri.parse(source.apiUrl),
         headers: {
@@ -114,9 +92,6 @@ class UpdateService {
           'User-Agent': 'AgriSale-Update-Checker/${AppVersion.versionForUserAgent}',
         },
       ).timeout(Duration(seconds: 20)); // 增加到20秒超时
-      
-      print('响应状态码: ${response.statusCode}');
-      print('响应内容类型: ${response.headers['content-type']}');
       
       if (response.statusCode == 200) {
         // 检查响应内容是否为JSON
@@ -140,7 +115,6 @@ class UpdateService {
         final latestVersionTag = data['tag_name'] as String;
         final latestVersion = latestVersionTag.replaceAll('v', '');
         
-        print('成功获取版本信息: $latestVersion');
         
         if (_compareVersions(latestVersion, currentVersion) > 0) {
           // 有新版本，获取下载链接
@@ -159,7 +133,6 @@ class UpdateService {
           );
         } else {
           // 已是最新版本
-          print('当前已是最新版本');
           return null;
         }
       } else {
@@ -187,70 +160,60 @@ class UpdateService {
       
       for (var asset in assets) {
         final assetName = asset['name'] as String;
-        final originalUrl = asset['browser_download_url'] as String;
+        // 清理URL中的空格和特殊字符
+        final originalUrl = (asset['browser_download_url'] as String).trim().replaceAll(' ', '');
         
         if (assetName.startsWith('agrisale-android-') && assetName.endsWith('.apk')) {
           apkUrl = originalUrl;
-          print('找到Android APK文件: $assetName');
         } else if (assetName.startsWith('agrisale-android-') && assetName.endsWith('.aab')) {
           aabUrl = originalUrl;
-          print('找到Android AAB文件: $assetName（注意：AAB文件需要Google Play安装）');
         }
       }
       
       // 优先返回APK，如果没有APK则返回AAB（虽然不能直接安装，但至少可以提示用户）
       final selectedUrl = apkUrl ?? aabUrl;
       if (selectedUrl != null) {
-        // 如果使用代理，添加代理前缀（确保URL格式正确）
+        // 如果使用代理，添加代理前缀
         if (proxyBase != null) {
-          // 移除URL中可能存在的空格，并正确构建代理URL
-          final cleanUrl = selectedUrl.trim();
-          final proxiedUrl = '$proxyBase/$cleanUrl';
-          print('使用下载链接（代理）: $proxiedUrl');
+          final proxiedUrl = '$proxyBase/$selectedUrl';
           return proxiedUrl;
         } else {
-          print('使用下载链接（直连）: $selectedUrl');
           return selectedUrl;
         }
       }
       
-      print('未找到Android平台的下载文件（APK或AAB）');
       return null;
     } else {
       // 其他平台的处理
       String fileName;
       
       if (platform == 'ios') {
-        fileName = 'agrisale-ios-';
-      } else if (platform == 'macos') {
-        fileName = 'agrisale-macos-';
-      } else if (platform == 'windows') {
-        fileName = 'agrisale-windows-';
-      } else {
-        print('不支持的平台: $platform');
-        return null;
-      }
-      
-      for (var asset in assets) {
-        final assetName = asset['name'] as String;
-        if (assetName.startsWith(fileName)) {
-          final originalUrl = asset['browser_download_url'] as String;
-          
-          // 如果使用代理，添加代理前缀（确保URL格式正确）
-          if (proxyBase != null) {
-            final cleanUrl = originalUrl.trim();
-            final proxiedUrl = '$proxyBase/$cleanUrl';
-            print('找到下载链接（代理）: $proxiedUrl');
-            return proxiedUrl;
-          } else {
-            print('找到下载链接（直连）: $originalUrl');
-            return originalUrl;
-          }
+      fileName = 'agrisale-ios-';
+    } else if (platform == 'macos') {
+      fileName = 'agrisale-macos-';
+    } else if (platform == 'windows') {
+      fileName = 'agrisale-windows-';
+    } else {
+      return null;
+    }
+    
+    for (var asset in assets) {
+      final assetName = asset['name'] as String;
+      if (assetName.startsWith(fileName)) {
+        // 清理URL中的空格和特殊字符
+        final originalUrl = (asset['browser_download_url'] as String).trim().replaceAll(' ', '');
+        
+        // 如果使用代理，添加代理前缀
+        if (proxyBase != null) {
+          final proxiedUrl = '$proxyBase/$originalUrl';
+          return proxiedUrl;
+        } else {
+          return originalUrl;
         }
       }
-      
-      print('未找到平台 $platform 的下载文件');
-      return null;
+    }
+    
+    return null;
     }
   }
   
@@ -273,8 +236,16 @@ class UpdateService {
   // 下载并安装更新（支持多个源重试）
   static Future<void> downloadAndInstall(
     String originalDownloadUrl,
-    Function(int received, int total) onProgress,
+    Function(int received, int total, String? downloadPath) onProgress,
   ) async {
+    // Android: 预先检查并请求安装权限
+    if (Platform.isAndroid) {
+      await _checkAndRequestInstallPermission();
+    }
+    
+    // 预先删除旧的APK文件（避免因文件存在导致下载失败）
+    await _deleteOldApkFiles(originalDownloadUrl);
+    
     // 构建多个下载源（原始链接 + 代理链接）
     final downloadUrls = _buildDownloadUrls(originalDownloadUrl);
     
@@ -283,7 +254,6 @@ class UpdateService {
     // 尝试从每个源下载
     for (var downloadUrl in downloadUrls) {
       try {
-        print('尝试从 ${downloadUrl['name']} 下载: ${downloadUrl['url']}');
         
         // 配置Dio以允许不验证SSL证书（仅用于下载场景）
         final dio = Dio();
@@ -294,7 +264,6 @@ class UpdateService {
           final httpClient = HttpClient()
             ..badCertificateCallback = (X509Certificate cert, String host, int port) {
               // 允许所有证书（仅用于下载更新文件）
-              print('跳过SSL证书验证: $host:$port');
               return true;
             };
           
@@ -324,18 +293,31 @@ class UpdateService {
           downloadDir = await getTemporaryDirectory();
         }
         
-        final fileName = originalDownloadUrl.split('/').last;
-        final filePath = '${downloadDir.path}/$fileName';
+        // 清理URL并提取文件名
+        final cleanOriginalUrl = originalDownloadUrl.trim().replaceAll(' ', '');
+        final fileName = cleanOriginalUrl.split('/').last;
+        var filePath = '${downloadDir.path}/$fileName';
         
-        print('下载目录: ${downloadDir.path}');
-        print('文件名: $fileName');
-        print('完整路径: $filePath');
         
         // 检查是否是AAB文件（Android App Bundle不能直接安装）
         if (Platform.isAndroid && fileName.toLowerCase().endsWith('.aab')) {
           throw Exception('下载的文件是AAB格式（Android App Bundle），无法直接安装。\n\n'
               'AAB文件需要通过Google Play商店安装。\n'
               '请从GitHub Releases下载APK文件进行安装。');
+        }
+        
+        // 检查并删除旧文件，如果无法删除则使用新文件名
+        final oldFile = File(filePath);
+        if (await oldFile.exists()) {
+          try {
+            await oldFile.delete();
+          } catch (e) {
+            // 使用带时间戳的文件名
+            final timestamp = DateTime.now().millisecondsSinceEpoch;
+            final ext = fileName.contains('.') ? '.${fileName.split('.').last}' : '';
+            final baseName = fileName.contains('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+            filePath = '${downloadDir.path}/${baseName}_$timestamp$ext';
+          }
         }
         
         // 清理URL中的空格和特殊字符
@@ -351,11 +333,10 @@ class UpdateService {
             validateStatus: (status) => status! < 500, // 允许重定向和客户端错误
           ),
           onReceiveProgress: (received, total) {
-            onProgress(received, total);
+            onProgress(received, total, filePath);
           },
         ).timeout(Duration(minutes: 10)); // 总超时10分钟
         
-        print('下载完成: $filePath');
         
         // 验证下载的文件
         try {
@@ -372,10 +353,8 @@ class UpdateService {
             final file = File(filePath);
             if (await file.exists()) {
               await file.delete();
-              print('已删除无效的下载文件: $filePath');
             }
           } catch (deleteError) {
-            print('删除无效文件失败: $deleteError');
           }
           // 重新抛出验证错误，让外层catch处理
           throw validationError;
@@ -384,20 +363,15 @@ class UpdateService {
         // 根据平台安装
         if (Platform.isAndroid) {
           // 记录下载的APK文件名，用于验证
-          print('准备安装APK: $fileName');
-          print('APK文件路径: $filePath');
-          print('APK文件大小: ${(await File(filePath).length() / 1024 / 1024).toStringAsFixed(2)} MB');
           
           await _installAndroid(filePath);
           
           // 安装启动后，等待一小段时间让安装完成
-          print('等待安装完成...');
           await Future.delayed(Duration(seconds: 3));
           
           // 验证安装（注意：当前运行的进程还是旧版本，所以这里只是检查文件）
           final installedFile = File(filePath);
           if (await installedFile.exists()) {
-            print('APK文件仍然存在，安装可能还在进行中或已完成');
           }
         } else if (Platform.isIOS) {
           await _installIOS();
@@ -410,7 +384,6 @@ class UpdateService {
         // 下载成功，返回
         return;
       } catch (e) {
-        print('从 ${downloadUrl['name']} 下载失败: $e');
         lastError = e is Exception ? e : Exception(e.toString());
         continue; // 尝试下一个源
       }
@@ -424,10 +397,13 @@ class UpdateService {
   static List<Map<String, String>> _buildDownloadUrls(String originalUrl) {
     final urls = <Map<String, String>>[];
     
+    // 清理原始URL中的空格和特殊字符
+    final cleanOriginalUrl = originalUrl.trim().replaceAll(' ', '');
+    
     // 1. 原始链接（直连）
     urls.add({
       'name': 'GitHub 直连',
-      'url': originalUrl,
+      'url': cleanOriginalUrl,
     });
     
     // 2-4. 代理链接
@@ -440,11 +416,86 @@ class UpdateService {
     for (var proxy in proxies) {
       urls.add({
         'name': '代理服务',
-        'url': '$proxy/$originalUrl',
+        'url': '$proxy/$cleanOriginalUrl',
       });
     }
     
     return urls;
+  }
+  
+  // 检查并请求安装未知应用权限（Android专用）
+  static Future<void> _checkAndRequestInstallPermission() async {
+    try {
+      // 检查是否有安装未知应用的权限
+      final installStatus = await Permission.requestInstallPackages.status;
+      
+      if (!installStatus.isGranted) {
+        final result = await Permission.requestInstallPackages.request();
+        
+        if (!result.isGranted) {
+        }
+      } else {
+      }
+    } catch (e) {
+      // 不抛出异常，继续流程（安装时系统会自动提示）
+    }
+  }
+  
+  // 预先删除旧的APK文件
+  static Future<void> _deleteOldApkFiles(String downloadUrl) async {
+    try {
+      // 清理URL并提取文件名
+      final cleanUrl = downloadUrl.trim().replaceAll(' ', '');
+      final fileName = cleanUrl.split('/').last;
+      
+      // 检查所有可能的下载目录
+      final possibleDirs = <Directory>[];
+      
+      if (Platform.isAndroid) {
+        // 请求存储权限（用于访问外部Download目录）
+        try {
+          final storageStatus = await Permission.storage.status;
+          if (!storageStatus.isGranted) {
+            await Permission.storage.request();
+          }
+          
+          // Android 11+ 需要管理外部存储权限
+          if (await Permission.manageExternalStorage.status.isDenied) {
+            await Permission.manageExternalStorage.request();
+          }
+        } catch (e) {
+        }
+        
+        // Android外部下载目录
+        possibleDirs.add(Directory('/storage/emulated/0/Download'));
+        // 应用临时目录
+        try {
+          possibleDirs.add(await getTemporaryDirectory());
+        } catch (e) {
+        }
+      } else {
+        try {
+          possibleDirs.add(await getTemporaryDirectory());
+        } catch (e) {
+        }
+      }
+      
+      for (var dir in possibleDirs) {
+        if (await dir.exists()) {
+          final filePath = '${dir.path}/$fileName';
+          final file = File(filePath);
+          if (await file.exists()) {
+            try {
+              await file.delete();
+            } catch (e) {
+            }
+          } else {
+          }
+        }
+      }
+    } catch (e) {
+      // 不抛出异常，继续下载流程
+    }
   }
   
   // 验证APK文件
@@ -487,7 +538,6 @@ class UpdateService {
       throw Exception('下载的文件格式不正确（不是有效的APK/ZIP文件）。文件头: $fileHeader');
     }
     
-    print('APK文件验证通过: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
   }
   
   // 验证ZIP文件
@@ -530,7 +580,6 @@ class UpdateService {
       throw Exception('下载的文件格式不正确（不是有效的ZIP文件）。文件头: $fileHeader');
     }
     
-    print('ZIP文件验证通过: ${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB');
   }
   
   // Android 安装
@@ -548,7 +597,6 @@ class UpdateService {
         throw Exception('APK文件为空');
       }
       
-      print('开始安装APK: $apkPath (${(fileSize / 1024 / 1024).toStringAsFixed(2)} MB)');
       
       // 再次验证文件可读
       try {
@@ -556,34 +604,22 @@ class UpdateService {
         if (testBytes.isEmpty || testBytes[0].isEmpty) {
           throw Exception('APK文件无法读取');
         }
-        print('✓ APK文件可读，文件头: ${String.fromCharCodes(testBytes[0].take(2))}');
       } catch (e) {
         throw Exception('APK文件无法读取: $e');
       }
       
       // 调用安装插件
       // install_plugin会自动处理权限请求和FileProvider
-      print('调用 InstallPlugin.installApk...');
-      print('文件路径: $apkPath');
-      print('文件存在: ${await file.exists()}');
-      print('文件大小: ${await file.length()} 字节');
       
       try {
         // 注意：installApk 只是启动安装流程，不等待安装完成
         // 它不会返回安装是否成功，也不会抛出异常（即使安装失败）
         // 用户必须在系统安装界面中完成所有步骤
         await InstallPlugin.installApk(apkPath);
-        print('✓ InstallPlugin.installApk 调用成功，安装流程已启动');
-        print('⚠️ 重要：installApk 不等待安装完成，也不返回安装结果');
-        print('⚠️ 如果安装失败（如签名不匹配），系统可能不会显示明确错误');
-        print('⚠️ 用户需要完成所有安装步骤，然后重启应用检查版本号');
       } catch (installError) {
-        print('✗ InstallPlugin.installApk 调用失败: $installError');
-        print('错误类型: ${installError.runtimeType}');
         rethrow;
       }
     } catch (e) {
-      print('Android 安装失败: $e');
       final errorStr = e.toString().toLowerCase();
       
       // 提供更详细的错误信息
@@ -591,17 +627,7 @@ class UpdateService {
           errorStr.contains('权限') ||
           errorStr.contains('install_denied') ||
           errorStr.contains('user restriction')) {
-        throw Exception('安装失败：缺少安装权限。\n\n'
-            '操作步骤：\n'
-            '1. 如果系统已跳转到"安装未知应用"设置页面：\n'
-            '   • 找到"Allow from this source"（允许从此来源）开关\n'
-            '   • 打开这个开关（通常是一个滑动开关或复选框）\n'
-            '   • 然后返回应用，再次点击"立即更新"\n\n'
-            '2. 如果没有跳转到设置页面：\n'
-            '   • 请前往：设置 → 应用 → 特殊应用访问 → 安装未知应用\n'
-            '   • 找到"Agrisale"并允许安装\n\n'
-            '注意：不同Android版本的设置路径可能略有不同。\n\n'
-            '错误详情: $e');
+        throw Exception('需要安装权限');
       } else if (errorStr.contains('filenotfoundexception') ||
                  errorStr.contains('文件不存在')) {
         throw Exception('安装失败：找不到APK文件。\n\n错误详情: $e');
@@ -629,6 +655,11 @@ class UpdateService {
             '请尝试手动从GitHub Releases下载并安装。');
       }
     }
+  }
+  
+  // 直接安装APK（用于权限授予后重试）
+  static Future<void> installApkDirect(String apkPath) async {
+    return _installAndroid(apkPath);
   }
   
   // iOS 安装（跳转到 App Store 或 TestFlight）
@@ -672,13 +703,11 @@ class UpdateService {
       final exeFile = File(path.join(extractPath, 'agrisale.exe'));
       if (await exeFile.exists()) {
         await Process.start(exeFile.path, [], mode: ProcessStartMode.detached);
-        print('Windows 安装已启动');
       } else {
         // 如果找不到 exe，打开文件夹让用户手动运行
         await Process.run('explorer', [extractPath]);
       }
     } catch (e) {
-      print('Windows 安装失败: $e');
       rethrow;
     }
   }
@@ -717,13 +746,11 @@ class UpdateService {
       
       if (appFiles.isNotEmpty) {
         await Process.run('open', [appFiles.first.path]);
-        print('macOS 安装已启动');
       } else {
         // 如果找不到 .app，打开文件夹让用户手动安装
         await Process.run('open', [extractPath]);
       }
     } catch (e) {
-      print('macOS 安装失败: $e');
       rethrow;
     }
   }

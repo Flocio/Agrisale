@@ -2,6 +2,7 @@
 
 import 'package:flutter/material.dart';
 import 'package:package_info_plus/package_info_plus.dart';
+import 'package:url_launcher/url_launcher.dart';
 import '../services/update_service.dart';
 import 'update_dialog.dart';
 
@@ -155,6 +156,7 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                     ),
                   ),
                   
+                  
                   // 检查错误提示
                   if (_checkError != null) ...[
                     SizedBox(height: 16),
@@ -208,35 +210,50 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                                     ),
                                   ),
                                 ),
+                                IconButton(
+                                  onPressed: () async {
+                                    final url = 'https://github.com/Flocio/Agrisale/releases/latest';
+                                    try {
+                                      final uri = Uri.parse(url);
+                                      if (await canLaunchUrl(uri)) {
+                                        await launchUrl(uri, mode: LaunchMode.externalApplication);
+                                      } else {
+                                        if (mounted) {
+                                          ScaffoldMessenger.of(context).showSnackBar(
+                                            SnackBar(
+                                              content: Text('无法打开链接，请手动访问: $url'),
+                                              backgroundColor: Colors.orange,
+                                              duration: Duration(seconds: 3),
+                                            ),
+                                          );
+                                        }
+                                      }
+                                    } catch (e) {
+                                      if (mounted) {
+                                        ScaffoldMessenger.of(context).showSnackBar(
+                                          SnackBar(
+                                            content: Text('打开链接失败: $e'),
+                                            backgroundColor: Colors.red,
+                                            duration: Duration(seconds: 3),
+                                          ),
+                                        );
+                                      }
+                                    }
+                                  },
+                                  icon: Icon(Icons.open_in_new, size: 18),
+                                  tooltip: 'Github',
+                                  padding: EdgeInsets.all(4),
+                                  constraints: BoxConstraints(),
+                                  style: IconButton.styleFrom(
+                                    foregroundColor: Colors.blue[700],
+                                    minimumSize: Size(32, 32),
+                                    tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                  ),
+                                ),
                               ],
                             ),
-                            SizedBox(height: 16),
-                            Container(
-                              padding: EdgeInsets.all(12),
-                              decoration: BoxDecoration(
-                                color: Colors.white,
-                                borderRadius: BorderRadius.circular(8),
-                              ),
-                              child: Column(
-                                crossAxisAlignment: CrossAxisAlignment.start,
-                                children: [
-                                  Text(
-                                    '当前版本: ${_updateInfo!.currentVersion}',
-                                    style: TextStyle(fontSize: 14),
-                                  ),
-                                  SizedBox(height: 8),
-                                  Text(
-                                    '最新版本: ${_updateInfo!.version}',
-                                    style: TextStyle(
-                                      fontSize: 14,
-                                      fontWeight: FontWeight.bold,
-                                      color: Colors.blue[900],
-                                    ),
-                                  ),
-                                ],
-                              ),
-                            ),
                             if (_updateInfo!.releaseNotes.isNotEmpty) ...[
+                              SizedBox(height: 16),
                               SizedBox(height: 16),
                               Text(
                                 '更新内容：',
