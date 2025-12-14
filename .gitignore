@@ -110,6 +110,7 @@ app.*.map.json
 **/android/**/GeneratedPluginRegistrant.java
 **/android/key.properties
 *.jks
+*.jks.base64
 
 # Database files (you may want to keep sample data, so adjust as needed)
 *.db
