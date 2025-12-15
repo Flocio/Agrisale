@@ -314,7 +314,13 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('自动备份列表', style: TextStyle(color: Colors.white)),
+        title: Text(
+          '自动备份列表',
+          style: TextStyle(
+            color: Colors.white,
+            fontWeight: FontWeight.bold,
+          ),
+        ),
         actions: [
           if (_backupList.isNotEmpty)
             IconButton(
@@ -373,13 +379,25 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
       widgets.add(
         Padding(
           padding: EdgeInsets.only(top: widgets.isEmpty ? 0 : 16, bottom: 8),
-          child: Text(
-            category,
-            style: TextStyle(
-              fontSize: 16,
-              fontWeight: FontWeight.bold,
-              color: Colors.grey[700],
-            ),
+          child: Row(
+            mainAxisAlignment: MainAxisAlignment.spaceBetween,
+            children: [
+              Text(
+                category,
+                style: TextStyle(
+                  fontSize: 16,
+                  fontWeight: FontWeight.bold,
+                  color: Colors.grey[700],
+                ),
+              ),
+              Text(
+                '共 ${backups.length} 个备份',
+                style: TextStyle(
+                  fontSize: 12,
+                  color: Colors.grey[600],
+                ),
+              ),
+            ],
           ),
         ),
       );

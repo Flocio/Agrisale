@@ -90,8 +90,8 @@ class _UpdateDialogState extends State<UpdateDialog> {
                   child: Text('知道了'),
                 ),
               ],
-            ),
-          );
+          ),
+        );
         }
       }
     } catch (e) {
@@ -155,7 +155,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
           children: [
             if (_errorMessage != null) ...[
               Text(
-                _errorMessage!,
+                        _errorMessage!,
                 style: TextStyle(color: Colors.red[700], fontSize: 14),
               ),
               SizedBox(height: 16),
@@ -193,16 +193,16 @@ class _UpdateDialogState extends State<UpdateDialog> {
               ],
               if (_downloadPath != null) ...[
                 SizedBox(height: 12),
-                Container(
+              Container(
                   padding: EdgeInsets.all(8),
-                  decoration: BoxDecoration(
+                decoration: BoxDecoration(
                     color: Colors.grey[100],
                     borderRadius: BorderRadius.circular(4),
-                  ),
+                ),
                   child: Row(
-                    children: [
+                  children: [
                       Icon(Icons.folder, size: 16, color: Colors.grey[600]),
-                      SizedBox(width: 8),
+                        SizedBox(width: 8),
                       Expanded(
                         child: Text(
                           '下载路径: $_downloadPath',
@@ -210,31 +210,31 @@ class _UpdateDialogState extends State<UpdateDialog> {
                           maxLines: 2,
                           overflow: TextOverflow.ellipsis,
                         ),
-                      ),
-                    ],
-                  ),
+                    ),
+                  ],
                 ),
+              ),
               ],
             ] else ...[
               if (widget.updateInfo.releaseNotes.isNotEmpty) ...[
-                Text('更新内容：', style: TextStyle(fontWeight: FontWeight.bold)),
-                SizedBox(height: 8),
-                Container(
-                  constraints: BoxConstraints(maxHeight: 200),
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.grey[100],
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  child: SingleChildScrollView(
-                    child: Text(
-                      widget.updateInfo.releaseNotes.isEmpty 
-                          ? '暂无更新说明' 
-                          : widget.updateInfo.releaseNotes,
-                      style: TextStyle(fontSize: 12),
-                    ),
+              Text('更新内容：', style: TextStyle(fontWeight: FontWeight.bold)),
+              SizedBox(height: 8),
+              Container(
+                constraints: BoxConstraints(maxHeight: 200),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.grey[100],
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                child: SingleChildScrollView(
+                  child: Text(
+                    widget.updateInfo.releaseNotes.isEmpty 
+                        ? '暂无更新说明' 
+                        : widget.updateInfo.releaseNotes,
+                    style: TextStyle(fontSize: 12),
                   ),
                 ),
+              ),
               ],
             ],
           ],

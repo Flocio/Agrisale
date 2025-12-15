@@ -462,6 +462,79 @@ class _SettingsScreenState extends State<SettingsScreen> {
 
         if (confirm != true) return;
 
+        // 兼容云端版导出的数据：如果每条记录仅比本地版多出 version/created_at/updated_at 这3个字段，则在导入前统一忽略这3个字段
+        void _stripExtraMetaFields(Map<String, dynamic> row) {
+          // 只移除这三个已知的额外字段，其它字段仍然保留（如果有其它字段，后续插入时会因列不存在而报错）
+          row.remove('version');
+          row.remove('created_at');
+          row.remove('updated_at');
+        }
+
+        // 对各表中的每条记录进行字段清理
+        if (data['products'] != null) {
+          for (var item in data['products']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+        if (data['suppliers'] != null) {
+          for (var item in data['suppliers']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+        if (data['customers'] != null) {
+          for (var item in data['customers']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+        if (data['employees'] != null) {
+          for (var item in data['employees']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+        if (data['purchases'] != null) {
+          for (var item in data['purchases']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+        if (data['sales'] != null) {
+          for (var item in data['sales']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+        if (data['returns'] != null) {
+          for (var item in data['returns']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+        if (data['income'] != null) {
+          for (var item in data['income']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+        if (data['remittance'] != null) {
+          for (var item in data['remittance']) {
+            if (item is Map<String, dynamic>) {
+              _stripExtraMetaFields(item);
+            }
+          }
+        }
+
         // 显示加载对话框
         showDialog(
           context: context,
@@ -769,6 +842,9 @@ class _SettingsScreenState extends State<SettingsScreen> {
     );
     
     if (confirm == true) {
+      // 退出账号前，如果开启了“退出时自动备份”，先备份一次
+      await AutoBackupService().backupOnExitIfNeeded();
+      
       // 停止自动备份服务
       await AutoBackupService().stopAutoBackup();
       

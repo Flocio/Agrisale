@@ -1,5 +1,6 @@
 import 'dart:async';
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/auto_backup_service.dart';
 import '../database_helper.dart';
@@ -15,6 +16,8 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
   bool _autoBackupEnabled = false;
   int _autoBackupInterval = 15; // 分钟
   int _autoBackupMaxCount = 20;
+  bool _backupOnAppLaunch = false; // 启动应用时自动备份
+  bool _backupOnAppExit = false;   // 退出应用/账号时自动备份
   String? _lastBackupTime;
   int _backupCount = 0;
   bool _isLoading = true;
@@ -22,7 +25,8 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
   Timer? _countdownTimer; // 倒计时定时器
   String _countdown = '未启动'; // 倒计时文本
   
-  final List<int> _availableIntervals = [5, 15, 30, 60, 360, 720, 1440]; // 分钟
+  // 备份间隔选项（分钟）：1分、5分、10分、20分、30分、1小时、2小时、6小时
+  final List<int> _availableIntervals = [1, 5, 10, 20, 30, 60, 120, 360];
 
   @override
   void initState() {
@@ -69,6 +73,8 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
             _autoBackupEnabled = (settings['auto_backup_enabled'] as int?) == 1;
             _autoBackupInterval = (settings['auto_backup_interval'] as int?) ?? 15;
             _autoBackupMaxCount = (settings['auto_backup_max_count'] as int?) ?? 20;
+            _backupOnAppLaunch = (settings['auto_backup_on_launch'] as int?) == 1;
+            _backupOnAppExit = (settings['auto_backup_on_exit'] as int?) == 1;
             _lastBackupTime = settings['last_backup_time'] as String?;
             _isLoading = false;
           });
@@ -111,6 +117,8 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
             'auto_backup_enabled': _autoBackupEnabled ? 1 : 0,
             'auto_backup_interval': _autoBackupInterval,
             'auto_backup_max_count': _autoBackupMaxCount,
+            'auto_backup_on_launch': _backupOnAppLaunch ? 1 : 0,
+            'auto_backup_on_exit': _backupOnAppExit ? 1 : 0,
           },
           where: 'userId = ?',
           whereArgs: [userId],
@@ -150,7 +158,8 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
     
     // 如果自动备份已开启，重启定时器
     if (_autoBackupEnabled) {
-      await _backupService.startAutoBackup(_autoBackupInterval);
+      // 使用新的间隔从当前时间重新计算下次备份时间
+      await _backupService.restartWithNewInterval(_autoBackupInterval);
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('备份间隔已更新为 ${_formatInterval(interval)}')),
       );
@@ -270,31 +279,122 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Divider(),
+                              SizedBox(height: 18),
                               SwitchListTile(
-                                title: Text('启用自动备份'),
-                                subtitle: Text(_autoBackupEnabled ? '已开启，系统将定期自动备份数据' : '已关闭'),
+                                title: Text('启动时自动备份'),
+                                subtitle: Text(
+                                  '每次打开应用并登录后备份一次',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                value: _backupOnAppLaunch,
+                                onChanged: (value) async {
+                                  setState(() {
+                                    _backupOnAppLaunch = value;
+                                  });
+                                  await _saveBackupSettings();
+                                },
+                                contentPadding: EdgeInsets.zero,
+                                secondary: Icon(
+                                  Icons.login,
+                                  color: Colors.green,
+                                  size: 28,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              SwitchListTile(
+                                title: Text('退出时自动备份'),
+                                subtitle: Text(
+                                  '每次关闭应用或退出前备份一次',
+                                  style: TextStyle(fontSize: 12),
+                                ),
+                                value: _backupOnAppExit,
+                                onChanged: (value) async {
+                                  setState(() {
+                                    _backupOnAppExit = value;
+                                  });
+                                  await _saveBackupSettings();
+                                },
+                                contentPadding: EdgeInsets.zero,
+                                secondary: Icon(
+                                  Icons.logout,
+                                  color: Colors.green,
+                                  size: 28,
+                                ),
+                              ),
+                              SizedBox(height: 6),
+                              SwitchListTile(
+                                title: Text('定时自动备份'),
+                                subtitle: Text(
+                                  '设置执行备份的时间间隔',
+                                  style: TextStyle(fontSize: 12),
+                                ),
                                 value: _autoBackupEnabled,
                                 onChanged: _toggleAutoBackup,
+                                contentPadding: EdgeInsets.zero,
                                 secondary: Icon(
-                                  _autoBackupEnabled ? Icons.backup : Icons.backup_outlined,
-                                  color: _autoBackupEnabled ? Colors.green : Colors.grey,
-                                  size: 32,
+                                  Icons.schedule,
+                                  color: Colors.green,
+                                  size: 28,
                                 ),
                               ),
                               
                               if (_autoBackupEnabled) ...[
-                                Divider(),
-                                ListTile(
-                                  leading: Icon(Icons.schedule, color: Colors.blue),
-                                  title: Text('上次备份'),
-                                  subtitle: Text(_formatLastBackupTime()),
-                                ),
-                                Divider(),
-                                ListTile(
-                                  leading: Icon(Icons.timer, color: Colors.orange),
-                                  title: Text('下次备份'),
-                                  subtitle: Text(_countdown),
+                                SizedBox(height: 8),
+                                Container(
+                                  decoration: BoxDecoration(
+                                    color: Colors.grey[50],
+                                    borderRadius: BorderRadius.circular(8),
+                                    border: Border.all(color: Colors.grey[300]!),
+                                  ),
+                                  child: Column(
+                                    children: [
+                                      ListTile(
+                                        leading: Icon(Icons.schedule, color: Colors.blue),
+                                        title: Text('上次备份'),
+                                        subtitle: Text(_formatLastBackupTime()),
+                                      ),
+                                      Divider(height: 0),
+                                      ListTile(
+                                        leading: Icon(Icons.timer, color: Colors.orange),
+                                        title: Text('下次备份'),
+                                        subtitle: Text(_countdown),
+                                      ),
+                                      Divider(height: 0),
+                                      ListTile(
+                                        leading: Icon(Icons.av_timer, color: Colors.teal),
+                                        title: Text('备份时间间隔'),
+                                        subtitle: Row(
+                                          children: [
+                                            Text('当前设置：'),
+                                            SizedBox(width: 8),
+                                            TextButton(
+                                              style: TextButton.styleFrom(
+                                                padding: EdgeInsets.symmetric(horizontal: 14, vertical: 6),
+                                                backgroundColor: Colors.teal.withOpacity(0.08),
+                                                shape: RoundedRectangleBorder(
+                                                  borderRadius: BorderRadius.circular(16),
+                                                  side: BorderSide(
+                                                    color: Colors.teal,
+                                                    width: 1,
+                                                  ),
+                                                ),
+                                                minimumSize: Size(0, 32),
+                                                tapTargetSize: MaterialTapTargetSize.shrinkWrap,
+                                              ),
+                                              onPressed: () => _showIntervalPicker(),
+                                              child: Text(
+                                                _formatInterval(_autoBackupInterval),
+                                                style: TextStyle(
+                                                  color: Colors.teal[800],
+                                                  fontWeight: FontWeight.w500,
+                                                ),
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ),
+                                    ],
+                                  ),
                                 ),
                               ],
                             ],
@@ -303,77 +403,6 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
                       ),
                       
                       SizedBox(height: 16),
-                      
-                      // 备份设置卡片
-                      if (_autoBackupEnabled) ...[
-                        Card(
-                          elevation: 2,
-                          child: Padding(
-                            padding: EdgeInsets.all(16.0),
-                            child: Column(
-                              crossAxisAlignment: CrossAxisAlignment.start,
-                              children: [
-                                Text(
-                                  '备份设置',
-                                  style: TextStyle(
-                                    fontSize: 18,
-                                    fontWeight: FontWeight.bold,
-                                  ),
-                                ),
-                                Divider(),
-                                
-                                // 备份间隔设置
-                                ListTile(
-                                  leading: Icon(Icons.timer, color: Colors.orange),
-                                  title: Text('备份间隔'),
-                                  subtitle: Text('当前: ${_formatInterval(_autoBackupInterval)}'),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 16),
-                                  child: Wrap(
-                                    spacing: 8,
-                                    runSpacing: 8,
-                                    children: _availableIntervals.map((interval) {
-                                      return ChoiceChip(
-                                        label: Text(_formatInterval(interval)),
-                                        selected: _autoBackupInterval == interval,
-                                        onSelected: (selected) {
-                                          if (selected) {
-                                            _changeBackupInterval(interval);
-                                          }
-                                        },
-                                        selectedColor: Colors.blue[200],
-                                      );
-                                    }).toList(),
-                                  ),
-                                ),
-                                SizedBox(height: 16),
-                                
-                                // 最大保留数量
-                                ListTile(
-                                  leading: Icon(Icons.inventory, color: Colors.purple),
-                                  title: Text('最多保留'),
-                                  subtitle: Text('$_autoBackupMaxCount 个备份'),
-                                ),
-                                Padding(
-                                  padding: EdgeInsets.symmetric(horizontal: 16),
-                                  child: Slider(
-                                    value: _autoBackupMaxCount.toDouble(),
-                                    min: 5,
-                                    max: 50,
-                                    divisions: 9,
-                                    label: '$_autoBackupMaxCount',
-                                    onChanged: (value) {
-                                      _changeMaxBackupCount(value.toInt());
-                                    },
-                                  ),
-                                ),
-                              ],
-                            ),
-                          ),
-                        ),
-                        SizedBox(height: 16),
-                      ],
                       
                       // 备份管理卡片
                       Card(
@@ -390,15 +419,18 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
                                   fontWeight: FontWeight.bold,
                                 ),
                               ),
-                              Divider(),
+                              SizedBox(height: 18),
                               ListTile(
                                 leading: Icon(Icons.backup, color: Colors.green),
                                 title: Text('立即备份'),
                                 subtitle: Text('手动执行一次数据备份'),
                                 trailing: Icon(Icons.arrow_forward_ios, size: 16),
                                 onTap: _manualBackup,
+                                contentPadding: EdgeInsets.zero,
                               ),
-                              Divider(),
+                              SizedBox(height: 4),
+                              Divider(height: 1),
+                              SizedBox(height: 4),
                               ListTile(
                                 leading: Icon(Icons.folder_open, color: Colors.blue),
                                 title: Text('查看所有备份'),
@@ -408,67 +440,30 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
                                   await Navigator.of(context).pushNamed('/auto_backup_list');
                                   _loadBackupCount(); // 返回后刷新备份数量
                                 },
+                                contentPadding: EdgeInsets.zero,
                               ),
-                              Divider(),
+                              SizedBox(height: 4),
+                              Divider(height: 1),
+                              SizedBox(height: 4),
+                              // 最大保留数量（对手动/自动备份都生效）
                               ListTile(
-                                leading: Icon(Icons.delete_sweep, color: Colors.red),
-                                title: Text('清理所有备份'),
-                                subtitle: Text('删除所有自动备份文件'),
-                                trailing: Icon(Icons.arrow_forward_ios, size: 16),
-                                onTap: () async {
-                                  if (_backupCount == 0) {
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('没有备份可删除')),
-                                    );
-                                    return;
-                                  }
-                                  
-                                  final confirm = await showDialog<bool>(
-                                    context: context,
-                                    builder: (context) => AlertDialog(
-                                      title: Text('确认清理', style: TextStyle(color: Colors.red[700])),
-                                      content: Text('确定要删除所有 $_backupCount 个自动备份吗？\n\n此操作不可撤销！'),
-                                      actions: [
-                                        TextButton(
-                                          onPressed: () => Navigator.of(context).pop(false),
-                                          child: Text('取消'),
-                                        ),
-                                        ElevatedButton(
-                                          onPressed: () => Navigator.of(context).pop(true),
-                                          style: ElevatedButton.styleFrom(
-                                            backgroundColor: Colors.red,
-                                            foregroundColor: Colors.white,
-                                          ),
-                                          child: Text('全部删除'),
-                                        ),
-                                      ],
-                                    ),
-                                  );
-                                  
-                                  if (confirm == true) {
-                                    showDialog(
-                                      context: context,
-                                      barrierDismissible: false,
-                                      builder: (context) => AlertDialog(
-                                        content: Row(
-                                          children: [
-                                            CircularProgressIndicator(),
-                                            SizedBox(width: 20),
-                                            Text('正在删除...'),
-                                          ],
-                                        ),
-                                      ),
-                                    );
-                                    
-                                    final deletedCount = await _backupService.deleteAllBackups();
-                                    Navigator.of(context).pop(); // 关闭加载对话框
-                                    
-                                    ScaffoldMessenger.of(context).showSnackBar(
-                                      SnackBar(content: Text('已删除 $deletedCount 个备份')),
-                                    );
-                                    _loadBackupCount();
-                                  }
-                                },
+                                leading: Icon(Icons.inventory, color: Colors.purple),
+                                title: Text('最多保留'),
+                                subtitle: Text('$_autoBackupMaxCount 个备份'),
+                                contentPadding: EdgeInsets.zero,
+                              ),
+                              Padding(
+                                padding: EdgeInsets.symmetric(horizontal: 16),
+                                child: Slider(
+                                  value: _autoBackupMaxCount.toDouble(),
+                                  min: 5,
+                                  max: 50,
+                                  divisions: 9,
+                                  label: '$_autoBackupMaxCount',
+                                  onChanged: (value) {
+                                    _changeMaxBackupCount(value.toInt());
+                                  },
+                                ),
                               ),
                             ],
                           ),
@@ -527,6 +522,66 @@ class _AutoBackupScreenState extends State<AutoBackupScreen> {
         style: TextStyle(fontSize: 13, color: Colors.blue[800]),
       ),
     );
+  }
+
+  // 弹出小窗选择备份间隔
+  Future<void> _showIntervalPicker() async {
+    final currentIndex = _availableIntervals.indexOf(_autoBackupInterval).clamp(0, _availableIntervals.length - 1);
+    int tempIndex = currentIndex;
+
+    final selectedIndex = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('选择备份时间间隔'),
+          content: SizedBox(
+            height: 200,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: StatefulBuilder(
+                    builder: (context, setStateDialog) {
+                      return CupertinoPicker(
+                        scrollController: FixedExtentScrollController(initialItem: currentIndex),
+                        itemExtent: 32,
+                        magnification: 1.1,
+                        useMagnifier: true,
+                        onSelectedItemChanged: (index) {
+                          setStateDialog(() {
+                            tempIndex = index;
+                          });
+                        },
+                        children: _availableIntervals
+                            .map((m) => Center(child: Text(_formatInterval(m))))
+                            .toList(),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(tempIndex),
+              child: Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < _availableIntervals.length) {
+      final minutes = _availableIntervals[selectedIndex];
+      if (minutes != _autoBackupInterval) {
+        await _changeBackupInterval(minutes);
+      }
+    }
   }
 }
 

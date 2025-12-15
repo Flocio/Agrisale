@@ -15,6 +15,79 @@ class AutoBackupService {
   bool _isBackupRunning = false;
   DateTime? _nextBackupTime; // 记录下次备份时间
 
+  // 将下次备份时间持久化到 user_settings.auto_backup_next_time 中
+  Future<void> _saveNextBackupTime(DateTime? time) async {
+    _nextBackupTime = time;
+
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('current_username');
+      if (username == null) return;
+
+      final db = await DatabaseHelper().database;
+      final userId = await DatabaseHelper().getCurrentUserId(username);
+      if (userId == null) return;
+
+      await db.update(
+        'user_settings',
+        {'auto_backup_next_time': time?.toIso8601String()},
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+    } catch (e) {
+      // 持久化失败不影响备份逻辑
+      print('保存下次自动备份时间失败（不影响备份）: $e');
+    }
+  }
+
+  // 从 user_settings.auto_backup_next_time 中恢复下次备份时间
+  Future<DateTime?> _loadNextBackupTime() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('current_username');
+      if (username == null) return null;
+
+      final db = await DatabaseHelper().database;
+      final userId = await DatabaseHelper().getCurrentUserId(username);
+      if (userId == null) return null;
+
+      final result = await db.query(
+        'user_settings',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      if (result.isEmpty) return null;
+
+      final nextTimeStr = result.first['auto_backup_next_time'] as String?;
+      if (nextTimeStr == null) return null;
+
+      return DateTime.tryParse(nextTimeStr);
+    } catch (e) {
+      print('加载下次自动备份时间失败（不影响备份）: $e');
+      return null;
+    }
+  }
+
+  void _schedulePeriodicBackups(Duration interval) {
+    final now = DateTime.now();
+    final nextTime = now.add(interval);
+    _saveNextBackupTime(nextTime);
+
+    _autoBackupTimer = Timer.periodic(interval, (timer) async {
+      await performAutoBackup();
+      final next = DateTime.now().add(interval);
+      _saveNextBackupTime(next);
+    });
+  }
+
+  /// 使用新的间隔重新启动自动备份调度（从当前时间开始，不使用上次记录的下次备份时间）
+  Future<void> restartWithNewInterval(int intervalMinutes) async {
+    await stopAutoBackup();
+    final interval = Duration(minutes: intervalMinutes);
+    print('使用新间隔重新启动自动备份服务，间隔: $intervalMinutes 分钟');
+    _schedulePeriodicBackups(interval);
+  }
+
   // 启动自动备份
   Future<void> startAutoBackup(int intervalMinutes) async {
     await stopAutoBackup(); // 先停止现有的定时器
@@ -22,22 +95,60 @@ class AutoBackupService {
     final interval = Duration(minutes: intervalMinutes);
     print('启动自动备份服务，间隔: $intervalMinutes 分钟');
     
-    // 设置下次备份时间
-    _nextBackupTime = DateTime.now().add(interval);
-    
-    _autoBackupTimer = Timer.periodic(interval, (timer) async {
+    // 尝试从上次记录中恢复下次备份时间，以保证跨重启/重新登录的连贯性
+    final storedNextTime = await _loadNextBackupTime();
+    final now = DateTime.now();
+
+    if (storedNextTime != null && storedNextTime.isAfter(now)) {
+      // 还有剩余时间，先等待到 storedNextTime，再进入周期性备份
+      final initialDelay = storedNextTime.difference(now);
+      _nextBackupTime = storedNextTime;
+      _autoBackupTimer = Timer(initialDelay, () async {
       await performAutoBackup();
-      // 每次备份后更新下次备份时间
-      _nextBackupTime = DateTime.now().add(interval);
+        _schedulePeriodicBackups(interval);
     });
+    } else {
+      // 没有记录或已过期，从现在开始按间隔计时
+      _schedulePeriodicBackups(interval);
+    }
   }
 
   // 停止自动备份
   Future<void> stopAutoBackup() async {
     _autoBackupTimer?.cancel();
     _autoBackupTimer = null;
-    _nextBackupTime = null; // 清除下次备份时间
+    // 仅清除内存中的时间，不清除数据库中的记录，以便下次登录时还能知道原来的计划时间
+    _nextBackupTime = null;
     print('停止自动备份服务');
+  }
+
+  /// 如果开启了“退出时自动备份”，在退出账号或关闭应用前调用一次
+  Future<void> backupOnExitIfNeeded() async {
+    try {
+      final prefs = await SharedPreferences.getInstance();
+      final username = prefs.getString('current_username');
+      if (username == null) return;
+
+      final db = await DatabaseHelper().database;
+      final userId = await DatabaseHelper().getCurrentUserId(username);
+      if (userId == null) return;
+
+      final result = await db.query(
+        'user_settings',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      if (result.isEmpty) return;
+
+      final settings = result.first;
+      final backupOnExit = (settings['auto_backup_on_exit'] as int?) == 1;
+      if (!backupOnExit) return;
+
+      await performAutoBackup();
+    } catch (e) {
+      // 退出前自动备份失败不影响退出或关闭应用
+      print('退出前自动备份失败（不影响退出）: $e');
+    }
   }
   
   // 获取距离下一次备份的剩余时间（秒）
@@ -164,12 +275,12 @@ class AutoBackupService {
         } else {
           // 如果列不存在，先添加列
           await db.execute('ALTER TABLE user_settings ADD COLUMN last_backup_time TEXT');
-          await db.update(
-            'user_settings',
-            {'last_backup_time': DateTime.now().toIso8601String()},
-            where: 'userId = ?',
-            whereArgs: [userId],
-          );
+      await db.update(
+        'user_settings',
+        {'last_backup_time': DateTime.now().toIso8601String()},
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
         }
       } catch (e) {
         // 更新备份时间失败不影响备份成功

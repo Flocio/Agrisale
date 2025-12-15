@@ -197,6 +197,9 @@ class DatabaseHelper {
       auto_backup_interval INTEGER DEFAULT 15,
       auto_backup_max_count INTEGER DEFAULT 20,
       last_backup_time TEXT,
+      auto_backup_on_launch INTEGER DEFAULT 0,
+      auto_backup_on_exit INTEGER DEFAULT 0,
+      auto_backup_next_time TEXT,
       FOREIGN KEY (userId) REFERENCES users (id)
     )
   ''');
@@ -298,6 +301,21 @@ class DatabaseHelper {
       print('✓ 已添加 last_backup_time 列');
       hasChanges = true;
     }
+    if (!columnNames.contains('auto_backup_on_launch')) {
+      await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_on_launch INTEGER DEFAULT 0');
+      print('✓ 已添加 auto_backup_on_launch 列');
+      hasChanges = true;
+    }
+    if (!columnNames.contains('auto_backup_on_exit')) {
+      await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_on_exit INTEGER DEFAULT 0');
+      print('✓ 已添加 auto_backup_on_exit 列');
+      hasChanges = true;
+    }
+    if (!columnNames.contains('auto_backup_next_time')) {
+      await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_next_time TEXT');
+      print('✓ 已添加 auto_backup_next_time 列');
+      hasChanges = true;
+    }
     
     if (!hasChanges && oldVersion < 12) {
       print('✓ user_settings表已包含所有自动备份字段');
@@ -344,6 +362,21 @@ class DatabaseHelper {
       if (!columnNames.contains('last_backup_time')) {
         await db.execute('ALTER TABLE user_settings ADD COLUMN last_backup_time TEXT');
         print('✓ [修复] 已添加 last_backup_time 列');
+        hasChanges = true;
+      }
+      if (!columnNames.contains('auto_backup_on_launch')) {
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_on_launch INTEGER DEFAULT 0');
+        print('✓ [修复] 已添加 auto_backup_on_launch 列');
+        hasChanges = true;
+      }
+      if (!columnNames.contains('auto_backup_on_exit')) {
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_on_exit INTEGER DEFAULT 0');
+        print('✓ [修复] 已添加 auto_backup_on_exit 列');
+        hasChanges = true;
+      }
+      if (!columnNames.contains('auto_backup_next_time')) {
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_next_time TEXT');
+        print('✓ [修复] 已添加 auto_backup_next_time 列');
         hasChanges = true;
       }
       

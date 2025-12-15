@@ -63,7 +63,7 @@ android {
                 signingConfig = signingConfigs.getByName("release")
             } else {
                 // 开发环境：使用debug签名
-                signingConfig = signingConfigs.getByName("debug")
+            signingConfig = signingConfigs.getByName("debug")
             }
         }
     }

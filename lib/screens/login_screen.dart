@@ -88,7 +88,14 @@ class _LoginScreenState extends State<LoginScreen> {
         final settings = result.first;
         final autoBackupEnabled = (settings['auto_backup_enabled'] as int?) == 1;
         final autoBackupInterval = (settings['auto_backup_interval'] as int?) ?? 15;
+        final backupOnLaunch = (settings['auto_backup_on_launch'] as int?) == 1;
         
+        // 启动应用/自动登录/登录成功时，如果配置了“启动时自动备份”，先备份一次
+        if (backupOnLaunch) {
+          await AutoBackupService().performAutoBackup();
+        }
+        
+        // 定时自动备份根据开关与间隔启动
         if (autoBackupEnabled) {
           await AutoBackupService().startAutoBackup(autoBackupInterval);
           print('自动备份服务已启动，间隔: $autoBackupInterval 分钟');

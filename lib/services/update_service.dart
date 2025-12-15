@@ -615,7 +615,7 @@ class UpdateService {
         // 注意：installApk 只是启动安装流程，不等待安装完成
         // 它不会返回安装是否成功，也不会抛出异常（即使安装失败）
         // 用户必须在系统安装界面中完成所有步骤
-        await InstallPlugin.installApk(apkPath);
+      await InstallPlugin.installApk(apkPath);
       } catch (installError) {
         rethrow;
       }
