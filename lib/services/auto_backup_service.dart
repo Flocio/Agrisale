@@ -148,13 +148,33 @@ class AutoBackupService {
       
       print('自动备份成功: $fileName');
       
-      // 更新最后备份时间
-      await db.update(
-        'user_settings',
-        {'last_backup_time': DateTime.now().toIso8601String()},
-        where: 'userId = ?',
-        whereArgs: [userId],
-      );
+      // 更新最后备份时间（如果列存在）
+      try {
+        // 先检查列是否存在
+        final tableInfo = await db.rawQuery('PRAGMA table_info(user_settings)');
+        final hasLastBackupTime = tableInfo.any((column) => column['name'] == 'last_backup_time');
+        
+        if (hasLastBackupTime) {
+          await db.update(
+            'user_settings',
+            {'last_backup_time': DateTime.now().toIso8601String()},
+            where: 'userId = ?',
+            whereArgs: [userId],
+          );
+        } else {
+          // 如果列不存在，先添加列
+          await db.execute('ALTER TABLE user_settings ADD COLUMN last_backup_time TEXT');
+          await db.update(
+            'user_settings',
+            {'last_backup_time': DateTime.now().toIso8601String()},
+            where: 'userId = ?',
+            whereArgs: [userId],
+          );
+        }
+      } catch (e) {
+        // 更新备份时间失败不影响备份成功
+        print('更新备份时间失败（不影响备份）: $e');
+      }
       
       // 清理旧备份
       await _cleanOldBackups();

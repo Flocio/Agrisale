@@ -182,7 +182,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
       
       // 生成文件名
       final timestamp = DateTime.now().toIso8601String().replaceAll(':', '-').substring(0, 19);
-      final fileName = '${username}_农资数据_$timestamp.json';
+      final fileName = '${username}_Agrisale数据_$timestamp.json';
 
       if (Platform.isMacOS || Platform.isWindows) {
         // macOS 和 Windows: 使用 file_picker 让用户选择保存位置

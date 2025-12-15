@@ -42,12 +42,17 @@ class DatabaseHelper {
       path = join(await getDatabasesPath(), 'agriculture_management.db');
     }
     
-    return await openDatabase(
+    final db = await openDatabase(
       path,
       version: 12, // 更新版本号 - 添加自动备份功能字段
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
+    
+    // 无论版本如何，都检查并修复缺失的列（确保数据库结构完整）
+    await _ensureDatabaseSchema(db);
+    
+    return db;
   }
 
   Future _onCreate(Database db, int version) async {
@@ -299,6 +304,56 @@ class DatabaseHelper {
     }
     
     print('数据库升级完成！所有数据已保留。');
+  }
+
+  // 确保数据库结构完整（检查和修复缺失的列）
+  // 这个方法在每次打开数据库时都会被调用，确保即使升级过程中出现问题也能修复
+  Future<void> _ensureDatabaseSchema(Database db) async {
+    try {
+      // 检查 user_settings 表是否存在
+      final tables = await db.rawQuery(
+        "SELECT name FROM sqlite_master WHERE type='table' AND name='user_settings'"
+      );
+      
+      if (tables.isEmpty) {
+        // 表不存在，说明是新数据库，会在 _onCreate 中创建
+        return;
+      }
+      
+      // 检查并添加缺失的列
+      final tableInfo = await db.rawQuery('PRAGMA table_info(user_settings)');
+      final columnNames = tableInfo.map((col) => col['name'] as String).toList();
+      
+      bool hasChanges = false;
+      
+      if (!columnNames.contains('auto_backup_enabled')) {
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_enabled INTEGER DEFAULT 0');
+        print('✓ [修复] 已添加 auto_backup_enabled 列');
+        hasChanges = true;
+      }
+      if (!columnNames.contains('auto_backup_interval')) {
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_interval INTEGER DEFAULT 15');
+        print('✓ [修复] 已添加 auto_backup_interval 列');
+        hasChanges = true;
+      }
+      if (!columnNames.contains('auto_backup_max_count')) {
+        await db.execute('ALTER TABLE user_settings ADD COLUMN auto_backup_max_count INTEGER DEFAULT 20');
+        print('✓ [修复] 已添加 auto_backup_max_count 列');
+        hasChanges = true;
+      }
+      if (!columnNames.contains('last_backup_time')) {
+        await db.execute('ALTER TABLE user_settings ADD COLUMN last_backup_time TEXT');
+        print('✓ [修复] 已添加 last_backup_time 列');
+        hasChanges = true;
+      }
+      
+      if (hasChanges) {
+        print('✓ 数据库结构修复完成');
+      }
+    } catch (e) {
+      print('检查数据库结构时出错: $e');
+      // 不抛出异常，避免影响数据库打开
+    }
   }
 
   // 获取当前用户ID的辅助方法
