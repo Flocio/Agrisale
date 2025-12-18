@@ -253,7 +253,7 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
     rows.add(['产品筛选: ${_selectedProduct ?? '所有产品'}']);
     rows.add([]); // 空行
     // 修改表头为中文
-    rows.add(['日期/月份', '总销售额', '总进货价', '利润']);
+    rows.add(['日期/月份', '总销售额', '总采购额', '利润']);
 
     List<Map<String, dynamic>> statistics = _currentIndex == 0 ? _dailyStatistics : _monthlyStatistics;
     String dateKey = _currentIndex == 0 ? 'date' : 'month';
@@ -893,7 +893,7 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
                                 ),
                                 SizedBox(width: 8),
                                 Text(
-                                  '总进货价',
+                                  '总采购额',
                                   style: TextStyle(
                                     fontSize: 13,
                                     color: Colors.grey[700],

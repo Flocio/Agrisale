@@ -204,7 +204,7 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
             }
           }
 
-          // 计算差异
+          // 计算差值
           List<Map<String, dynamic>> analysisData = [];
           for (var data in combinedData.values) {
             double totalPurchases = data['totalPurchases'];
@@ -343,7 +343,7 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
     rows.add([]);
     
     // 表头
-    rows.add(['日期', '供应商', '净采购额', '实际汇款', '差异']);
+    rows.add(['日期', '供应商', '净采购额', '实际汇款', '差值']);
 
     // 数据行
     for (var item in _analysisData) {
@@ -411,7 +411,7 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '分析每日每供应商的采购（含退货）与汇款对应情况，差异为正表示欠款，为负表示超付',
+                    '每日的采购额（含退货）与实际汇款的对应情况，差值为正表示欠款（赊账金额），差值为负表示超付（预付金额）',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.blue[800],
@@ -669,7 +669,7 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
                 children: [
                   _buildSummaryItem('净采购额', _formatMoney(_totalPurchases), Colors.blue),
                   _buildSummaryItem('实际汇款', _formatMoney(_totalRemittances), Colors.orange),
-                  _buildSummaryItem('差异', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.green),
+                  _buildSummaryItem('差值', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.green),
                 ],
               ),
             ],
@@ -730,7 +730,7 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
         onSort: (columnIndex, ascending) => _onSort('totalRemittances'),
       ),
       DataColumn(
-        label: Text('差异'),
+        label: Text('差值'),
         numeric: true,
         onSort: (columnIndex, ascending) => _onSort('difference'),
       ),

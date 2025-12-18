@@ -254,7 +254,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
             }
           }
 
-          // 计算净销售额、理论应付、实际应付和差异
+          // 计算净销售额、理论应付、实际应付和差值
           List<Map<String, dynamic>> analysisData = [];
           for (var data in combinedData.values) {
             double netSales = data['totalSales'] - data['totalReturns'];
@@ -404,7 +404,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
     rows.add([]);
     
     // 表头
-    rows.add(['日期', '客户', '销售总额', '退货总额', '净销售额', '应收', '优惠金额', '实际收款', '差异']);
+    rows.add(['日期', '客户', '销售总额', '退货总额', '净销售额', '应收', '优惠金额', '实际收款', '差值']);
 
     // 数据行
     for (var item in _analysisData) {
@@ -478,7 +478,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '分析每日每客户的销售与收款对应情况，差异为正表示欠款（赊账金额），为负表示超收（预收金额）',
+                    '每日的销售额（含退货）与实际收款的对应情况，差值为正表示欠款（赊账金额），差值为负表示超收（预收金额）',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.blue[800],
@@ -737,7 +737,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
                   _buildSummaryItem('净销售额', _formatMoney(_totalNetSales), Colors.blue),
                   _buildSummaryItem('实际收款', _formatMoney(_totalActualPayment), Colors.green),
                   _buildSummaryItem('优惠总额', _formatMoney(_totalDiscount), Colors.orange),
-                  _buildSummaryItem('差异', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.purple),
+                  _buildSummaryItem('差值', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.purple),
                 ],
               ),
             ],
@@ -818,7 +818,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
         onSort: (columnIndex, ascending) => _onSort('actualPayment'),
       ),
       DataColumn(
-        label: Text('差异'),
+        label: Text('差值'),
         numeric: true,
         onSort: (columnIndex, ascending) => _onSort('difference'),
       ),
