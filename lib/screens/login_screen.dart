@@ -106,6 +106,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _login() async {
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('请输入用户名和密码')),
       );
@@ -138,6 +139,7 @@ class _LoginScreenState extends State<LoginScreen> {
         
         Navigator.pushReplacementNamed(context, '/main');
       } else {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('用户名或密码错误'),
@@ -154,6 +156,7 @@ class _LoginScreenState extends State<LoginScreen> {
 
   Future<void> _register() async {
     if (_usernameController.text.isEmpty || _passwordController.text.isEmpty || _confirmPasswordController.text.isEmpty) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('请填写所有字段')),
       );
@@ -161,6 +164,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (_passwordController.text != _confirmPasswordController.text) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('两次输入的密码不一致')),
       );
@@ -168,6 +172,7 @@ class _LoginScreenState extends State<LoginScreen> {
     }
 
     if (_passwordController.text.length < 3) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('密码长度至少为3个字符')),
       );
@@ -191,6 +196,7 @@ class _LoginScreenState extends State<LoginScreen> {
       );
 
       if (existingUser.isNotEmpty) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('用户名已存在，请选择其他用户名'),
@@ -217,6 +223,7 @@ class _LoginScreenState extends State<LoginScreen> {
       // 启动自动备份服务（新用户默认未开启，所以这里不会实际启动）
       await _startAutoBackupService(username);
 
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(
           content: Text('注册成功！'),

@@ -2,16 +2,12 @@
 
 import 'package:flutter/material.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:file_picker/file_picker.dart';
-import 'dart:io';
 import 'package:csv/csv.dart';
 import 'package:table_calendar/table_calendar.dart';
 import 'package:intl/intl.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../services/export_service.dart';
 
 class FinancialStatisticsScreen extends StatefulWidget {
   @override
@@ -277,58 +273,12 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
 
     String csv = const ListToCsvConverter().convert(rows);
 
-    if (Platform.isMacOS || Platform.isWindows) {
-      // macOS 和 Windows: 使用 file_picker 让用户选择保存位置
-      String? selectedPath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存财务统计报告',
-        fileName: 'financial_statistics.csv',
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
+    // 使用统一的导出服务
+    await ExportService.showExportOptions(
+      context: context,
+      csvData: csv,
+      baseFileName: '财务统计报告',
       );
-      
-      if (selectedPath != null) {
-        final file = File(selectedPath);
-        await file.writeAsString(csv);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出成功: $selectedPath')),
-        );
-      }
-      return;
-    }
-
-    String path;
-    if (Platform.isAndroid) {
-      // 请求存储权限
-      if (await Permission.storage.request().isGranted) {
-        final directory = Directory('/storage/emulated/0/Download');
-        path = '${directory.path}/financial_statistics.csv';
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('存储权限被拒绝')),
-        );
-        return;
-      }
-    } else if (Platform.isIOS) {
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/financial_statistics.csv';
-    } else {
-      // 其他平台使用应用文档目录作为后备方案
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/financial_statistics.csv';
-    }
-
-    final file = File(path);
-    await file.writeAsString(csv);
-
-    if (Platform.isIOS) {
-      // iOS 让用户手动选择存储位置
-      await Share.shareFiles([file.path], text: '财务统计 CSV 文件');
-    } else {
-      // Android 直接存入 Download 目录，并提示用户
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出成功: $path')),
-      );
-    }
   }
 
   // 显示日历对话框
@@ -345,10 +295,10 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
             title: Text(_currentIndex == 0 ? '选择日期' : '选择月份'),
             content: SingleChildScrollView(
               child: Container(
-                width: double.maxFinite,
-                child: Column(
-                  mainAxisSize: MainAxisSize.min,
-                  children: [
+              width: double.maxFinite,
+              child: Column(
+                mainAxisSize: MainAxisSize.min,
+                children: [
                   if (_currentIndex == 0)
                   // 每日统计使用常规日历
                   TableCalendar(
@@ -499,7 +449,7 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
                       fontStyle: FontStyle.italic,
                     ),
                   ),
-                  ],
+                ],
                 ),
               ),
             ),
@@ -514,6 +464,7 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
                     Navigator.of(context).pop();
                     _jumpToDate(selectedDay!);
                   } else {
+                    ScaffoldMessenger.of(context).hideCurrentSnackBar();
                     ScaffoldMessenger.of(context).showSnackBar(
                       SnackBar(content: Text('请先选择一个${_currentIndex == 0 ? '日期' : '月份'}')),
                     );
@@ -558,10 +509,12 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
         );
       });
       
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已跳转到 $targetDate 的记录')),
       );
     } else {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('未找到 $targetDate 的记录')),
       );
@@ -613,7 +566,7 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
               onPressed: _toggleSortOrder,
             ),
             IconButton(
-              icon: Icon(Icons.download),
+              icon: Icon(Icons.share),
               tooltip: '导出 CSV',
               onPressed: _exportToCSV,
             ),

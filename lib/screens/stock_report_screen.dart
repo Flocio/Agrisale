@@ -1,6 +1,7 @@
 // lib/screens/stock_report_screen.dart
 
 import 'package:flutter/material.dart';
+import 'package:flutter/cupertino.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'product_detail_screen.dart'; // 导入产品详情屏幕
@@ -17,6 +18,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
   List<Map<String, dynamic>> _suppliers = []; // 添加供应商列表
   TextEditingController _searchController = TextEditingController();
   bool _isSearching = false;
+  int? _selectedSupplierId; // 选中的供应商ID，null表示所有供应商
 
   @override
   void initState() {
@@ -81,18 +83,101 @@ class _StockReportScreenState extends State<StockReportScreen> {
     final searchText = _searchController.text.trim().toLowerCase();
     
     setState(() {
-      if (searchText.isEmpty) {
-        _filteredProducts = List.from(_products);
-        _isSearching = false;
-      } else {
-        _filteredProducts = _products.where((product) {
+      _filteredProducts = _products.where((product) {
+        // 供应商筛选
+        if (_selectedSupplierId != null && product['supplierId'] != _selectedSupplierId) {
+          return false;
+        }
+        
+        // 搜索文本筛选
+        if (searchText.isNotEmpty) {
           final name = product['name'].toString().toLowerCase();
           final description = (product['description'] ?? '').toString().toLowerCase();
-          return name.contains(searchText) || description.contains(searchText);
-        }).toList();
-        _isSearching = true;
-      }
+          if (!name.contains(searchText) && !description.contains(searchText)) {
+            return false;
+          }
+        }
+        
+        return true;
+      }).toList();
+      
+      // 判断是否有筛选条件
+      _isSearching = searchText.isNotEmpty || _selectedSupplierId != null;
     });
+  }
+  
+  // 显示供应商筛选对话框
+  Future<void> _showSupplierFilterDialog() async {
+    // 创建选项列表：第一个是"所有供应商"，后面是所有供应商
+    final List<MapEntry<int?, String>> supplierOptions = [
+      MapEntry<int?, String>(null, '所有供应商'),
+      ..._suppliers.map((s) => MapEntry<int?, String>(s['id'] as int, s['name'] as String)),
+    ];
+    
+    // 找到当前选中项的索引
+    int currentIndex = supplierOptions.indexWhere((entry) => entry.key == _selectedSupplierId);
+    if (currentIndex < 0) {
+      currentIndex = 0; // 默认选中"所有供应商"
+    }
+    
+    int tempIndex = currentIndex;
+
+    final selectedIndex = await showDialog<int>(
+      context: context,
+      builder: (context) {
+        return AlertDialog(
+          title: Text('选择供应商'),
+          content: SizedBox(
+            height: 200,
+            child: Column(
+              mainAxisSize: MainAxisSize.min,
+              children: [
+                Expanded(
+                  child: StatefulBuilder(
+                    builder: (context, setStateDialog) {
+                      return CupertinoPicker(
+                        scrollController: FixedExtentScrollController(initialItem: currentIndex),
+                        itemExtent: 32,
+                        magnification: 1.1,
+                        useMagnifier: true,
+                        onSelectedItemChanged: (index) {
+                          setStateDialog(() {
+                            tempIndex = index;
+                          });
+                        },
+                        children: supplierOptions
+                            .map((entry) => Center(child: Text(entry.value)))
+                            .toList(),
+                      );
+                    },
+                  ),
+                ),
+              ],
+            ),
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(null),
+              child: Text('取消'),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(tempIndex),
+              child: Text('确定'),
+            ),
+          ],
+        );
+      },
+    );
+
+    if (selectedIndex != null && selectedIndex >= 0 && selectedIndex < supplierOptions.length) {
+      final selectedEntry = supplierOptions[selectedIndex];
+      if (selectedEntry.key != _selectedSupplierId) {
+        setState(() {
+          _selectedSupplierId = selectedEntry.key;
+        });
+        _filterProducts();
+      }
+    }
   }
 
   void _showDescriptionDialog(String productName, String description) {
@@ -132,17 +217,6 @@ class _StockReportScreenState extends State<StockReportScreen> {
         ),
       body: Column(
         children: <Widget>[
-            Padding(
-              padding: const EdgeInsets.all(16.0),
-              child: Text(
-                '当前库存情况',
-                style: TextStyle(
-                  fontSize: 18,
-                  fontWeight: FontWeight.bold,
-                  color: Colors.green[800],
-                ),
-              ),
-            ),
           Expanded(
               child: _filteredProducts.isEmpty
                   ? SingleChildScrollView(
@@ -182,19 +256,6 @@ class _StockReportScreenState extends State<StockReportScreen> {
                       padding: EdgeInsets.symmetric(vertical: 8, horizontal: 12),
               itemBuilder: (context, index) {
                         final product = _filteredProducts[index];
-                        final stockLevel = (product['stock'] is double) 
-                            ? product['stock'] 
-                            : double.tryParse(product['stock'].toString()) ?? 0.0;
-                        
-                        // 根据库存量确定显示颜色
-                        Color stockColor = Colors.black87;
-                        if (stockLevel <= 10) {
-                          stockColor = Colors.red;
-                        } else if (stockLevel <= 30) {
-                          stockColor = Colors.orange;
-                        } else {
-                          stockColor = Colors.green;
-                        }
                         
                         return Card(
                           margin: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
@@ -216,7 +277,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
                                   ),
                                   child: Icon(
                                     Icons.inventory_2,
-                                    color: stockColor,
+                                    color: Colors.green,
                                     size: 24,
                                   ),
                                 ),
@@ -248,7 +309,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
                                             style: TextStyle(
                                               fontSize: 14,
                                               fontWeight: FontWeight.bold,
-                                              color: stockColor,
+                                              color: Colors.green,
                                             ),
                                           ),
                                         ],
@@ -257,88 +318,74 @@ class _StockReportScreenState extends State<StockReportScreen> {
                                       SizedBox(height: 2),
                                       Row(
                                         children: [
-                                          Icon(Icons.business, size: 12, color: Colors.blue[600]),
-                                          SizedBox(width: 4),
                                           Text(
-                                            '供应商: ${_getSupplierName(product['supplierId'])}',
+                                            '供应商: ',
                                             style: TextStyle(
                                               fontSize: 12,
-                                              color: Colors.blue[700],
+                                              color: Colors.blue,
+                                            ),
+                                          ),
+                                          Text(
+                                            _getSupplierName(product['supplierId']),
+                                            style: TextStyle(
+                                              fontSize: 12,
+                                              color: Colors.black87,
                                             ),
                                           ),
                                         ],
                                       ),
-                                      // 无论是否有备注，都保留相同高度的区域
-                                      Container(
-                                        height: 18, // 设置固定高度
-                                        child: (product['description'] ?? '').isNotEmpty
-                                          ? Row(
-                                              children: [
-                                                Icon(
-                                                  Icons.description, 
-                                                  size: 12, 
-                                                  color: Colors.grey[600],
+                                      // 备注信息（仅在有时显示）
+                                      if ((product['description'] ?? '').isNotEmpty) ...[
+                                        SizedBox(height: 2),
+                                        Row(
+                                          children: [
+                                            Text(
+                                              '备注: ',
+                                              style: TextStyle(
+                                                fontSize: 12,
+                                                color: Colors.purple,
+                                              ),
+                                            ),
+                                            Expanded(
+                                              child: Text(
+                                                product['description'] ?? '',
+                                                style: TextStyle(
+                                                  fontSize: 12,
+                                                  color: Colors.grey[700],
                                                 ),
-                                                SizedBox(width: 4),
-                                                Expanded(
-                                                  child: Text(
-                                                    '${product['description']}',
-                                                    style: TextStyle(
-                                                      fontSize: 12,
-                                                      color: Colors.grey[600],
-                                                      fontStyle: FontStyle.italic,
-                                                    ),
-                                                    maxLines: 1,
-                                                    overflow: TextOverflow.ellipsis,
-                                                  ),
-                                                ),
-                                              ],
-                                            )
-                                          : null, // 无备注时不显示内容，但保留高度
-                                      ),
+                                                maxLines: 1,
+                                                overflow: TextOverflow.ellipsis,
+                                              ),
+                                            ),
+                                          ],
+                                        ),
+                                      ],
                                     ],
                                   ),
                                 ),
                                 // 详情图标
-                                Row(
-                                  children: [
-                                    // 添加表格查看按钮
-                                    InkWell(
-                                      onTap: () {
-                                        Navigator.push(
-                                          context,
-                                          MaterialPageRoute(
-                                            builder: (context) => ProductDetailScreen(
-                                              product: product,
-                                            ),
+                                Padding(
+                                  padding: EdgeInsets.only(right: 28),
+                                  child: InkWell(
+                                    onTap: () {
+                                      Navigator.push(
+                                        context,
+                                        MaterialPageRoute(
+                                          builder: (context) => ProductDetailScreen(
+                                            product: product,
                                           ),
-                                        );
-                                      },
-                                      child: Padding(
-                                        padding: EdgeInsets.all(4),
-                                        child: Icon(
-                                          Icons.table_chart,
-                                          color: Colors.purple[400],
-                                          size: 24,
                                         ),
+                                      );
+                                    },
+                                    child: Padding(
+                                      padding: EdgeInsets.all(4),
+                                      child: Icon(
+                                        Icons.table_chart,
+                                        color: Colors.purple[400],
+                                        size: 24,
                                       ),
                                     ),
-                                    SizedBox(width: 16), // 增加按钮之间的间距
-                                    InkWell(
-                                      onTap: () => _showDescriptionDialog(
-                                        product['name'], 
-                                        product['description'] ?? ''
-                                      ),
-                                      child: Padding(
-                                        padding: EdgeInsets.all(4),
-                                        child: Icon(
-                                          Icons.info_outline,
-                                          color: Colors.blue[400],
-                                          size: 24,
-                                        ),
-                                      ),
-                                    ),
-                                  ],
+                                  ),
                                 ),
                               ],
                             ),
@@ -364,6 +411,7 @@ class _StockReportScreenState extends State<StockReportScreen> {
                 children: [
                   // 搜索框
                   Expanded(
+                    flex: 3,
                     child: TextField(
                       controller: _searchController,
                       decoration: InputDecoration(
@@ -374,6 +422,10 @@ class _StockReportScreenState extends State<StockReportScreen> {
                                 icon: Icon(Icons.clear, color: Colors.grey[600]),
                                 onPressed: () {
                                   _searchController.clear();
+                                  setState(() {
+                                    _selectedSupplierId = null;
+                                  });
+                                  _filterProducts();
                                   FocusScope.of(context).unfocus();
                                 },
                               )
@@ -399,6 +451,34 @@ class _StockReportScreenState extends State<StockReportScreen> {
                       onEditingComplete: () {
                         FocusScope.of(context).unfocus();
                       },
+                    ),
+                  ),
+                  SizedBox(width: 8),
+                  // 筛选按钮（绿色漏斗icon，正方形区域）
+                  Container(
+                    width: 48,
+                    height: 48,
+                    decoration: BoxDecoration(
+                      color: Colors.grey[100],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(
+                        color: Colors.grey[100]!,
+                        width: 1,
+                      ),
+                    ),
+                    child: Material(
+                      color: Colors.transparent,
+                      child: InkWell(
+                        onTap: _showSupplierFilterDialog,
+                        borderRadius: BorderRadius.circular(8),
+                        child: Center(
+                          child: Icon(
+                            Icons.filter_alt,
+                            color: Colors.green[400],
+                            size: 32,
+                          ),
+                        ),
+                      ),
                     ),
                   ),
                 ],

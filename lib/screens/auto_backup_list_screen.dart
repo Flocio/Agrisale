@@ -35,6 +35,7 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
       setState(() {
         _isLoading = false;
       });
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('加载备份列表失败: $e')),
       );
@@ -64,11 +65,13 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
     if (confirm == true) {
       final success = await _backupService.deleteBackup(backup['path']);
       if (success) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('删除成功')),
         );
         _loadBackupList();
       } else {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('删除失败')),
         );
@@ -78,6 +81,7 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
 
   Future<void> _deleteAllBackups() async {
     if (_backupList.isEmpty) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('没有备份可删除')),
       );
@@ -121,6 +125,7 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
       final deletedCount = await _backupService.deleteAllBackups();
       Navigator.of(context).pop(); // 关闭加载对话框
 
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
       ScaffoldMessenger.of(context).showSnackBar(
         SnackBar(content: Text('已删除 $deletedCount 个备份')),
       );
@@ -202,6 +207,7 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
         final username = prefs.getString('current_username');
         if (username == null) {
           Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('未登录')),
           );
@@ -211,6 +217,7 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId == null) {
           Navigator.of(context).pop();
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('用户信息错误')),
           );
@@ -238,12 +245,14 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
             ),
           );
         } else {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('恢复失败')),
           );
         }
       } catch (e) {
         Navigator.of(context).pop();
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(content: Text('恢复失败: $e')),
         );

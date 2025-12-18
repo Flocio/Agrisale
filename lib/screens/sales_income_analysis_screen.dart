@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../services/export_service.dart';
 
 class SalesIncomeAnalysisScreen extends StatefulWidget {
   @override
@@ -30,12 +26,58 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
   double _totalActualPayment = 0.0;
   double _totalDiscount = 0.0;
   double _totalDifference = 0.0;
+  
+  // 汇总统计卡片是否展开（默认展开）
+  bool _isSummaryExpanded = true;
+  
+  // 表头固定时：需要两个横向滚动控制器（一个 controller 不能同时绑定两个 ScrollView）
+  final ScrollController _headerHorizontalScrollController = ScrollController();
+  final ScrollController _dataHorizontalScrollController = ScrollController();
+  bool _isSyncingFromHeader = false;
+  bool _isSyncingFromData = false;
 
   @override
   void initState() {
     super.initState();
     _fetchCustomers();
     _fetchAnalysisData();
+    
+    // 同步表头和数据的水平滚动（保持对齐）
+    _headerHorizontalScrollController.addListener(_onHeaderHorizontalScroll);
+    _dataHorizontalScrollController.addListener(_onDataHorizontalScroll);
+  }
+  
+  void _onHeaderHorizontalScroll() {
+    if (_isSyncingFromData) return;
+    if (!_dataHorizontalScrollController.hasClients) return;
+    _isSyncingFromHeader = true;
+    final max = _dataHorizontalScrollController.position.maxScrollExtent;
+    final target = _headerHorizontalScrollController.offset.clamp(0.0, max);
+    if (_dataHorizontalScrollController.offset != target) {
+      _dataHorizontalScrollController.jumpTo(target);
+    }
+    _isSyncingFromHeader = false;
+  }
+
+  void _onDataHorizontalScroll() {
+    if (_isSyncingFromHeader) return;
+    if (!_headerHorizontalScrollController.hasClients) return;
+    _isSyncingFromData = true;
+    final max = _headerHorizontalScrollController.position.maxScrollExtent;
+    final target = _dataHorizontalScrollController.offset.clamp(0.0, max);
+    if (_headerHorizontalScrollController.offset != target) {
+      _headerHorizontalScrollController.jumpTo(target);
+    }
+    _isSyncingFromData = false;
+  }
+  
+  @override
+  void dispose() {
+    _headerHorizontalScrollController.removeListener(_onHeaderHorizontalScroll);
+    _dataHorizontalScrollController.removeListener(_onDataHorizontalScroll);
+    _headerHorizontalScrollController.dispose();
+    _dataHorizontalScrollController.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchCustomers() async {
@@ -252,6 +294,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
             _isLoading = false;
           });
           if (mounted) {
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(content: Text('无法获取用户信息')),
             );
@@ -262,6 +305,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
           _isLoading = false;
         });
         if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(content: Text('用户未登录')),
           );
@@ -272,6 +316,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
         _isLoading = false;
       });
       if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('数据加载失败: ${e.toString()}'),
@@ -389,53 +434,14 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
 
     String csv = const ListToCsvConverter().convert(rows);
 
-    if (Platform.isMacOS || Platform.isWindows) {
-      String? selectedPath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存销售进账分析报告',
-        fileName: 'sales_income_analysis.csv',
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-      );
-      
-      if (selectedPath != null) {
-        final file = File(selectedPath);
-        await file.writeAsString(csv);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出成功: $selectedPath')),
-        );
-      }
-      return;
-    }
-
-    String path;
-    if (Platform.isAndroid) {
-      if (await Permission.storage.request().isGranted) {
-        final directory = Directory('/storage/emulated/0/Download');
-        path = '${directory.path}/sales_income_analysis.csv';
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('存储权限被拒绝')),
-        );
-        return;
-      }
-    } else if (Platform.isIOS) {
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/sales_income_analysis.csv';
-    } else {
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/sales_income_analysis.csv';
-    }
-
-    final file = File(path);
-    await file.writeAsString(csv);
-
-    if (Platform.isIOS) {
-      await Share.shareFiles([file.path], text: '销售进账分析报告 CSV 文件');
-    } else {
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出成功: $path')),
-      );
-    }
+    // 使用统一的导出服务
+    await ExportService.showExportOptions(
+      context: context,
+      csvData: csv,
+      baseFileName: (_selectedCustomer != null && _selectedCustomer != '所有客户')
+          ? '${_selectedCustomer}_销售与进账统计'
+          : '销售与进账统计',
+    );
   }
 
   @override
@@ -448,7 +454,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
         )),
         actions: [
           IconButton(
-            icon: Icon(Icons.download),
+            icon: Icon(Icons.share),
             tooltip: '导出 CSV',
             onPressed: _exportToCSV,
           ),
@@ -472,7 +478,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '分析每日每客户的销售与收款对应情况，差异为正表示欠款，为负表示超收',
+                    '分析每日每客户的销售与收款对应情况，差异为正表示欠款（赊账金额），为负表示超收（预收金额）',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.blue[800],
@@ -698,24 +704,43 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
         child: Column(
           crossAxisAlignment: CrossAxisAlignment.start,
           children: [
-            Text(
-              '汇总统计',
-              style: TextStyle(
-                fontSize: 16,
-                fontWeight: FontWeight.bold,
-                color: Colors.blue[800],
-              ),
-            ),
-            Divider(),
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                _buildSummaryItem('净销售额', '¥${_totalNetSales.toStringAsFixed(2)}', Colors.blue),
-                _buildSummaryItem('实际收款', '¥${_totalActualPayment.toStringAsFixed(2)}', Colors.green),
-                _buildSummaryItem('优惠总额', '¥${_totalDiscount.toStringAsFixed(2)}', Colors.orange),
-                _buildSummaryItem('差异', '¥${_totalDifference.toStringAsFixed(2)}', _totalDifference >= 0 ? Colors.red : Colors.purple),
+                Text(
+                  '汇总统计',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.blue[800],
+                  ),
+                ),
+                InkWell(
+                  onTap: () {
+                    setState(() {
+                      _isSummaryExpanded = !_isSummaryExpanded;
+                    });
+                  },
+                  child: Icon(
+                    _isSummaryExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
+                    size: 20,
+                    color: Colors.blue[800],
+                  ),
+                ),
               ],
             ),
+            if (_isSummaryExpanded) ...[
+              Divider(),
+              Row(
+                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+                children: [
+                  _buildSummaryItem('净销售额', _formatMoney(_totalNetSales), Colors.blue),
+                  _buildSummaryItem('实际收款', _formatMoney(_totalActualPayment), Colors.green),
+                  _buildSummaryItem('优惠总额', _formatMoney(_totalDiscount), Colors.orange),
+                  _buildSummaryItem('差异', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.purple),
+                ],
+              ),
+            ],
           ],
         ),
       ),
@@ -744,121 +769,231 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
       ],
     );
   }
+  
+  // 负数金额显示为 -¥123.45，正数保持 ¥123.45
+  String _formatMoney(double value) {
+    final absText = value.abs().toStringAsFixed(2);
+    return value < 0 ? '-¥$absText' : '¥$absText';
+  }
 
   Widget _buildDataTable() {
-    return SingleChildScrollView(
-      scrollDirection: Axis.vertical,
-      child: SingleChildScrollView(
-        scrollDirection: Axis.horizontal,
-        child: DataTable(
-          sortColumnIndex: _getSortColumnIndex(),
-          sortAscending: !_isDescending,
-          horizontalMargin: 12,
-          columnSpacing: 16,
-          headingTextStyle: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.blue[800],
-            fontSize: 12,
-          ),
-          dataTextStyle: TextStyle(fontSize: 11),
-          columns: [
-            DataColumn(
-              label: Text('日期'),
-              onSort: (columnIndex, ascending) => _onSort('date'),
-            ),
-            DataColumn(
-              label: Text('客户'),
-              onSort: (columnIndex, ascending) => _onSort('customerName'),
-            ),
-            DataColumn(
-              label: Text('销售总额'),
-              numeric: true,
-              onSort: (columnIndex, ascending) => _onSort('totalSales'),
-            ),
-            DataColumn(
-              label: Text('退货总额'),
-              numeric: true,
-              onSort: (columnIndex, ascending) => _onSort('totalReturns'),
-            ),
-            DataColumn(
-              label: Text('净销售额'),
-              numeric: true,
-              onSort: (columnIndex, ascending) => _onSort('netSales'),
-            ),
-            DataColumn(
-              label: Text('应收'),
-              numeric: true,
-              onSort: (columnIndex, ascending) => _onSort('actualPayable'),
-            ),
-            DataColumn(
-              label: Text('优惠金额'),
-              numeric: true,
-              onSort: (columnIndex, ascending) => _onSort('discount'),
-            ),
-            DataColumn(
-              label: Text('实际收款'),
-              numeric: true,
-              onSort: (columnIndex, ascending) => _onSort('actualPayment'),
-            ),
-            DataColumn(
-              label: Text('差异'),
-              numeric: true,
-              onSort: (columnIndex, ascending) => _onSort('difference'),
-            ),
+    // 原始列定义（保持原样）
+    final columns = <DataColumn>[
+      DataColumn(
+        label: Text('日期'),
+        onSort: (columnIndex, ascending) => _onSort('date'),
+      ),
+      DataColumn(
+        label: Text('客户'),
+        onSort: (columnIndex, ascending) => _onSort('customerName'),
+      ),
+      DataColumn(
+        label: Text('销售总额'),
+        numeric: true,
+        onSort: (columnIndex, ascending) => _onSort('totalSales'),
+      ),
+      DataColumn(
+        label: Text('退货总额'),
+        numeric: true,
+        onSort: (columnIndex, ascending) => _onSort('totalReturns'),
+      ),
+      DataColumn(
+        label: Text('净销售额'),
+        numeric: true,
+        onSort: (columnIndex, ascending) => _onSort('netSales'),
+      ),
+      DataColumn(
+        label: Text('应收'),
+        numeric: true,
+        onSort: (columnIndex, ascending) => _onSort('actualPayable'),
+      ),
+      DataColumn(
+        label: Text('优惠金额'),
+        numeric: true,
+        onSort: (columnIndex, ascending) => _onSort('discount'),
+      ),
+      DataColumn(
+        label: Text('实际收款'),
+        numeric: true,
+        onSort: (columnIndex, ascending) => _onSort('actualPayment'),
+      ),
+      DataColumn(
+        label: Text('差异'),
+        numeric: true,
+        onSort: (columnIndex, ascending) => _onSort('difference'),
+      ),
+    ];
+    
+    // 构造用于“撑开列宽”的隐形行（保证表头与数据列宽一致）
+    String maxDate = '';
+    String maxCustomer = '';
+    String maxTotalSales = '¥0.00';
+    String maxTotalReturns = '¥0.00';
+    String maxNetSales = '¥0.00';
+    String maxActualPayable = '¥0.00';
+    String maxDiscount = '¥0.00';
+    String maxActualPayment = '¥0.00';
+    String maxDifference = '¥0.00';
+
+    for (final item in _analysisData) {
+      final String date = (item['date'] ?? '').toString();
+      final String customer = (item['customerName'] ?? '').toString();
+      final String totalSales = _formatMoney((item['totalSales'] as num).toDouble());
+      final String totalReturns = _formatMoney((item['totalReturns'] as num).toDouble());
+      final String netSales = _formatMoney((item['netSales'] as num).toDouble());
+      final String actualPayable = _formatMoney((item['actualPayable'] as num).toDouble());
+      final String discount = _formatMoney((item['discount'] as num).toDouble());
+      final String actualPayment = _formatMoney((item['actualPayment'] as num).toDouble());
+      final String difference = _formatMoney((item['difference'] as num).toDouble());
+
+      if (date.length > maxDate.length) maxDate = date;
+      if (customer.length > maxCustomer.length) maxCustomer = customer;
+      if (totalSales.length > maxTotalSales.length) maxTotalSales = totalSales;
+      if (totalReturns.length > maxTotalReturns.length) maxTotalReturns = totalReturns;
+      if (netSales.length > maxNetSales.length) maxNetSales = netSales;
+      if (actualPayable.length > maxActualPayable.length) maxActualPayable = actualPayable;
+      if (discount.length > maxDiscount.length) maxDiscount = discount;
+      if (actualPayment.length > maxActualPayment.length) maxActualPayment = actualPayment;
+      if (difference.length > maxDifference.length) maxDifference = difference;
+    }
+    
+    // 也考虑“总计行”的数值宽度（避免总计更宽导致对齐偏差）
+    final String totalNetSalesText = _formatMoney(_totalNetSales);
+    final String totalPayableText = _formatMoney(_totalActualPayment + _totalDiscount);
+    final String totalDiscountText = _formatMoney(_totalDiscount);
+    final String totalActualPaymentText = _formatMoney(_totalActualPayment);
+    final String totalDifferenceText = _formatMoney(_totalDifference);
+
+    if (totalNetSalesText.length > maxNetSales.length) maxNetSales = totalNetSalesText;
+    if (totalPayableText.length > maxActualPayable.length) maxActualPayable = totalPayableText;
+    if (totalDiscountText.length > maxDiscount.length) maxDiscount = totalDiscountText;
+    if (totalActualPaymentText.length > maxActualPayment.length) maxActualPayment = totalActualPaymentText;
+    if (totalDifferenceText.length > maxDifference.length) maxDifference = totalDifferenceText;
+    
+    final List<DataRow> headerSizerRows = [
+      DataRow(
+        cells: [
+          DataCell(Opacity(opacity: 0, child: Text(maxDate))),
+          DataCell(Opacity(opacity: 0, child: Text(maxCustomer))),
+          DataCell(Opacity(opacity: 0, child: Text(maxTotalSales))),
+          DataCell(Opacity(opacity: 0, child: Text(maxTotalReturns))),
+          DataCell(Opacity(opacity: 0, child: Text(maxNetSales))),
+          DataCell(Opacity(opacity: 0, child: Text(maxActualPayable))),
+          DataCell(Opacity(opacity: 0, child: Text(maxDiscount))),
+          DataCell(Opacity(opacity: 0, child: Text(maxActualPayment))),
+          DataCell(Opacity(opacity: 0, child: Text(maxDifference))),
+        ],
+      ),
+    ];
+    
+    final bodyRows = <DataRow>[
+      ..._analysisData.map((item) {
+        final double totalSales = (item['totalSales'] as num).toDouble();
+        final double totalReturns = (item['totalReturns'] as num).toDouble();
+        final double netSales = (item['netSales'] as num).toDouble();
+        final double actualPayable = (item['actualPayable'] as num).toDouble();
+        final double discount = (item['discount'] as num).toDouble();
+        final double actualPayment = (item['actualPayment'] as num).toDouble();
+        final double difference = (item['difference'] as num).toDouble();
+        
+        return DataRow(
+          cells: [
+            DataCell(Text(item['date'] ?? '')),
+            DataCell(Text(item['customerName'] ?? '')),
+            DataCell(Text(_formatMoney(totalSales))),
+            DataCell(Text(_formatMoney(totalReturns))),
+            DataCell(Text(_formatMoney(netSales),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))),
+            DataCell(Text(_formatMoney(actualPayable))),
+            DataCell(discount > 0
+                ? Text(_formatMoney(discount), style: TextStyle(color: Colors.orange))
+                : Text('')),
+            DataCell(Text(_formatMoney(actualPayment), style: TextStyle(color: Colors.green))),
+            DataCell(Text(_formatMoney(difference),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: difference >= 0 ? Colors.red : Colors.purple
+              ))),
           ],
-          rows: [
-            ..._analysisData.map((item) {
-              return DataRow(
-                cells: [
-                  DataCell(Text(item['date'] ?? '')),
-                  DataCell(Text(item['customerName'] ?? '')),
-                  DataCell(Text('¥${item['totalSales'].toStringAsFixed(2)}')),
-                  DataCell(Text('¥${item['totalReturns'].toStringAsFixed(2)}')),
-                  DataCell(Text('¥${item['netSales'].toStringAsFixed(2)}', 
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))),
-                  DataCell(Text('¥${item['actualPayable'].toStringAsFixed(2)}')),
-                  DataCell(item['discount'] > 0 
-                    ? Text('¥${item['discount'].toStringAsFixed(2)}', 
-                        style: TextStyle(color: Colors.orange))
-                    : Text('')),
-                  DataCell(Text('¥${item['actualPayment'].toStringAsFixed(2)}', 
-                    style: TextStyle(color: Colors.green))),
-                  DataCell(Text('¥${item['difference'].toStringAsFixed(2)}', 
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: item['difference'] >= 0 ? Colors.red : Colors.purple
-                    ))),
-                ],
-              );
-            }).toList(),
-            
-            // 总计行
-            if (_analysisData.isNotEmpty)
-              DataRow(
-                color: MaterialStateProperty.all(Colors.grey[100]),
-                cells: [
-                  DataCell(Text('总计', style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataCell(Text('')),
-                  DataCell(Text('')),
-                  DataCell(Text('')),
-                  DataCell(Text('¥${_totalNetSales.toStringAsFixed(2)}', 
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))),
-                  DataCell(Text('¥${(_totalActualPayment + _totalDiscount).toStringAsFixed(2)}', 
-                    style: TextStyle(fontWeight: FontWeight.bold))),
-                  DataCell(Text('¥${_totalDiscount.toStringAsFixed(2)}', 
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange))),
-                  DataCell(Text('¥${_totalActualPayment.toStringAsFixed(2)}', 
-                    style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green))),
-                  DataCell(Text('¥${_totalDifference.toStringAsFixed(2)}', 
-                    style: TextStyle(
-                      fontWeight: FontWeight.bold,
-                      color: _totalDifference >= 0 ? Colors.red : Colors.purple
-                    ))),
-                ],
-              ),
+        );
+      }).toList(),
+      
+      // 总计行
+      if (_analysisData.isNotEmpty)
+        DataRow(
+          color: MaterialStateProperty.all(Colors.grey[100]),
+          cells: [
+            DataCell(Text('总计', style: TextStyle(fontWeight: FontWeight.bold))),
+            DataCell(Text('')),
+            DataCell(Text('')),
+            DataCell(Text('')),
+            DataCell(Text(_formatMoney(_totalNetSales),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.blue))),
+            DataCell(Text(_formatMoney(_totalActualPayment + _totalDiscount),
+              style: TextStyle(fontWeight: FontWeight.bold))),
+            DataCell(Text(_formatMoney(_totalDiscount),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.orange))),
+            DataCell(Text(_formatMoney(_totalActualPayment),
+              style: TextStyle(fontWeight: FontWeight.bold, color: Colors.green))),
+            DataCell(Text(_formatMoney(_totalDifference),
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: _totalDifference >= 0 ? Colors.red : Colors.purple
+              ))),
           ],
         ),
-      ),
+    ];
+    
+    return Column(
+      children: [
+        // 固定表头（仅垂直方向固定；水平方向与数据同步）
+        SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          controller: _headerHorizontalScrollController,
+          child: DataTable(
+            sortColumnIndex: _getSortColumnIndex(),
+            sortAscending: !_isDescending,
+            horizontalMargin: 12,
+            columnSpacing: 16,
+            headingTextStyle: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.blue[800],
+              fontSize: 12,
+            ),
+            dataTextStyle: TextStyle(fontSize: 11),
+            // 用 0 高度的数据行撑列宽，不改变视觉（只显示表头）
+            dataRowMinHeight: 0,
+            dataRowMaxHeight: 0,
+            columns: columns,
+            rows: headerSizerRows,
+          ),
+        ),
+        
+        // 数据区域（可上下滚动；左右滚动与表头同步保持对齐）
+        Expanded(
+          child: SingleChildScrollView(
+            scrollDirection: Axis.vertical,
+            child: SingleChildScrollView(
+              scrollDirection: Axis.horizontal,
+              controller: _dataHorizontalScrollController,
+              child: DataTable(
+                horizontalMargin: 12,
+                columnSpacing: 16,
+                headingTextStyle: TextStyle(
+                  fontWeight: FontWeight.bold,
+                  color: Colors.blue[800],
+                  fontSize: 12,
+                ),
+                dataTextStyle: TextStyle(fontSize: 11),
+                // 隐藏表头（仅显示数据），但列定义保持一致以确保对齐
+                headingRowHeight: 0,
+                columns: columns,
+                rows: bodyRows,
+              ),
+            ),
+          ),
+        ),
+      ],
     );
   }
 

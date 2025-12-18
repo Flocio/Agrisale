@@ -114,6 +114,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
         await launchUrl(uri, mode: LaunchMode.externalApplication);
       } else {
         if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('无法打开链接，请手动访问: $url'),
@@ -125,6 +126,7 @@ class _UpdateDialogState extends State<UpdateDialog> {
       }
     } catch (e) {
       if (mounted) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
         ScaffoldMessenger.of(context).showSnackBar(
           SnackBar(
             content: Text('打开链接失败: $e'),

@@ -63,6 +63,9 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
       final userId = await DatabaseHelper().getCurrentUserId(username);
       if (userId != null) {
         List<Map<String, dynamic>> allTransactions = [];
+        
+        // 获取产品信息（用于获取单位）
+        final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
 
         // 获取销售记录
         final salesRecords = await db.query(
@@ -72,12 +75,18 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
         );
         
         for (var sale in salesRecords) {
+          final product = products.firstWhere(
+            (p) => p['name'] == sale['productName'],
+            orElse: () => {'unit': ''},
+          );
+          
           allTransactions.add({
             'type': 'sale',
             'typeName': '销售',
             'date': sale['saleDate'],
             'productName': sale['productName'],
             'quantity': sale['quantity'],
+            'unit': product['unit'] ?? '',
             'amount': sale['totalSalePrice'],
             'note': sale['note'] ?? '',
             'icon': Icons.sell,
@@ -93,12 +102,18 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
         );
         
         for (var returnRecord in returnsRecords) {
+          final product = products.firstWhere(
+            (p) => p['name'] == returnRecord['productName'],
+            orElse: () => {'unit': ''},
+          );
+          
           allTransactions.add({
             'type': 'return',
             'typeName': '退货',
             'date': returnRecord['returnDate'],
             'productName': returnRecord['productName'],
             'quantity': returnRecord['quantity'],
+            'unit': product['unit'] ?? '',
             'amount': returnRecord['totalReturnPrice'],
             'note': returnRecord['note'] ?? '',
             'icon': Icons.keyboard_return,
@@ -138,7 +153,7 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
             'employeeName': employeeName,
             'note': income['note'] ?? '',
             'icon': Icons.payment,
-            'color': Colors.blue,
+            'color': Colors.amber, // 改为黄色
           });
         }
 
@@ -585,6 +600,17 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
     return value.toStringAsFixed(2);
   }
 
+  // 格式化数字显示：整数显示为整数，小数显示为小数
+  String _formatNumber(dynamic number) {
+    if (number == null) return '0';
+    double value = number is double ? number : double.tryParse(number.toString()) ?? 0.0;
+    if (value == value.floor()) {
+      return value.toInt().toString();
+    } else {
+      return value.toString();
+    }
+  }
+
   Widget _buildTransactionCard(Map<String, dynamic> transaction) {
     return Card(
       margin: EdgeInsets.symmetric(vertical: 4, horizontal: 2),
@@ -645,7 +671,7 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
-                              color: transaction['type'] == 'return' ? Colors.red : Colors.green,
+                              color: transaction['color'],
                             ),
                           ),
                           if (transaction['discount'] != null && transaction['discount'] > 0)
@@ -690,7 +716,7 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
                     _buildDetailRow('产品', transaction['productName']),
                   
                   if (transaction['quantity'] != null)
-                    _buildDetailRow('数量', _formatAmount(transaction['quantity'])),
+                    _buildDetailRow('数量', '${_formatNumber(transaction['quantity'])} ${transaction['unit'] ?? ''}'),
                   
                   // 支付方式（进账）
                   if (transaction['paymentMethod'] != null)
@@ -751,7 +777,7 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
       child: Scaffold(
       appBar: AppBar(
         title: Text(
-          '${widget.customerName} - 往来记录',
+          '${widget.customerName}的往来记录',
           style: TextStyle(
             fontWeight: FontWeight.bold,
             color: Colors.white,
@@ -863,7 +889,7 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
                       _applyFiltersAndSort();
                     },
                     child: Text(
-                      '清除',
+                      '清除筛选',
                       style: TextStyle(color: Colors.orange[700], fontSize: 12),
                     ),
                     style: TextButton.styleFrom(

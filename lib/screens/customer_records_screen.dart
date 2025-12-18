@@ -2,14 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../services/export_service.dart';
 
 class CustomerRecordsScreen extends StatefulWidget {
   final int customerId;
@@ -29,7 +25,18 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
   String? _selectedProduct = '所有产品'; // 产品筛选
   bool _isSummaryExpanded = true; // 汇总信息是否展开
   
+  // 添加日期筛选相关变量
+  DateTimeRange? _selectedDateRange;
+  
+  // 滚动控制器和指示器
+  ScrollController? _summaryScrollController;
+  double _summaryScrollPosition = 0.0;
+  double _summaryScrollMaxExtent = 0.0;
+  
   // 汇总数据
+  int _totalRecordCount = 0; // 总记录数
+  int _purchaseRecordCount = 0; // 购买记录数
+  int _returnRecordCount = 0; // 退货记录数
   double _totalPurchaseQuantity = 0.0;
   double _totalPurchaseAmount = 0.0;
   double _totalReturnQuantity = 0.0;
@@ -40,8 +47,26 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
   @override
   void initState() {
     super.initState();
+    _summaryScrollController = ScrollController();
+    _summaryScrollController!.addListener(_onSummaryScroll);
     _fetchProducts();
     _fetchRecords();
+  }
+
+  void _onSummaryScroll() {
+    if (_summaryScrollController != null && _summaryScrollController!.hasClients) {
+      setState(() {
+        _summaryScrollPosition = _summaryScrollController!.offset;
+        _summaryScrollMaxExtent = _summaryScrollController!.position.maxScrollExtent;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _summaryScrollController?.removeListener(_onSummaryScroll);
+    _summaryScrollController?.dispose();
+    super.dispose();
   }
 
   // 格式化数字显示：整数显示为整数，小数显示为小数
@@ -84,17 +109,32 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
             ? "AND productName = '$_selectedProduct'"
             : '';
 
+        // 构建日期筛选条件
+        String dateFilter = '';
+        String returnDateFilter = '';
+        List<dynamic> salesParams = [widget.customerId, userId];
+        List<dynamic> returnsParams = [widget.customerId, userId];
+        if (_selectedDateRange != null) {
+          dateFilter = 'AND saleDate >= ? AND saleDate <= ?';
+          salesParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
+          salesParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
+          
+          returnDateFilter = 'AND returnDate >= ? AND returnDate <= ?';
+          returnsParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
+          returnsParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
+        }
+
         // 获取当前用户的销售记录
         final sales = await db.rawQuery('''
           SELECT * FROM sales 
-          WHERE customerId = ? AND userId = ? $productFilter
-        ''', [widget.customerId, userId]);
+          WHERE customerId = ? AND userId = ? $productFilter $dateFilter
+        ''', salesParams);
 
         // 获取当前用户的退货记录
         final returns = await db.rawQuery('''
           SELECT * FROM returns 
-          WHERE customerId = ? AND userId = ? $productFilter
-        ''', [widget.customerId, userId]);
+          WHERE customerId = ? AND userId = ? $productFilter $returnDateFilter
+        ''', returnsParams);
 
         // 获取当前用户的产品信息
         final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
@@ -159,6 +199,8 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
   }
 
   void _calculateSummary(List<Map<String, dynamic>> records) {
+    int purchaseRecordCount = 0;
+    int returnRecordCount = 0;
     double purchaseQuantity = 0.0;
     double purchaseAmount = 0.0;
     double returnQuantity = 0.0;
@@ -166,15 +208,20 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
 
     for (var record in records) {
       if (record['type'] == '购买') {
+        purchaseRecordCount++;
         purchaseQuantity += (record['quantity'] as num).toDouble();
         purchaseAmount += (record['totalPrice'] as num).toDouble();
       } else if (record['type'] == '退货') {
+        returnRecordCount++;
         returnQuantity += (record['quantity'] as num).toDouble();
         returnAmount += (record['totalPrice'] as num).toDouble();
       }
     }
 
     setState(() {
+      _totalRecordCount = records.length;
+      _purchaseRecordCount = purchaseRecordCount;
+      _returnRecordCount = returnRecordCount;
       _totalPurchaseQuantity = purchaseQuantity;
       _totalPurchaseAmount = purchaseAmount;
       _totalReturnQuantity = returnQuantity;
@@ -191,10 +238,20 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
     
     List<List<dynamic>> rows = [];
     // 添加用户信息和导出时间
-    rows.add(['客户交易记录 - 用户: $username']);
+    rows.add(['客户销售记录 - 用户: $username']);
     rows.add(['导出时间: ${DateTime.now().toString().substring(0, 19)}']);
     rows.add(['客户: ${widget.customerName}']);
     rows.add(['产品筛选: $_selectedProduct']);
+    
+    // 添加日期筛选信息
+    String dateFilterInfo;
+    if (_selectedDateRange != null) {
+      dateFilterInfo = '日期筛选: 日期范围 (${_selectedDateRange!.start.year}-${_selectedDateRange!.start.month.toString().padLeft(2, '0')}-${_selectedDateRange!.start.day.toString().padLeft(2, '0')} 至 ${_selectedDateRange!.end.year}-${_selectedDateRange!.end.month.toString().padLeft(2, '0')}-${_selectedDateRange!.end.day.toString().padLeft(2, '0')})';
+    } else {
+      dateFilterInfo = '日期筛选: 所有日期';
+    }
+    rows.add([dateFilterInfo]);
+    
     rows.add([]); // 空行
     // 修改表头为中文
     rows.add(['日期', '类型', '产品', '数量', '单位', '金额', '备注']);
@@ -230,61 +287,39 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                   : '', 
               _netAmount.toStringAsFixed(2), 
               '']);
+    
+    // 添加汇总信息
+    rows.add([]);
+    rows.add(['汇总信息']);
+    rows.add(['总记录数', '$_totalRecordCount']);
+    rows.add(['购买记录数', '$_purchaseRecordCount']);
+    rows.add(['退货记录数', '$_returnRecordCount']);
+    rows.add(['购买总量', _formatNumber(_totalPurchaseQuantity)]);
+    rows.add(['退货总量', _formatNumber(_totalReturnQuantity)]);
+    rows.add(['净数量', _formatNumber(_netQuantity)]);
+    rows.add(['购买总额', _totalPurchaseAmount.toStringAsFixed(2)]);
+    rows.add(['退货总额', _totalReturnAmount.toStringAsFixed(2)]);
+    // 正数不显示+号，避免Excel将其识别为公式
+    rows.add(['净销售额', _netAmount >= 0 
+        ? _netAmount.toStringAsFixed(2) 
+        : '-${_netAmount.abs().toStringAsFixed(2)}']);
 
     String csv = const ListToCsvConverter().convert(rows);
 
-    if (Platform.isMacOS || Platform.isWindows) {
-      // macOS 和 Windows: 使用 file_picker 让用户选择保存位置
-      String? selectedPath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存客户交易记录',
-        fileName: '${widget.customerName}_records.csv',
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-      );
-      
-      if (selectedPath != null) {
-        final file = File(selectedPath);
-        await file.writeAsString(csv);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出成功: $selectedPath')),
-        );
-      }
-      return;
-    }
-
-    String path;
-    if (Platform.isAndroid) {
-      // 请求存储权限
-      if (await Permission.storage.request().isGranted) {
-        final directory = Directory('/storage/emulated/0/Download');
-        path = '${directory.path}/${widget.customerName}_records.csv';
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('存储权限被拒绝')),
-        );
-        return;
-      }
-    } else if (Platform.isIOS) {
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/${widget.customerName}_records.csv';
+    // 生成导出文件名：如果筛选了产品，格式为"{客户名}_{产品名}_销售记录"，否则为"{客户名}_销售记录"
+    String baseFileName;
+    if (_selectedProduct != null && _selectedProduct != '所有产品') {
+      baseFileName = '${widget.customerName}_${_selectedProduct}_销售记录';
     } else {
-      // 其他平台使用应用文档目录作为后备方案
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/${widget.customerName}_records.csv';
+      baseFileName = '${widget.customerName}_销售记录';
     }
 
-    final file = File(path);
-    await file.writeAsString(csv);
-
-    if (Platform.isIOS) {
-      // iOS 让用户手动选择存储位置
-      await Share.shareFiles([file.path], text: '${widget.customerName}的记录 CSV 文件');
-    } else {
-      // Android 直接存入 Download 目录，并提示用户
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出成功: $path')),
-      );
-    }
+    // 使用统一的导出服务
+    await ExportService.showExportOptions(
+      context: context,
+      csvData: csv,
+      baseFileName: baseFileName,
+    );
   }
 
   void _toggleSortOrder() {
@@ -321,7 +356,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
             onPressed: _toggleSalesFirst,
           ),
           IconButton(
-            icon: Icon(Icons.download),
+            icon: Icon(Icons.share),
             tooltip: '导出 CSV',
             onPressed: _exportToCSV,
           ),
@@ -329,15 +364,17 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
       ),
       body: Column(
         children: [
-          // 产品筛选条件
+          // 筛选条件 - 产品和日期在同一行
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: Colors.orange[50],
             child: Row(
               children: [
+                // 产品筛选
                 Icon(Icons.filter_alt, color: Colors.orange[700], size: 20),
-                SizedBox(width: 12),
+                SizedBox(width: 8),
                 Expanded(
+                  flex: 1,
                   child: DropdownButtonHideUnderline(
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 12),
@@ -357,7 +394,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                             _fetchRecords();
                           });
                         },
-                        style: TextStyle(color: Colors.black87, fontSize: 15),
+                        style: TextStyle(color: Colors.black87, fontSize: 14),
                         items: [
                           DropdownMenuItem<String>(
                             value: '所有产品',
@@ -369,6 +406,82 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                               child: Text(product['name']),
                             );
                           }).toList(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                // 日期范围选择器
+                Icon(Icons.date_range, color: Colors.orange[700], size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  flex: 1,
+                  child: InkWell(
+                    onTap: () async {
+                      final now = DateTime.now();
+                      final initialDateRange = _selectedDateRange ??
+                          DateTimeRange(
+                            start: now.subtract(Duration(days: 30)),
+                            end: now,
+                          );
+                      
+                      final pickedRange = await showDateRangePicker(
+                        context: context,
+                        initialDateRange: initialDateRange,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: ColorScheme.light(primary: Colors.orange),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      
+                      if (pickedRange != null) {
+                        setState(() {
+                          _selectedDateRange = pickedRange;
+                          _fetchRecords();
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.orange[300]!),
+                        color: Colors.white,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _selectedDateRange != null
+                                  ? '${_selectedDateRange!.start.year}-${_selectedDateRange!.start.month.toString().padLeft(2, '0')}-${_selectedDateRange!.start.day.toString().padLeft(2, '0')} 至 ${_selectedDateRange!.end.year}-${_selectedDateRange!.end.month.toString().padLeft(2, '0')}-${_selectedDateRange!.end.day.toString().padLeft(2, '0')}'
+                                  : '日期范围',
+                              style: TextStyle(
+                                color: _selectedDateRange != null ? Colors.black87 : Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          if (_selectedDateRange != null)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedDateRange = null;
+                                  _fetchRecords();
+                                });
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.only(right: 8),
+                                child: Icon(Icons.clear, color: Colors.orange[700], size: 18),
+                              ),
+                            ),
+                          Icon(Icons.arrow_drop_down, color: Colors.orange[700]),
                         ],
                       ),
                     ),
@@ -390,7 +503,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                 SizedBox(width: 8),
           Expanded(
                   child: Text(
-                    '横向和纵向滑动可查看更多数据，购买以绿色显示，退货以红色显示',
+                    '横向和纵向滑动可查看完整表格，购买以绿色显示，退货以红色显示',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.orange[800],
@@ -420,7 +533,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                 ),
                 SizedBox(width: 8),
                 Text(
-                  '客户交易记录',
+                  '客户销售记录',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,
@@ -649,7 +762,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                                   ),
                                   DataCell(
                                     Text(
-                                      '${_netAmount >= 0 ? '+' : ''}¥${_netAmount.toStringAsFixed(2)}',
+                                      '${_netAmount >= 0 ? '+' : '-'}¥${_netAmount.abs().toStringAsFixed(2)}',
                                       style: TextStyle(
                                         color: _netAmount >= 0 ? Colors.green : Colors.red,
                                         fontWeight: FontWeight.bold,
@@ -692,7 +805,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                     Icon(Icons.person, color: Colors.orange, size: 16),
                     SizedBox(width: 8),
                     Text(
-                      '${widget.customerName} - ${_selectedProduct ?? '所有产品'}',
+                      '${widget.customerName}    ${_selectedProduct ?? '所有产品'}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -719,7 +832,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                       ),
                       SizedBox(width: 4),
                       Icon(
-                        _isSummaryExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        _isSummaryExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
                         size: 16,
                         color: Colors.orange[800],
                       ),
@@ -731,51 +844,93 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
             if (_isSummaryExpanded) ...[
               Divider(height: 16, thickness: 1),
               
-              // 记录数和净值
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSummaryItem('交易记录数', '${_records.length}', Colors.purple),
-                  _buildSummaryItem('净数量', '${_netQuantity >= 0 ? '+' : ''}${_formatNumber(_netQuantity)}', _netQuantity >= 0 ? Colors.green : Colors.red),
-                ],
-              ),
-              SizedBox(height: 12),
-              
-              // 购买和退货数量汇总
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSummaryItem('购买总量', '+${_formatNumber(_totalPurchaseQuantity)}', Colors.green),
-                  _buildSummaryItem('退货总量', '-${_formatNumber(_totalReturnQuantity)}', Colors.red),
-                ],
-              ),
-              SizedBox(height: 12),
-              
-              // 购买和退货金额汇总
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSummaryItem('购买总额', '+¥${_totalPurchaseAmount.toStringAsFixed(2)}', Colors.green),
-                  _buildSummaryItem('退货总额', '-¥${_totalReturnAmount.toStringAsFixed(2)}', Colors.red),
-                ],
-              ),
-              
-              Divider(height: 16, thickness: 1),
-              
-              // 净收入
-              Row(
-                mainAxisAlignment: MainAxisAlignment.center,
-                children: [
-                  Text('净收入: ', style: TextStyle(fontWeight: FontWeight.bold)),
-                  Text(
-                    '${_netAmount >= 0 ? '+' : ''}¥${_netAmount.toStringAsFixed(2)}',
-                    style: TextStyle(
-                      color: _netAmount >= 0 ? Colors.green : Colors.red,
-                      fontWeight: FontWeight.bold,
-                      fontSize: 16,
+              // 单行显示，支持左右滑动
+              Builder(
+                builder: (context) {
+                  // 在布局完成后检查滚动状态
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_summaryScrollController != null && _summaryScrollController!.hasClients) {
+                      final newMaxExtent = _summaryScrollController!.position.maxScrollExtent;
+                      final newPosition = _summaryScrollController!.offset;
+                      if (newMaxExtent != _summaryScrollMaxExtent || newPosition != _summaryScrollPosition) {
+                        setState(() {
+                          _summaryScrollPosition = newPosition;
+                          _summaryScrollMaxExtent = newMaxExtent;
+                        });
+                      }
+                    }
+                  });
+                  
+                  return SingleChildScrollView(
+                    controller: _summaryScrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        SizedBox(width: 8),
+                        _buildSummaryItem('总记录数', '$_totalRecordCount', Colors.purple),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('购买记录数', '$_purchaseRecordCount', Colors.green),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('退货记录数', '$_returnRecordCount', Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('购买总量', '+${_formatNumber(_totalPurchaseQuantity)}', Colors.green),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('退货总量', '-${_formatNumber(_totalReturnQuantity)}', Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('净数量', '${_netQuantity >= 0 ? '+' : ''}${_formatNumber(_netQuantity)}', _netQuantity >= 0 ? Colors.green : Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('购买总额', '+¥${_totalPurchaseAmount.toStringAsFixed(2)}', Colors.green),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('退货总额', '-¥${_totalReturnAmount.toStringAsFixed(2)}', Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('净销售额', '${_netAmount >= 0 ? '+' : '-'}¥${_netAmount.abs().toStringAsFixed(2)}', _netAmount >= 0 ? Colors.green : Colors.red),
+                        SizedBox(width: 8),
+                      ],
                     ),
-                  ),
-                ],
+                  );
+                },
+              ),
+              
+              // 滚动指示器
+              SizedBox(height: 8),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final containerWidth = constraints.maxWidth - 24;
+                  // 计算可见区域比例和滚动位置
+                  final visibleRatio = _summaryScrollMaxExtent > 0 
+                      ? containerWidth / (_summaryScrollMaxExtent + containerWidth)
+                      : 0.0; // 如果内容不能滚动，不显示彩色条
+                  final scrollRatio = _summaryScrollMaxExtent > 0 ? _summaryScrollPosition / _summaryScrollMaxExtent : 0.0;
+                  final indicatorLeft = _summaryScrollMaxExtent > 0
+                      ? scrollRatio * (containerWidth - containerWidth * visibleRatio)
+                      : 0.0;
+                  
+                  return Container(
+                    height: 4,
+                    margin: EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      color: Colors.grey[300],
+                    ),
+                    child: Stack(
+                      children: [
+                        // 进度条（显示可见区域）- 只在内容可滚动时显示
+                        if (_summaryScrollMaxExtent > 0)
+                          Positioned(
+                            left: indicatorLeft.clamp(0.0, containerWidth - containerWidth * visibleRatio),
+                            child: Container(
+                              width: containerWidth * visibleRatio,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(2),
+                                color: Colors.orange[700],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ],
@@ -795,6 +950,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
             color: Colors.grey[700],
           ),
         ),
+        SizedBox(height: 6),
         Text(
           value,
           style: TextStyle(

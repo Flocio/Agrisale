@@ -46,6 +46,7 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
           _updateInfo = updateInfo;
         } else {
           // 已是最新版本
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('当前已是最新版本'),
@@ -219,6 +220,7 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                                         await launchUrl(uri, mode: LaunchMode.externalApplication);
                                       } else {
                                         if (mounted) {
+                                          ScaffoldMessenger.of(context).hideCurrentSnackBar();
                                           ScaffoldMessenger.of(context).showSnackBar(
                                             SnackBar(
                                               content: Text('无法打开链接，请手动访问: $url'),
@@ -230,6 +232,7 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                                       }
                                     } catch (e) {
                                       if (mounted) {
+                                        ScaffoldMessenger.of(context).hideCurrentSnackBar();
                                         ScaffoldMessenger.of(context).showSnackBar(
                                           SnackBar(
                                             content: Text('打开链接失败: $e'),

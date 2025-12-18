@@ -114,6 +114,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         _addSystemMessage("欢迎使用数据分析助手！您可以询问关于系统中的产品、销售、采购、库存等数据的问题。");
         
         if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('对话记录已清空'),
@@ -124,6 +125,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         }
       } catch (e) {
         if (mounted) {
+          ScaffoldMessenger.of(context).hideCurrentSnackBar();
           ScaffoldMessenger.of(context).showSnackBar(
             SnackBar(
               content: Text('清空失败: $e'),
@@ -206,6 +208,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
   Future<void> _copyToClipboard(String text) async {
     await Clipboard.setData(ClipboardData(text: text));
     if (mounted) {
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(
         content: Text('文本已复制到剪贴板'),

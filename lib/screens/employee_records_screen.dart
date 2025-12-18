@@ -1,13 +1,9 @@
 import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../services/export_service.dart';
 
 class EmployeeRecordsScreen extends StatefulWidget {
   final int employeeId;
@@ -30,8 +26,12 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
   
   // 添加日期筛选相关变量
   DateTimeRange? _selectedDateRange;
-  DateTime? _selectedSingleDate;
-  String _dateFilterType = '所有日期'; // '所有日期', '单日', '日期范围'
+  String _dateFilterType = '日期范围'; // '日期范围'
+  
+  // 滚动控制器和指示器
+  ScrollController? _summaryScrollController;
+  double _summaryScrollPosition = 0.0;
+  double _summaryScrollMaxExtent = 0.0;
   
   // 汇总数据
   double _totalIncomeAmount = 0.0;
@@ -44,8 +44,26 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
   @override
   void initState() {
     super.initState();
+    _summaryScrollController = ScrollController();
+    _summaryScrollController!.addListener(_onSummaryScroll);
     _fetchCustomersAndSuppliers();
     _fetchRecords();
+  }
+
+  void _onSummaryScroll() {
+    if (_summaryScrollController != null && _summaryScrollController!.hasClients) {
+      setState(() {
+        _summaryScrollPosition = _summaryScrollController!.offset;
+        _summaryScrollMaxExtent = _summaryScrollController!.position.maxScrollExtent;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _summaryScrollController?.removeListener(_onSummaryScroll);
+    _summaryScrollController?.dispose();
+    super.dispose();
   }
 
   Future<void> _fetchCustomersAndSuppliers() async {
@@ -82,10 +100,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
           List<dynamic> dateParams = [widget.employeeId, userId];
           
           // 添加日期筛选条件
-          if (_dateFilterType == '单日' && _selectedSingleDate != null) {
-            dateFilter = 'AND i.incomeDate = ?';
-            dateParams.add(_selectedSingleDate!.toIso8601String().split('T')[0]);
-          } else if (_dateFilterType == '日期范围' && _selectedDateRange != null) {
+          if (_selectedDateRange != null) {
             dateFilter = 'AND i.incomeDate >= ? AND i.incomeDate <= ?';
             dateParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
             dateParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
@@ -116,10 +131,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
           List<dynamic> dateParams = [widget.employeeId, userId];
           
           // 添加日期筛选条件
-          if (_dateFilterType == '单日' && _selectedSingleDate != null) {
-            dateFilter = 'AND r.remittanceDate = ?';
-            dateParams.add(_selectedSingleDate!.toIso8601String().split('T')[0]);
-          } else if (_dateFilterType == '日期范围' && _selectedDateRange != null) {
+          if (_selectedDateRange != null) {
             dateFilter = 'AND r.remittanceDate >= ? AND r.remittanceDate <= ?';
             dateParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
             dateParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
@@ -210,11 +222,11 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
     rows.add(['类型筛选: $_selectedType']);
     
     // 添加日期筛选信息
-    String dateFilterInfo = '日期筛选: $_dateFilterType';
-    if (_dateFilterType == '单日' && _selectedSingleDate != null) {
-      dateFilterInfo += ' (${_selectedSingleDate!.year}-${_selectedSingleDate!.month.toString().padLeft(2, '0')}-${_selectedSingleDate!.day.toString().padLeft(2, '0')})';
-    } else if (_dateFilterType == '日期范围' && _selectedDateRange != null) {
-      dateFilterInfo += ' (${_selectedDateRange!.start.year}-${_selectedDateRange!.start.month.toString().padLeft(2, '0')}-${_selectedDateRange!.start.day.toString().padLeft(2, '0')} 至 ${_selectedDateRange!.end.year}-${_selectedDateRange!.end.month.toString().padLeft(2, '0')}-${_selectedDateRange!.end.day.toString().padLeft(2, '0')})';
+    String dateFilterInfo;
+    if (_selectedDateRange != null) {
+      dateFilterInfo = '日期筛选: 日期范围 (${_selectedDateRange!.start.year}-${_selectedDateRange!.start.month.toString().padLeft(2, '0')}-${_selectedDateRange!.start.day.toString().padLeft(2, '0')} 至 ${_selectedDateRange!.end.year}-${_selectedDateRange!.end.month.toString().padLeft(2, '0')}-${_selectedDateRange!.end.day.toString().padLeft(2, '0')})';
+    } else {
+      dateFilterInfo = '日期筛选: 所有日期';
     }
     rows.add([dateFilterInfo]);
     
@@ -248,58 +260,20 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
 
     String csv = const ListToCsvConverter().convert(rows);
 
-    if (Platform.isMacOS || Platform.isWindows) {
-      // macOS 和 Windows: 使用 file_picker 让用户选择保存位置
-      String? selectedPath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存员工业务记录',
-        fileName: '${widget.employeeName}_records.csv',
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-      );
-      
-      if (selectedPath != null) {
-        final file = File(selectedPath);
-        await file.writeAsString(csv);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出成功: $selectedPath')),
-        );
-      }
-      return;
-    }
-
-    String path;
-    if (Platform.isAndroid) {
-      // 请求存储权限
-      if (await Permission.storage.request().isGranted) {
-        final directory = Directory('/storage/emulated/0/Download');
-        path = '${directory.path}/${widget.employeeName}_records.csv';
+    // 生成导出文件名：如果筛选了类型，格式为"{员工名}_{进账/汇款}_业务记录"，否则为"{员工名}_业务记录"
+    String baseFileName;
+    if (_selectedType != null && _selectedType != '所有类型') {
+      baseFileName = '${widget.employeeName}_${_selectedType}_业务记录';
       } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('存储权限被拒绝')),
-        );
-        return;
-      }
-    } else if (Platform.isIOS) {
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/${widget.employeeName}_records.csv';
-    } else {
-      // 其他平台使用应用文档目录作为后备方案
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/${widget.employeeName}_records.csv';
+      baseFileName = '${widget.employeeName}_业务记录';
     }
 
-    final file = File(path);
-    await file.writeAsString(csv);
-
-    if (Platform.isIOS) {
-      // iOS 让用户手动选择存储位置
-      await Share.shareFiles([file.path], text: '${widget.employeeName}的业务记录 CSV 文件');
-    } else {
-      // Android 直接存入 Download 目录，并提示用户
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出成功: $path')),
+    // 使用统一的导出服务
+    await ExportService.showExportOptions(
+      context: context,
+      csvData: csv,
+      baseFileName: baseFileName,
       );
-    }
   }
 
   void _toggleSortOrder() {
@@ -336,7 +310,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
             onPressed: _toggleIncomeFirst,
           ),
           IconButton(
-            icon: Icon(Icons.download),
+            icon: Icon(Icons.share),
             tooltip: '导出 CSV',
             onPressed: _exportToCSV,
           ),
@@ -397,110 +371,12 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                       ),
                     ),
                     SizedBox(width: 12),
-                    // 日期类型筛选
+                    // 日期范围选择器
                     Icon(Icons.date_range, color: Colors.purple[700], size: 20),
                     SizedBox(width: 8),
                     Expanded(
                       flex: 1,
-                      child: DropdownButtonHideUnderline(
-                        child: Container(
-                          padding: EdgeInsets.symmetric(horizontal: 12),
-                          decoration: BoxDecoration(
-                            borderRadius: BorderRadius.circular(8),
-                            border: Border.all(color: Colors.purple[300]!),
-                            color: Colors.white,
-                          ),
-                          child: DropdownButton<String>(
-                            hint: Text('日期筛选', style: TextStyle(color: Colors.black87)),
-                            value: _dateFilterType,
-                            isExpanded: true,
-                            icon: Icon(Icons.arrow_drop_down, color: Colors.purple[700]),
-                            onChanged: (String? newValue) {
-                              setState(() {
-                                _dateFilterType = newValue!;
-                                if (_dateFilterType == '所有日期') {
-                                  _selectedSingleDate = null;
-                                  _selectedDateRange = null;
-                                }
-                                _fetchRecords();
-                              });
-                            },
-                            style: TextStyle(color: Colors.black87, fontSize: 14),
-                            items: [
-                              DropdownMenuItem<String>(
-                                value: '所有日期',
-                                child: Text('所有日期'),
-                              ),
-                              DropdownMenuItem<String>(
-                                value: '单日',
-                                child: Text('单日'),
-                              ),
-                              DropdownMenuItem<String>(
-                                value: '日期范围',
-                                child: Text('日期范围'),
-                              ),
-                            ],
-                          ),
-                        ),
-                      ),
-                    ),
-                  ],
-                ),
-                
-                // 第二行：日期选择器（仅在需要时显示）
-                if (_dateFilterType == '单日') ...[
-                  SizedBox(height: 12),
-                  InkWell(
-                    onTap: () async {
-                      final picked = await showDatePicker(
-                        context: context,
-                        initialDate: _selectedSingleDate ?? DateTime.now(),
-                        firstDate: DateTime(2000),
-                        lastDate: DateTime.now(),
-                        builder: (context, child) {
-                          return Theme(
-                            data: Theme.of(context).copyWith(
-                              colorScheme: ColorScheme.light(primary: Colors.purple),
-                            ),
-                            child: child!,
-                          );
-                        },
-                      );
-                      if (picked != null) {
-                        setState(() {
-                          _selectedSingleDate = picked;
-                          _fetchRecords();
-                        });
-                      }
-                    },
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
-                      decoration: BoxDecoration(
-                        border: Border.all(color: Colors.purple[300]!),
-                        borderRadius: BorderRadius.circular(8),
-                        color: Colors.white,
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.calendar_today, color: Colors.purple[700], size: 18),
-                          SizedBox(width: 8),
-                          Text(
-                            _selectedSingleDate != null
-                                ? '${_selectedSingleDate!.year}-${_selectedSingleDate!.month.toString().padLeft(2, '0')}-${_selectedSingleDate!.day.toString().padLeft(2, '0')}'
-                                : '选择日期',
-                            style: TextStyle(
-                              color: _selectedSingleDate != null ? Colors.black87 : Colors.grey[600],
-                            ),
-                          ),
-                          Spacer(),
-                          Icon(Icons.arrow_drop_down, color: Colors.purple[700]),
-                        ],
-                      ),
-                    ),
-                  ),
-                ] else if (_dateFilterType == '日期范围') ...[
-                  SizedBox(height: 12),
-                  InkWell(
+                      child: InkWell(
                     onTap: () async {
                       final now = DateTime.now();
                       final initialDateRange = _selectedDateRange ??
@@ -534,30 +410,44 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
                       decoration: BoxDecoration(
-                        border: Border.all(color: Colors.purple[300]!),
                         borderRadius: BorderRadius.circular(8),
+                            border: Border.all(color: Colors.purple[300]!),
                         color: Colors.white,
                       ),
                       child: Row(
                         children: [
-                          Icon(Icons.date_range, color: Colors.purple[700], size: 18),
-                          SizedBox(width: 8),
                           Expanded(
                             child: Text(
                               _selectedDateRange != null
                                   ? '${_selectedDateRange!.start.year}-${_selectedDateRange!.start.month.toString().padLeft(2, '0')}-${_selectedDateRange!.start.day.toString().padLeft(2, '0')} 至 ${_selectedDateRange!.end.year}-${_selectedDateRange!.end.month.toString().padLeft(2, '0')}-${_selectedDateRange!.end.day.toString().padLeft(2, '0')}'
-                                  : '选择日期范围',
+                                      : '日期范围',
                               style: TextStyle(
                                 color: _selectedDateRange != null ? Colors.black87 : Colors.grey[600],
+                                    fontSize: 14,
+                                  ),
+                                ),
                               ),
+                              if (_selectedDateRange != null)
+                                GestureDetector(
+                                  onTap: () {
+                                    setState(() {
+                                      _selectedDateRange = null;
+                                      _fetchRecords();
+                                    });
+                                  },
+                                  child: Padding(
+                                    padding: EdgeInsets.only(right: 8),
+                                    child: Icon(Icons.clear, color: Colors.purple[700], size: 18),
                             ),
                           ),
                           Icon(Icons.arrow_drop_down, color: Colors.purple[700]),
                         ],
+                          ),
                       ),
                     ),
                   ),
                 ],
+                ),
               ],
             ),
           ),
@@ -574,7 +464,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '横向和纵向滑动可查看更多数据，进账以绿色显示，汇款以红色显示',
+                    '横向和纵向滑动可查看完整表格，进账以绿色显示，汇款以红色显示',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.purple[800],
@@ -828,7 +718,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                                   DataCell(Text('')), // 客户/供应商列
                                   DataCell(
                                     Text(
-                                      '${_netAmount >= 0 ? '+' : ''}¥${_netAmount.toStringAsFixed(2)}',
+                                      '${_netAmount >= 0 ? '+' : '-'}¥${_netAmount.abs().toStringAsFixed(2)}',
                                       style: TextStyle(
                                         color: _netAmount >= 0 ? Colors.green : Colors.red,
                                         fontWeight: FontWeight.bold,
@@ -884,7 +774,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                     Icon(Icons.badge, color: Colors.purple, size: 16),
                     SizedBox(width: 8),
                     Text(
-                      '${widget.employeeName} - ${_selectedType ?? '所有类型'}',
+                      '${widget.employeeName}    ${_selectedType ?? '所有类型'}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -911,7 +801,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                       ),
                       SizedBox(width: 4),
                       Icon(
-                        _isSummaryExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        _isSummaryExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
                         size: 16,
                         color: Colors.purple[800],
                       ),
@@ -923,58 +813,92 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
             if (_isSummaryExpanded) ...[
               Divider(height: 16, thickness: 1),
               
-              // 记录数和净收入
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
+              // 单行显示，支持左右滑动
+              Builder(
+                builder: (context) {
+                  // 在布局完成后检查滚动状态
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_summaryScrollController != null && _summaryScrollController!.hasClients) {
+                      final newMaxExtent = _summaryScrollController!.position.maxScrollExtent;
+                      final newPosition = _summaryScrollController!.offset;
+                      if (newMaxExtent != _summaryScrollMaxExtent || newPosition != _summaryScrollPosition) {
+                        setState(() {
+                          _summaryScrollPosition = newPosition;
+                          _summaryScrollMaxExtent = newMaxExtent;
+                        });
+                      }
+                    }
+                  });
+                  
+                  return SingleChildScrollView(
+                    controller: _summaryScrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
                 children: [
-                  _buildSummaryItem('业务记录数', '${_records.length}', Colors.blue),
-                  _buildSummaryItem('净收入', '${_netAmount >= 0 ? '+' : ''}¥${_netAmount.toStringAsFixed(2)}', _netAmount >= 0 ? Colors.green : Colors.red),
-                ],
-              ),
-              SizedBox(height: 12),
-              
-              // 进账和汇款记录数
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
+                        SizedBox(width: 8),
+                        _buildSummaryItem('业务记录数', '${_records.length}', Colors.blue),
+                        SizedBox(width: 16),
                   _buildSummaryItem('进账记录数', '${_incomeCount}', Colors.green),
+                        SizedBox(width: 16),
                   _buildSummaryItem('汇款记录数', '${_remittanceCount}', Colors.red),
-                ],
-              ),
-              SizedBox(height: 12),
-              
-              // 进账和汇款总额
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
+                        SizedBox(width: 16),
                   _buildSummaryItem('进账总额', '+¥${_totalIncomeAmount.toStringAsFixed(2)}', Colors.green),
+                        SizedBox(width: 16),
                   _buildSummaryItem('汇款总额', '-¥${_totalRemittanceAmount.toStringAsFixed(2)}', Colors.red),
-                ],
+                        SizedBox(width: 16),
+                        _buildSummaryItem('净收入', '${_netAmount >= 0 ? '+' : '-'}¥${_netAmount.abs().toStringAsFixed(2)}', _netAmount >= 0 ? Colors.green : Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('平均进账', _incomeCount > 0 ? '¥${(_totalIncomeAmount / _incomeCount).toStringAsFixed(2)}' : '¥0.00', Colors.green),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('平均汇款', _remittanceCount > 0 ? '¥${(_totalRemittanceAmount / _remittanceCount).toStringAsFixed(2)}' : '¥0.00', Colors.red),
+                        SizedBox(width: 8),
+                  ],
+                ),
+                  );
+                },
               ),
               
-              // 优惠金额（如果有的话）
-              if (_totalDiscountAmount > 0) ...[
-                SizedBox(height: 12),
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.center,
+              // 滚动指示器
+              SizedBox(height: 8),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final containerWidth = constraints.maxWidth - 24;
+                  // 计算可见区域比例和滚动位置
+                  final visibleRatio = _summaryScrollMaxExtent > 0 
+                      ? containerWidth / (_summaryScrollMaxExtent + containerWidth)
+                      : 0.0; // 如果内容不能滚动，不显示彩色条
+                  final scrollRatio = _summaryScrollMaxExtent > 0 ? _summaryScrollPosition / _summaryScrollMaxExtent : 0.0;
+                  final indicatorLeft = _summaryScrollMaxExtent > 0
+                      ? scrollRatio * (containerWidth - containerWidth * visibleRatio)
+                      : 0.0;
+                  
+                  return Container(
+                    height: 4,
+                    margin: EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      color: Colors.grey[300],
+                    ),
+                    child: Stack(
                   children: [
-                    _buildSummaryItem('优惠总额', '¥${_totalDiscountAmount.toStringAsFixed(2)}', Colors.orange),
-                  ],
+                        // 进度条（显示可见区域）- 只在内容可滚动时显示
+                        if (_summaryScrollMaxExtent > 0)
+                          Positioned(
+                            left: indicatorLeft.clamp(0.0, containerWidth - containerWidth * visibleRatio),
+                            child: Container(
+                              width: containerWidth * visibleRatio,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(2),
+                                color: Colors.purple[700],
+                              ),
+                            ),
                 ),
               ],
-              
-              if (_incomeCount > 0 || _remittanceCount > 0) ...[
-                Divider(height: 16, thickness: 1),
-                
-                // 平均金额
-                Row(
-                  mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                  children: [
-                    _buildSummaryItem('平均进账', _incomeCount > 0 ? '¥${(_totalIncomeAmount / _incomeCount).toStringAsFixed(2)}' : '¥0.00', Colors.green),
-                    _buildSummaryItem('平均汇款', _remittanceCount > 0 ? '¥${(_totalRemittanceAmount / _remittanceCount).toStringAsFixed(2)}' : '¥0.00', Colors.red),
-                  ],
-                ),
-              ],
+                    ),
+                  );
+                },
+              ),
             ],
           ],
         ),
@@ -993,6 +917,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
             color: Colors.grey[700],
           ),
         ),
+        SizedBox(height: 6),
         Text(
           value,
           style: TextStyle(

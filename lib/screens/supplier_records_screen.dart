@@ -2,14 +2,10 @@
 
 import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
-import 'package:path_provider/path_provider.dart';
-import 'package:share_plus/share_plus.dart';
-import 'package:permission_handler/permission_handler.dart';
-import 'package:file_picker/file_picker.dart';
 import 'package:shared_preferences/shared_preferences.dart';
-import 'dart:io';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../services/export_service.dart';
 
 class SupplierRecordsScreen extends StatefulWidget {
   final int supplierId;
@@ -25,18 +21,52 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
   List<Map<String, dynamic>> _purchases = [];
   List<Map<String, dynamic>> _products = [];
   bool _isDescending = true;
+  bool _purchaseFirst = true; // 控制采购在前还是退货在前
   String? _selectedProduct = '所有产品'; // 产品筛选
   bool _isSummaryExpanded = true; // 汇总信息是否展开
   
+  // 添加日期筛选相关变量
+  DateTimeRange? _selectedDateRange;
+  
+  // 滚动控制器和指示器
+  ScrollController? _summaryScrollController;
+  double _summaryScrollPosition = 0.0;
+  double _summaryScrollMaxExtent = 0.0;
+  
   // 汇总数据
-  double _totalQuantity = 0.0;
-  double _totalAmount = 0.0;
+  int _totalRecordCount = 0; // 总记录数
+  int _purchaseRecordCount = 0; // 采购记录数（只包含正的）
+  int _returnRecordCount = 0; // 退货记录数
+  double _totalPurchaseQuantity = 0.0; // 采购总量（只包含正数）
+  double _totalReturnQuantity = 0.0; // 退货总量（只包含负数）
+  double _netQuantity = 0.0; // 净数量
+  double _totalPurchaseAmount = 0.0; // 采购总额（只包含正数）
+  double _totalReturnAmount = 0.0; // 退货总额（只包含负数）
+  double _netAmount = 0.0; // 净采购额
 
   @override
   void initState() {
     super.initState();
+    _summaryScrollController = ScrollController();
+    _summaryScrollController!.addListener(_onSummaryScroll);
     _fetchProducts();
     _fetchRecords();
+  }
+
+  void _onSummaryScroll() {
+    if (_summaryScrollController != null && _summaryScrollController!.hasClients) {
+      setState(() {
+        _summaryScrollPosition = _summaryScrollController!.offset;
+        _summaryScrollMaxExtent = _summaryScrollController!.position.maxScrollExtent;
+      });
+    }
+  }
+
+  @override
+  void dispose() {
+    _summaryScrollController?.removeListener(_onSummaryScroll);
+    _summaryScrollController?.dispose();
+    super.dispose();
   }
 
   // 格式化数字方法：整数显示为整数，小数显示为小数
@@ -81,12 +111,21 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
             ? "AND productName = '$_selectedProduct'"
             : '';
 
+        // 构建日期筛选条件
+        String dateFilter = '';
+        List<dynamic> queryParams = [widget.supplierId, userId];
+        if (_selectedDateRange != null) {
+          dateFilter = 'AND purchaseDate >= ? AND purchaseDate <= ?';
+          queryParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
+          queryParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
+        }
+
         // 获取当前用户的采购记录
         final purchases = await db.rawQuery('''
           SELECT * FROM purchases 
-          WHERE supplierId = ? AND userId = ? $productFilter
+          WHERE supplierId = ? AND userId = ? $productFilter $dateFilter
           ORDER BY purchaseDate $orderBy
-        ''', [widget.supplierId, userId]);
+        ''', queryParams);
 
         // 获取当前用户的产品信息
         final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
@@ -100,8 +139,24 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
           return {
             ...purchase,
             'unit': product['unit'],
+            'type': (purchase['quantity'] as num).toDouble() >= 0 ? '采购' : '退货',
           };
         }).toList();
+
+        // 按日期和类型排序
+        purchasesWithUnits.sort((a, b) {
+          int dateComparison = _isDescending
+              ? (b['purchaseDate'] as String).compareTo(a['purchaseDate'] as String)
+              : (a['purchaseDate'] as String).compareTo(b['purchaseDate'] as String);
+          if (dateComparison != 0) return dateComparison;
+
+          // 如果日期相同，根据类型排序
+          if (_purchaseFirst) {
+            return a['type'] == '采购' ? -1 : 1;
+          } else {
+            return a['type'] == '退货' ? -1 : 1;
+          }
+        });
 
         // 计算汇总数据
         _calculateSummary(purchasesWithUnits);
@@ -114,17 +169,40 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
   }
 
   void _calculateSummary(List<Map<String, dynamic>> purchases) {
-    double totalQuantity = 0.0;
-    double totalAmount = 0.0;
+    int purchaseRecordCount = 0;
+    int returnRecordCount = 0;
+    double purchaseQuantity = 0.0;
+    double returnQuantity = 0.0;
+    double purchaseAmount = 0.0;
+    double returnAmount = 0.0;
 
     for (var purchase in purchases) {
-      totalQuantity += (purchase['quantity'] as num).toDouble();
-      totalAmount += (purchase['totalPurchasePrice'] as num).toDouble();
+      final quantity = (purchase['quantity'] as num).toDouble();
+      final amount = (purchase['totalPurchasePrice'] as num).toDouble();
+      
+      if (quantity >= 0) {
+        // 采购（正数）
+        purchaseRecordCount++;
+        purchaseQuantity += quantity;
+        purchaseAmount += amount;
+      } else {
+        // 退货（负数）
+        returnRecordCount++;
+        returnQuantity += quantity.abs(); // 存储为绝对值
+        returnAmount += amount.abs(); // 存储为绝对值
+      }
     }
 
     setState(() {
-      _totalQuantity = totalQuantity;
-      _totalAmount = totalAmount;
+      _totalRecordCount = purchases.length;
+      _purchaseRecordCount = purchaseRecordCount;
+      _returnRecordCount = returnRecordCount;
+      _totalPurchaseQuantity = purchaseQuantity;
+      _totalReturnQuantity = returnQuantity;
+      _netQuantity = purchaseQuantity - returnQuantity;
+      _totalPurchaseAmount = purchaseAmount;
+      _totalReturnAmount = returnAmount;
+      _netAmount = purchaseAmount - returnAmount;
     });
   }
 
@@ -139,85 +217,89 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
     rows.add(['导出时间: ${DateTime.now().toString().substring(0, 19)}']);
     rows.add(['供应商: ${widget.supplierName}']);
     rows.add(['产品筛选: $_selectedProduct']);
+    
+    // 添加日期筛选信息
+    String dateFilterInfo;
+    if (_selectedDateRange != null) {
+      dateFilterInfo = '日期筛选: 日期范围 (${_selectedDateRange!.start.year}-${_selectedDateRange!.start.month.toString().padLeft(2, '0')}-${_selectedDateRange!.start.day.toString().padLeft(2, '0')} 至 ${_selectedDateRange!.end.year}-${_selectedDateRange!.end.month.toString().padLeft(2, '0')}-${_selectedDateRange!.end.day.toString().padLeft(2, '0')})';
+    } else {
+      dateFilterInfo = '日期筛选: 所有日期';
+    }
+    rows.add([dateFilterInfo]);
+    
     rows.add([]); // 空行
     // 修改表头为中文
-    rows.add(['日期', '产品', '数量', '单位', '总价', '备注']);
+    rows.add(['日期', '类型', '产品', '数量', '单位', '金额', '备注']);
 
     for (var purchase in _purchases) {
+      final quantity = (purchase['quantity'] as num).toDouble();
+      final isPurchase = quantity >= 0;
+      final type = isPurchase ? '采购' : '退货';
+      
+      // 根据类型决定数量正负
+      final quantityText = isPurchase
+          ? _formatNumber(quantity)
+          : '-${_formatNumber(quantity.abs())}';
+      
+      // 根据类型决定金额正负
+      final amount = (purchase['totalPurchasePrice'] as num).toDouble();
+      final amountText = isPurchase
+          ? amount.toStringAsFixed(2)
+          : '-${amount.abs().toStringAsFixed(2)}';
+      
       rows.add([
         purchase['purchaseDate'],
+        type,
         purchase['productName'],
-        _formatNumber(purchase['quantity']),
+        quantityText,
         purchase['unit'] ?? '',
-        purchase['totalPurchasePrice'],
+        amountText,
         purchase['note'] ?? ''
       ]);
     }
 
     // 添加总计行
     rows.add([]);
-    rows.add(['总计', '', 
-              _formatNumber(_totalQuantity), 
+    rows.add(['总计', '', '', 
+              '${_netQuantity >= 0 ? '+' : ''}${_formatNumber(_netQuantity)}', 
               _selectedProduct != '所有产品' 
                   ? (_products.firstWhere((p) => p['name'] == _selectedProduct, orElse: () => {'unit': ''})['unit'] ?? '')
                   : '', 
-              _totalAmount.toStringAsFixed(2), 
+              _netAmount.toStringAsFixed(2), 
               '']);
+    
+    // 添加汇总信息
+    rows.add([]);
+    rows.add(['汇总信息']);
+    rows.add(['总记录数', '$_totalRecordCount']);
+    rows.add(['采购记录数', '$_purchaseRecordCount']);
+    rows.add(['退货记录数', '$_returnRecordCount']);
+    rows.add(['采购总量', _formatNumber(_totalPurchaseQuantity)]);
+    rows.add(['退货总量', _formatNumber(_totalReturnQuantity)]);
+    rows.add(['净数量', _formatNumber(_netQuantity)]);
+    rows.add(['采购总额', _totalPurchaseAmount.toStringAsFixed(2)]);
+    rows.add(['退货总额', _totalReturnAmount.toStringAsFixed(2)]);
+    // 正数不显示+号，避免Excel将其识别为公式
+    rows.add(['净采购额', _netAmount >= 0 
+        ? _netAmount.toStringAsFixed(2) 
+        : '-${_netAmount.abs().toStringAsFixed(2)}']);
 
     String csv = const ListToCsvConverter().convert(rows);
 
-    if (Platform.isMacOS || Platform.isWindows) {
-      // macOS 和 Windows: 使用 file_picker 让用户选择保存位置
-      String? selectedPath = await FilePicker.platform.saveFile(
-        dialogTitle: '保存供应商采购记录',
-        fileName: '${widget.supplierName}_purchases.csv',
-        type: FileType.custom,
-        allowedExtensions: ['csv'],
-      );
-      
-      if (selectedPath != null) {
-        final file = File(selectedPath);
-        await file.writeAsString(csv);
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('导出成功: $selectedPath')),
-        );
-      }
-      return;
-    }
-
-    String path;
-    if (Platform.isAndroid) {
-      // 请求存储权限
-      if (await Permission.storage.request().isGranted) {
-        final directory = Directory('/storage/emulated/0/Download');
-        path = '${directory.path}/${widget.supplierName}_purchases.csv';
-      } else {
-        ScaffoldMessenger.of(context).showSnackBar(
-          SnackBar(content: Text('存储权限被拒绝')),
-        );
-        return;
-      }
-    } else if (Platform.isIOS) {
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/${widget.supplierName}_purchases.csv';
+    // 生成导出文件名：如果筛选了产品，格式为"{供应商名}_{产品名}_采购记录"，否则为"{供应商名}_采购记录"
+    String baseFileName;
+    if (_selectedProduct != null && _selectedProduct != '所有产品') {
+      baseFileName = '${widget.supplierName}_${_selectedProduct}_采购记录';
     } else {
-      // 其他平台使用应用文档目录作为后备方案
-      final directory = await getApplicationDocumentsDirectory();
-      path = '${directory.path}/${widget.supplierName}_purchases.csv';
+      baseFileName = '${widget.supplierName}_采购记录';
     }
 
-    final file = File(path);
-    await file.writeAsString(csv);
-
-    if (Platform.isIOS) {
-      // iOS 让用户手动选择存储位置
-      await Share.shareFiles([file.path], text: '${widget.supplierName}的采购记录 CSV 文件');
-    } else {
-      // Android 直接存入 Download 目录，并提示用户
-      ScaffoldMessenger.of(context).showSnackBar(
-        SnackBar(content: Text('导出成功: $path')),
-      );
-    }
+    // 使用统一的导出服务
+    await ExportService.showExportOptions(
+      context: context,
+      csvData: csv,
+      baseFileName: baseFileName,
+    );
   }
 
   void _toggleSortOrder() {
@@ -227,11 +309,18 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
     });
   }
 
+  void _togglePurchaseFirst() {
+    setState(() {
+      _purchaseFirst = !_purchaseFirst;
+      _fetchRecords();
+    });
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.supplierName}的采购记录', style: TextStyle(
+        title: Text('${widget.supplierName}的记录', style: TextStyle(
           fontWeight: FontWeight.bold,
           color: Colors.white,
         )),
@@ -242,7 +331,12 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
             onPressed: _toggleSortOrder,
           ),
           IconButton(
-            icon: Icon(Icons.download),
+            icon: Icon(_purchaseFirst ? Icons.swap_vert : Icons.swap_vert),
+            tooltip: _purchaseFirst ? '采购在前' : '退货在前',
+            onPressed: _togglePurchaseFirst,
+          ),
+          IconButton(
+            icon: Icon(Icons.share),
             tooltip: '导出 CSV',
             onPressed: _exportToCSV,
           ),
@@ -250,15 +344,17 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
       ),
       body: Column(
         children: [
-          // 产品筛选条件
+          // 筛选条件 - 产品和日期在同一行
           Container(
             padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
             color: Colors.blue[50],
             child: Row(
               children: [
+                // 产品筛选
                 Icon(Icons.filter_alt, color: Colors.blue[700], size: 20),
-                SizedBox(width: 12),
+                SizedBox(width: 8),
                 Expanded(
+                  flex: 1,
                   child: DropdownButtonHideUnderline(
                     child: Container(
                       padding: EdgeInsets.symmetric(horizontal: 12),
@@ -278,7 +374,7 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
                             _fetchRecords();
                           });
                         },
-                        style: TextStyle(color: Colors.black87, fontSize: 15),
+                        style: TextStyle(color: Colors.black87, fontSize: 14),
                         items: [
                           DropdownMenuItem<String>(
                             value: '所有产品',
@@ -290,6 +386,82 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
                               child: Text(product['name']),
                             );
                           }).toList(),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+                SizedBox(width: 12),
+                // 日期范围选择器
+                Icon(Icons.date_range, color: Colors.blue[700], size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  flex: 1,
+                  child: InkWell(
+                    onTap: () async {
+                      final now = DateTime.now();
+                      final initialDateRange = _selectedDateRange ??
+                          DateTimeRange(
+                            start: now.subtract(Duration(days: 30)),
+                            end: now,
+                          );
+                      
+                      final pickedRange = await showDateRangePicker(
+                        context: context,
+                        initialDateRange: initialDateRange,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: ColorScheme.light(primary: Colors.blue),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      
+                      if (pickedRange != null) {
+                        setState(() {
+                          _selectedDateRange = pickedRange;
+                          _fetchRecords();
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.blue[300]!),
+                        color: Colors.white,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _selectedDateRange != null
+                                  ? '${_selectedDateRange!.start.year}-${_selectedDateRange!.start.month.toString().padLeft(2, '0')}-${_selectedDateRange!.start.day.toString().padLeft(2, '0')} 至 ${_selectedDateRange!.end.year}-${_selectedDateRange!.end.month.toString().padLeft(2, '0')}-${_selectedDateRange!.end.day.toString().padLeft(2, '0')}'
+                                  : '日期范围',
+                              style: TextStyle(
+                                color: _selectedDateRange != null ? Colors.black87 : Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          if (_selectedDateRange != null)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedDateRange = null;
+                                  _fetchRecords();
+                                });
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.only(right: 8),
+                                child: Icon(Icons.clear, color: Colors.blue[700], size: 18),
+                              ),
+                            ),
+                          Icon(Icons.arrow_drop_down, color: Colors.blue[700]),
                         ],
                       ),
                     ),
@@ -311,7 +483,7 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
                 SizedBox(width: 8),
           Expanded(
                   child: Text(
-                    '横向和纵向滑动可查看更多数据，点击右上角图标可导出CSV文件',
+                    '横向和纵向滑动可查看完整表格，采购以绿色显示，退货以红色显示',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.blue[800],
@@ -325,17 +497,18 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
             padding: const EdgeInsets.fromLTRB(16, 12, 16, 8),
             child: Row(
               children: [
-                Container(
-                  width: 28,
-                  height: 28,
-                  decoration: BoxDecoration(
-                    color: Colors.blue[100],
-                    borderRadius: BorderRadius.circular(6),
-                  ),
-                  child: Icon(
-                    Icons.business,
-                    color: Colors.blue[800],
-                    size: 16,
+                CircleAvatar(
+                  backgroundColor: Colors.blue[100],
+                  radius: 14,
+                  child: Text(
+                    widget.supplierName.isNotEmpty 
+                        ? widget.supplierName[0].toUpperCase() 
+                        : '?',
+                    style: TextStyle(
+                      color: Colors.blue[800],
+                      fontWeight: FontWeight.bold,
+                      fontSize: 14,
+                    ),
                   ),
                 ),
                 SizedBox(width: 8),
@@ -438,40 +611,87 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
                           dividerThickness: 1,
                 columns: [
                   DataColumn(label: Text('日期')),
+                  DataColumn(label: Text('类型')),
                   DataColumn(label: Text('产品')),
                   DataColumn(label: Text('数量')),
                   DataColumn(label: Text('单位')),
-                  DataColumn(label: Text('总价')),
+                  DataColumn(label: Text('金额')),
                   DataColumn(label: Text('备注')),
                 ],
                           rows: [
                             // 数据行
-                            ..._purchases.map((purchase) => DataRow(cells: [
-                  DataCell(Text(purchase['purchaseDate'])),
-                  DataCell(Text(purchase['productName'])),
-                              DataCell(Text(_formatNumber(purchase['quantity']))),
-                  DataCell(Text(purchase['unit'] ?? '')),
-                            DataCell(
-                              Text(
-                                purchase['totalPurchasePrice'].toString(),
-                                style: TextStyle(
-                                  fontWeight: FontWeight.bold,
-                                  color: Colors.green[700],
-                                ),
-                              )
-                            ),
-                            DataCell(
-                              purchase['note'] != null && purchase['note'].toString().isNotEmpty
-                                  ? Text(
-                                      purchase['note'],
-                                      style: TextStyle(
-                                        fontStyle: FontStyle.italic,
-                                        color: Colors.grey[700],
+                            ..._purchases.map((purchase) {
+                              final quantity = (purchase['quantity'] as num).toDouble();
+                              final isPurchase = quantity >= 0;
+                              final textColor = isPurchase ? Colors.green : Colors.red;
+                              
+                              // 根据类型决定数量显示格式
+                              final quantityText = isPurchase
+                                  ? _formatNumber(quantity)
+                                  : '-${_formatNumber(quantity.abs())}';
+                              
+                              // 根据类型决定金额显示格式
+                              final amount = (purchase['totalPurchasePrice'] as num).toDouble();
+                              final amountText = isPurchase
+                                  ? amount.toStringAsFixed(2)
+                                  : '-${amount.abs().toStringAsFixed(2)}';
+                              
+                              return DataRow(cells: [
+                                DataCell(Text(purchase['purchaseDate'])),
+                                DataCell(
+                                  Container(
+                                    padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                    decoration: BoxDecoration(
+                                      color: isPurchase ? Colors.green[50] : Colors.red[50],
+                                      borderRadius: BorderRadius.circular(4),
+                                      border: Border.all(
+                                        color: isPurchase ? Colors.green[300]! : Colors.red[300]!,
+                                        width: 1,
                                       ),
-                                    )
-                                  : Text(''),
-                            ),
-                ])).toList(),
+                                    ),
+                                    child: Text(
+                                      isPurchase ? '采购' : '退货',
+                                      style: TextStyle(
+                                        fontSize: 12,
+                                        color: textColor,
+                                        fontWeight: FontWeight.bold,
+                                      ),
+                                    ),
+                                  ),
+                                ),
+                                DataCell(Text(purchase['productName'])),
+                                DataCell(
+                                  Text(
+                                    quantityText,
+                                    style: TextStyle(
+                                      color: textColor,
+                                      fontWeight: FontWeight.bold,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(Text(purchase['unit'] ?? '')),
+                                DataCell(
+                                  Text(
+                                    amountText,
+                                    style: TextStyle(
+                                      fontWeight: FontWeight.bold,
+                                      color: textColor,
+                                    ),
+                                  ),
+                                ),
+                                DataCell(
+                                  purchase['note'] != null && purchase['note'].toString().isNotEmpty
+                                      ? Text(
+                                          purchase['note'],
+                                          style: TextStyle(
+                                            fontStyle: FontStyle.italic,
+                                            color: Colors.grey[700],
+                                          ),
+                                        )
+                                      : Text(''),
+                                ),
+                              ]);
+                            }).toList(),
                             
                             // 总计行
                             if (_purchases.isNotEmpty)
@@ -497,11 +717,12 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
                                       ),
                                     ),
                                   ),
+                                  DataCell(Text('')), // 产品列
                                   DataCell(
                                     Text(
-                                      _formatNumber(_totalQuantity),
+                                      '${_netQuantity >= 0 ? '+' : ''}${_formatNumber(_netQuantity)}',
                                       style: TextStyle(
-                                        color: Colors.green[700],
+                                        color: _netQuantity >= 0 ? Colors.green : Colors.red,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
@@ -517,9 +738,9 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
                                   ),
                                   DataCell(
                                     Text(
-                                      '¥${_totalAmount.toStringAsFixed(2)}',
+                                      '${_netAmount >= 0 ? '+' : '-'}¥${_netAmount.abs().toStringAsFixed(2)}',
                                       style: TextStyle(
-                                        color: Colors.green[700],
+                                        color: _netAmount >= 0 ? Colors.green : Colors.red,
                                         fontWeight: FontWeight.bold,
                                         fontSize: 14,
                                       ),
@@ -560,7 +781,7 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
                     Icon(Icons.business, color: Colors.blue, size: 16),
                     SizedBox(width: 8),
                     Text(
-                      '${widget.supplierName} - ${_selectedProduct ?? '所有产品'}',
+                      '${widget.supplierName}    ${_selectedProduct ?? '所有产品'}',
                       style: TextStyle(
                         fontSize: 16,
                         fontWeight: FontWeight.bold,
@@ -587,7 +808,7 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
                       ),
                       SizedBox(width: 4),
                       Icon(
-                        _isSummaryExpanded ? Icons.keyboard_arrow_up : Icons.keyboard_arrow_down,
+                        _isSummaryExpanded ? Icons.keyboard_arrow_down : Icons.keyboard_arrow_up,
                         size: 16,
                         color: Colors.blue[800],
                       ),
@@ -599,23 +820,93 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
             if (_isSummaryExpanded) ...[
               Divider(height: 16, thickness: 1),
               
-              // 记录数和平均单价
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSummaryItem('采购记录数', '${_purchases.length}', Colors.purple),
-                  _buildSummaryItem('平均单价', _totalQuantity > 0 ? '¥${(_totalAmount / _totalQuantity).toStringAsFixed(2)}' : '¥0.00', Colors.orange),
-                ],
+              // 单行显示，支持左右滑动
+              Builder(
+                builder: (context) {
+                  // 在布局完成后检查滚动状态
+                  WidgetsBinding.instance.addPostFrameCallback((_) {
+                    if (_summaryScrollController != null && _summaryScrollController!.hasClients) {
+                      final newMaxExtent = _summaryScrollController!.position.maxScrollExtent;
+                      final newPosition = _summaryScrollController!.offset;
+                      if (newMaxExtent != _summaryScrollMaxExtent || newPosition != _summaryScrollPosition) {
+                        setState(() {
+                          _summaryScrollPosition = newPosition;
+                          _summaryScrollMaxExtent = newMaxExtent;
+                        });
+                      }
+                    }
+                  });
+                  
+                  return SingleChildScrollView(
+                    controller: _summaryScrollController,
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        SizedBox(width: 8),
+                        _buildSummaryItem('总记录数', '$_totalRecordCount', Colors.purple),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('采购记录数', '$_purchaseRecordCount', Colors.green),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('退货记录数', '$_returnRecordCount', Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('采购总量', '+${_formatNumber(_totalPurchaseQuantity)}', Colors.green),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('退货总量', '-${_formatNumber(_totalReturnQuantity)}', Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('净数量', '${_netQuantity >= 0 ? '+' : ''}${_formatNumber(_netQuantity)}', _netQuantity >= 0 ? Colors.green : Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('采购总额', '+¥${_totalPurchaseAmount.toStringAsFixed(2)}', Colors.green),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('退货总额', '-¥${_totalReturnAmount.toStringAsFixed(2)}', Colors.red),
+                        SizedBox(width: 16),
+                        _buildSummaryItem('净采购额', '${_netAmount >= 0 ? '+' : '-'}¥${_netAmount.abs().toStringAsFixed(2)}', _netAmount >= 0 ? Colors.green : Colors.red),
+                        SizedBox(width: 8),
+                      ],
+                    ),
+                  );
+                },
               ),
-              SizedBox(height: 12),
               
-              // 总数量和总金额
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSummaryItem('采购总量', '${_formatNumber(_totalQuantity)}', Colors.green),
-                  _buildSummaryItem('采购总额', '¥${_totalAmount.toStringAsFixed(2)}', Colors.green),
-                ],
+              // 滚动指示器
+              SizedBox(height: 8),
+              LayoutBuilder(
+                builder: (context, constraints) {
+                  final containerWidth = constraints.maxWidth - 24;
+                  // 计算可见区域比例和滚动位置
+                  final visibleRatio = _summaryScrollMaxExtent > 0 
+                      ? containerWidth / (_summaryScrollMaxExtent + containerWidth)
+                      : 0.0; // 如果内容不能滚动，不显示彩色条
+                  final scrollRatio = _summaryScrollMaxExtent > 0 ? _summaryScrollPosition / _summaryScrollMaxExtent : 0.0;
+                  final indicatorLeft = _summaryScrollMaxExtent > 0
+                      ? scrollRatio * (containerWidth - containerWidth * visibleRatio)
+                      : 0.0;
+                  
+                  return Container(
+                    height: 4,
+                    margin: EdgeInsets.symmetric(horizontal: 12),
+                    decoration: BoxDecoration(
+                      borderRadius: BorderRadius.circular(2),
+                      color: Colors.grey[300],
+                    ),
+                    child: Stack(
+                      children: [
+                        // 进度条（显示可见区域）- 只在内容可滚动时显示
+                        if (_summaryScrollMaxExtent > 0)
+                          Positioned(
+                            left: indicatorLeft.clamp(0.0, containerWidth - containerWidth * visibleRatio),
+                            child: Container(
+                              width: containerWidth * visibleRatio,
+                              height: 4,
+                              decoration: BoxDecoration(
+                                borderRadius: BorderRadius.circular(2),
+                                color: Colors.blue[700],
+                              ),
+                            ),
+                          ),
+                      ],
+                    ),
+                  );
+                },
               ),
             ],
           ],
@@ -635,6 +926,7 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
             color: Colors.grey[700],
           ),
         ),
+        SizedBox(height: 6),
         Text(
           value,
           style: TextStyle(

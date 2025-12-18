@@ -63,6 +63,9 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
       final userId = await DatabaseHelper().getCurrentUserId(username);
       if (userId != null) {
         List<Map<String, dynamic>> allTransactions = [];
+        
+        // 获取产品信息（用于获取单位）
+        final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
 
         // 获取采购记录
         final purchaseRecords = await db.query(
@@ -72,19 +75,24 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
         );
         
         for (var purchase in purchaseRecords) {
-          double amount = double.tryParse(purchase['totalPurchasePrice'].toString()) ?? 0.0;
-          bool isReturn = amount < 0;
+          final quantity = (purchase['quantity'] as num).toDouble();
+          bool isReturn = quantity < 0;
+          final product = products.firstWhere(
+            (p) => p['name'] == purchase['productName'],
+            orElse: () => {'unit': ''},
+          );
           
           allTransactions.add({
             'type': isReturn ? 'return' : 'purchase',
             'typeName': isReturn ? '退货' : '采购',
             'date': purchase['purchaseDate'],
             'productName': purchase['productName'],
-            'quantity': purchase['quantity'],
-            'amount': purchase['totalPurchasePrice'],
+            'quantity': quantity.abs(), // 存储绝对值，因为已经有类型标识了
+            'unit': product['unit'] ?? '',
+            'amount': (purchase['totalPurchasePrice'] as num).toDouble().abs(), // 存储绝对值
             'note': purchase['note'] ?? '',
             'icon': isReturn ? Icons.undo : Icons.shopping_cart,
-            'color': isReturn ? Colors.orange : Colors.green,
+            'color': isReturn ? Colors.red : Colors.green, // 退货改为红色
           });
         }
 
@@ -559,6 +567,17 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
     return value.toStringAsFixed(2);
   }
 
+  // 格式化数字显示：整数显示为整数，小数显示为小数
+  String _formatNumber(dynamic number) {
+    if (number == null) return '0';
+    double value = number is double ? number : double.tryParse(number.toString()) ?? 0.0;
+    if (value == value.floor()) {
+      return value.toInt().toString();
+    } else {
+      return value.toString();
+    }
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -568,7 +587,7 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
       child: Scaffold(
         appBar: AppBar(
           title: Text(
-            '${widget.supplierName} - 往来记录',
+            '${widget.supplierName}的往来记录',
             style: TextStyle(
               fontWeight: FontWeight.bold,
               color: Colors.white,
@@ -680,7 +699,7 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
                         _applyFiltersAndSort();
                       },
                       child: Text(
-                        '清除',
+                        '清除筛选',
                         style: TextStyle(color: Colors.blue[700], fontSize: 12),
                       ),
                       style: TextButton.styleFrom(
@@ -764,7 +783,7 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
                                                   ),
                                                   Spacer(),
                                                   Text(
-                                                    transaction['date'] ?? '',
+                                                    _formatDate(transaction['date']),
                                                     style: TextStyle(
                                                       fontSize: 14,
                                                       color: Colors.grey[600],
@@ -774,12 +793,11 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
                                               ),
                                               SizedBox(height: 4),
                                               Text(
-                                                '¥${transaction['amount'] ?? '0.00'}',
+                                                '¥${_formatAmount(transaction['amount'])}',
                                                 style: TextStyle(
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
-                                                  color: transaction['type'] == 'return' ? Colors.red : 
-                                                         transaction['type'] == 'purchase' ? Colors.red : Colors.green,
+                                                  color: transaction['color'],
                                                 ),
                                               ),
                                             ],
@@ -801,6 +819,12 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
                                             children: [
                                               if (transaction['productName'] != null)
                                                 Text('产品: ${transaction['productName']}'),
+                                              if (transaction['quantity'] != null)
+                                                Text('数量: ${_formatNumber(transaction['quantity'])} ${transaction['unit'] ?? ''}'),
+                                              if (transaction['paymentMethod'] != null)
+                                                Text('支付方式: ${transaction['paymentMethod']}'),
+                                              if (transaction['employeeName'] != null && transaction['employeeName'].isNotEmpty)
+                                                Text('经手员工: ${transaction['employeeName']}'),
                                               if (transaction['note'] != null && transaction['note'].isNotEmpty)
                                                 Text('备注: ${transaction['note']}'),
                                             ],

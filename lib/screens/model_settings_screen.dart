@@ -113,6 +113,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   // 手动保存设置（显示提示）
   Future<void> _manualSaveSettings() async {
     await _saveSettings();
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('设置已保存')),
     );
@@ -130,6 +131,7 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     // 重置后自动保存
     _autoSaveSettings();
     
+    ScaffoldMessenger.of(context).hideCurrentSnackBar();
     ScaffoldMessenger.of(context).showSnackBar(
       SnackBar(content: Text('已重置为默认设置')),
     );

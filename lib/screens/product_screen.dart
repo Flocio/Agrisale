@@ -123,6 +123,7 @@ class _ProductScreenState extends State<ProductScreen> {
 
           if (existingProduct.isNotEmpty) {
             // 显示提示信息
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('${result['name']} 已存在'),
@@ -162,6 +163,7 @@ class _ProductScreenState extends State<ProductScreen> {
 
           if (existingProduct.isNotEmpty) {
             // 显示提示信息
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
             ScaffoldMessenger.of(context).showSnackBar(
               SnackBar(
                 content: Text('${result['name']} 已存在'),
