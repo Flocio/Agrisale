@@ -193,6 +193,97 @@ jobs:
                   print('✓ AndroidManifest.xml 中已无 package 属性')
           else:
               print(f'警告: 未找到 AndroidManifest.xml: {manifest_path}')
+          
+          # 修复 share_plus 插件的 build.gradle
+          share_plus_build_gradle_path = os.path.join(home, '.pub-cache', 'hosted', 'pub.dev', 'share_plus-12.0.1', 'android', 'build.gradle')
+          if os.path.isfile(share_plus_build_gradle_path):
+              print(f'找到 share_plus build.gradle: {share_plus_build_gradle_path}')
+              with open(share_plus_build_gradle_path, 'r', encoding='utf-8') as f:
+                  content = f.read()
+              
+              has_changes = False
+              
+              # 添加 namespace（如果不存在）
+              if 'namespace' not in content:
+                  pattern = r'(android\s*\{)'
+                  replacement = r'\1\n    namespace "dev.fluttercommunity.plus.share"'
+                  content = re.sub(pattern, replacement, content, count=1)
+                  has_changes = True
+                  print('✓ 已添加 namespace 到 share_plus build.gradle')
+              else:
+                  print('✓ share_plus build.gradle 已包含 namespace')
+              
+              # 修复 compileSdkVersion - 确保至少为 35
+              if 'compileSdkVersion' in content:
+                  match = re.search(r'compileSdkVersion\s+(\d+)', content)
+                  if match:
+                      current_sdk = int(match.group(1))
+                      if current_sdk < 35:
+                          content = re.sub(r'compileSdkVersion\s+\d+', 'compileSdkVersion 35', content)
+                          has_changes = True
+                          print(f'✓ 已更新 share_plus compileSdkVersion 从 {current_sdk} 到 35')
+                  else:
+                      content = re.sub(r'compileSdkVersion\s*[^\n]+', 'compileSdkVersion 35', content)
+                      has_changes = True
+                      print('✓ 已设置 share_plus compileSdkVersion 为 35')
+              else:
+                  # 如果没有 compileSdkVersion，添加它
+                  if 'namespace' in content:
+                      pattern = r'(namespace\s+"[^"]+"\s*\n)'
+                      replacement = r'\1    compileSdkVersion 35\n'
+                      content = re.sub(pattern, replacement, content, count=1)
+                      has_changes = True
+                      print('✓ 已添加 share_plus compileSdkVersion 35')
+                  elif 'android {' in content:
+                      pattern = r'(android\s*\{)'
+                      replacement = r'\1\n    compileSdkVersion 35'
+                      content = re.sub(pattern, replacement, content, count=1)
+                      has_changes = True
+                      print('✓ 已添加 share_plus compileSdkVersion 35')
+              
+              # 修复 Java 版本
+              if 'VERSION_1_8' in content:
+                  content = re.sub(r'VERSION_1_8', 'VERSION_11', content)
+                  has_changes = True
+                  print('✓ 已更新 share_plus Java 版本从 1.8 到 11')
+              
+              # 修复 kotlinOptions jvmTarget
+              if 'jvmTarget' in content:
+                  content = re.sub(r'jvmTarget\s*=\s*["\']1\.8["\']', 'jvmTarget = "11"', content)
+                  if 'jvmTarget = "11"' not in content and "jvmTarget = '11'" not in content:
+                      has_changes = True
+                      print('✓ 已更新 share_plus kotlinOptions jvmTarget 到 11')
+              
+              # 添加 compileOptions（如果不存在）
+              if 'compileOptions' not in content and 'android {' in content:
+                  pattern = r'(android\s*\{)'
+                  replacement = r'\1\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_11\n        targetCompatibility JavaVersion.VERSION_11\n    }'
+                  content = re.sub(pattern, replacement, content, count=1)
+                  has_changes = True
+                  print('✓ 已添加 share_plus compileOptions 配置')
+              
+              # 添加 kotlinOptions（如果不存在）
+              if 'kotlinOptions' not in content and 'compileOptions' in content:
+                  pattern = r'(compileOptions\s*\{[^\}]*?\})'
+                  replacement = r'\1\n    kotlinOptions {\n        jvmTarget = "11"\n    }'
+                  content = re.sub(pattern, replacement, content, count=1)
+                  has_changes = True
+                  print('✓ 已添加 share_plus kotlinOptions 配置')
+              
+              # 修复 flutter 属性访问问题
+              # 如果 build.gradle 中使用了 flutter.compileSdkVersion 等，需要确保 Flutter Gradle Plugin 已正确应用
+              # 检查是否有 flutter.xxx 的引用
+              if 'flutter.' in content and 'apply plugin:' not in content:
+                  # 查找 android { 块，确保在它之前有正确的插件应用
+                  # 这通常已经在 Flutter 插件系统中处理，但我们需要确保 compileSdkVersion 是直接指定的
+                  pass
+              
+              if has_changes:
+                  with open(share_plus_build_gradle_path, 'w', encoding='utf-8') as f:
+                      f.write(content)
+                  print('✓ share_plus build.gradle 修复完成')
+          else:
+              print(f'警告: 未找到 share_plus build.gradle: {share_plus_build_gradle_path}')
           PYEOF
 
       - name: Restore Android keystore
