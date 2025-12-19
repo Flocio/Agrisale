@@ -15,6 +15,7 @@ class _SalesScreenState extends State<SalesScreen> {
   List<Map<String, dynamic>> _sales = [];
   List<Map<String, dynamic>> _products = [];
   List<Map<String, dynamic>> _customers = [];
+  List<Map<String, dynamic>> _suppliers = [];
   bool _showDeleteButtons = false;
 
   // 添加搜索相关的状态变量
@@ -179,11 +180,13 @@ class _SalesScreenState extends State<SalesScreen> {
         // 只获取当前用户的数据
         final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
         final customers = await db.query('customers', where: 'userId = ?', whereArgs: [userId]);
+        final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
         final sales = await db.query('sales', where: 'userId = ?', whereArgs: [userId], orderBy: 'id DESC');
         
         setState(() {
           _products = products;
           _customers = customers;
+          _suppliers = suppliers;
           _sales = sales;
           _filteredSales = sales;
         });
@@ -194,7 +197,7 @@ class _SalesScreenState extends State<SalesScreen> {
   Future<void> _addSale() async {
     final result = await showDialog<Map<String, dynamic>>(
       context: context,
-      builder: (context) => SalesDialog(products: _products, customers: _customers),
+      builder: (context) => SalesDialog(products: _products, customers: _customers, suppliers: _suppliers),
     );
     if (result != null) {
       // Check if there's enough stock
@@ -236,6 +239,7 @@ class _SalesScreenState extends State<SalesScreen> {
       builder: (context) => SalesDialog(
         products: _products,
         customers: _customers,
+        suppliers: _suppliers,
         existingSale: sale,
       ),
     );
@@ -866,15 +870,16 @@ class _SalesScreenState extends State<SalesScreen> {
                                       children: [
                                         Icon(Icons.note, 
                                              size: 14, 
-                                             color: Colors.grey[600]),
+                                             color: Colors.purple),
                                         SizedBox(width: 4),
                                         Expanded(
                                           child: Text(
                                             '备注: ${sale['note']}',
                                             style: TextStyle(
-                                              fontSize: 12,
-                                              color: Colors.grey[700],
-                                              fontStyle: FontStyle.italic,
+                                              // 备注字体与“客户/数量/总售价”一致：同字号、黑色、非斜体
+                                              fontSize: 13,
+                                              color: Colors.black87,
+                                              fontWeight: FontWeight.normal,
                                             ),
                                             maxLines: 1,
                                             overflow: TextOverflow.ellipsis,
@@ -1030,11 +1035,13 @@ class _SalesScreenState extends State<SalesScreen> {
 class SalesDialog extends StatefulWidget {
   final List<Map<String, dynamic>> products;
   final List<Map<String, dynamic>> customers;
+  final List<Map<String, dynamic>> suppliers;
   final Map<String, dynamic>? existingSale; // 添加此参数用于编辑模式
 
   SalesDialog({
     required this.products,
     required this.customers,
+    required this.suppliers,
     this.existingSale,
   });
 
@@ -1044,6 +1051,7 @@ class SalesDialog extends StatefulWidget {
 
 class _SalesDialogState extends State<SalesDialog> {
   String? _selectedProduct;
+  String? _selectedSupplier;
   String? _selectedCustomer;
   final _quantityController = TextEditingController();
   final _salePriceController = TextEditingController();
@@ -1066,6 +1074,17 @@ class _SalesDialogState extends State<SalesDialog> {
       _quantityController.text = sale['quantity'].toString();
       _noteController.text = sale['note'] ?? '';
       _selectedDate = DateTime.parse(sale['saleDate']);
+
+      // 根据已选产品反推供应商（用于供应商筛选默认值）
+      final Map<String, dynamic> product = widget.products.firstWhere(
+        (p) => p['name'] == _selectedProduct,
+        orElse: () => <String, dynamic>{},
+      );
+      final dynamic rawSupplierId = product['supplierId'];
+      final int? sid = rawSupplierId is int ? rawSupplierId : int.tryParse(rawSupplierId?.toString() ?? '');
+      if (sid != null && sid != 0) {
+        _selectedSupplier = sid.toString();
+      }
       
       // 根据总价和数量计算单价
       final quantity = sale['quantity'] as double;
@@ -1162,6 +1181,15 @@ class _SalesDialogState extends State<SalesDialog> {
       unit = product['unit'];
     }
 
+    final int? selectedSupplierId = int.tryParse(_selectedSupplier ?? '');
+    final List<Map<String, dynamic>> filteredProducts = selectedSupplierId != null
+        ? widget.products.where((p) {
+            final dynamic raw = p['supplierId'];
+            final int? sid = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+            return sid == selectedSupplierId;
+          }).toList()
+        : widget.products;
+
     return AlertDialog(
       title: Text(
         _isEditMode ? '编辑销售' : '添加销售',
@@ -1174,6 +1202,54 @@ class _SalesDialogState extends State<SalesDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 供应商筛选：用于过滤产品列表（不影响原有保存数据结构）
+            DropdownButtonFormField<String>(
+              value: _selectedSupplier,
+              decoration: InputDecoration(
+                labelText: '供应商筛选',
+                border: OutlineInputBorder(
+                  borderRadius: BorderRadius.circular(8),
+                ),
+                filled: true,
+                fillColor: Colors.grey[50],
+                prefixIcon: Icon(Icons.business, color: Colors.green),
+              ),
+              isExpanded: true,
+              items: [
+                DropdownMenuItem<String>(
+                  value: null,
+                  child: Text('全部供应商'),
+                ),
+                ...widget.suppliers.map((supplier) {
+                  return DropdownMenuItem<String>(
+                    value: supplier['id'].toString(),
+                    child: Text(supplier['name']),
+                  );
+                }).toList(),
+              ],
+              onChanged: (value) {
+                setState(() {
+                  _selectedSupplier = value;
+
+                  // 若已选产品不属于该供应商，则清空，避免 Dropdown value 不在 items 里导致断言崩溃
+                  if (_selectedProduct != null && _selectedSupplier != null) {
+                    final Map<String, dynamic> p =
+                        widget.products.firstWhere((p) => p['name'] == _selectedProduct);
+                    final dynamic raw = p['supplierId'];
+                    final int? productSid =
+                        raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+                    final int? selectedSid = int.tryParse(_selectedSupplier ?? '');
+                    if (selectedSid != null &&
+                        (productSid == null || productSid == 0 || productSid != selectedSid)) {
+                      _selectedProduct = null;
+                      _availableStock = 0.0;
+                    }
+                  }
+                });
+              },
+            ),
+            SizedBox(height: 16),
+
             DropdownButtonFormField<String>(
               value: _selectedProduct,
                 decoration: InputDecoration(
@@ -1186,10 +1262,11 @@ class _SalesDialogState extends State<SalesDialog> {
                   prefixIcon: Icon(Icons.inventory, color: Colors.green),
                 ),
                 isExpanded: true,
-              items: widget.products.map((product) {
+              items: filteredProducts.map((product) {
                 return DropdownMenuItem<String>(
                   value: product['name'],
-                    child: Text('${product['name']} (库存: ${_formatNumber(product['stock'])} ${product['unit']})'),
+                    // 显示格式改为："产品名({数字}{单位})"，去掉“库存：”
+                    child: Text('${product['name']} (${_formatNumber(product['stock'])}${product['unit']})'),
                 );
               }).toList(),
                 validator: (value) {
@@ -1202,6 +1279,17 @@ class _SalesDialogState extends State<SalesDialog> {
                 setState(() {
                   _selectedProduct = value;
                     _updateAvailableStock();
+
+                  // 若未选择供应商筛选，则根据产品自动带出（不破坏旧流程）
+                  if (_selectedSupplier == null && value != null) {
+                    final Map<String, dynamic> p =
+                        widget.products.firstWhere((p) => p['name'] == value);
+                    final dynamic raw = p['supplierId'];
+                    final int? sid = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+                    if (sid != null && sid != 0) {
+                      _selectedSupplier = sid.toString();
+                    }
+                  }
                 });
               },
             ),
@@ -1239,120 +1327,108 @@ class _SalesDialogState extends State<SalesDialog> {
             ),
               SizedBox(height: 16),
               
-              // 数量和售价
+              // 数量和单价
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
-                    child: TextFormField(
-              controller: _quantityController,
-                      decoration: InputDecoration(
-                        labelText: '数量',
-                        helperText: unit.isNotEmpty ? '单位: $unit' : '',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _quantityController,
+                          decoration: InputDecoration(
+                            labelText: '数量',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            prefixIcon: Icon(Icons.format_list_numbered, color: Colors.green),
+                          ),
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return '请输入数量';
+                            }
+                            if (double.tryParse(value) == null) {
+                              return '请输入有效数字';
+                            }
+                            if (double.parse(value) <= 0) {
+                              return '数量必须大于0';
+                            }
+                            if (_selectedProduct != null) {
+                              final quantity = double.tryParse(value) ?? 0.0;
+                              if (quantity > _availableStock) {
+                                return '库存不足';
+                              }
+                            }
+                            return null;
+                          },
+                          onChanged: (value) => _calculateTotalPrice(),
                         ),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                        prefixIcon: Icon(Icons.format_list_numbered, color: Colors.green),
-                      ),
-                      keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return '请输入数量';
-                        }
-                        if (double.tryParse(value) == null) {
-                          return '请输入有效数字';
-                        }
-                        if (double.parse(value) <= 0) {
-                          return '数量必须大于0';
-                        }
-                        if (_selectedProduct != null) {
-                          final quantity = double.tryParse(value) ?? 0.0;
-                          if (quantity > _availableStock) {
-                            return '库存不足';
-                          }
-                        }
-                        return null;
-                      },
-              onChanged: (value) => _calculateTotalPrice(),
-            ),
+                        SizedBox(height: 4),
+                        Center(
+                          child: Text(
+                            unit.isNotEmpty ? '单位：$unit' : '单位：',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                   SizedBox(width: 12),
                   Expanded(
-                    child: TextFormField(
-              controller: _salePriceController,
-                      decoration: InputDecoration(
-                        labelText: '售价',
-                        helperText: unit.isNotEmpty ? '元/$unit' : '元/单位',
-                        border: OutlineInputBorder(
-                          borderRadius: BorderRadius.circular(8),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.stretch,
+                      children: [
+                        TextFormField(
+                          controller: _salePriceController,
+                          decoration: InputDecoration(
+                            labelText: '单价',
+                            border: OutlineInputBorder(
+                              borderRadius: BorderRadius.circular(8),
+                            ),
+                            filled: true,
+                            fillColor: Colors.grey[50],
+                            prefixIcon: Icon(Icons.attach_money, color: Colors.green),
+                          ),
+                          keyboardType: TextInputType.numberWithOptions(decimal: true),
+                          validator: (value) {
+                            if (value == null || value.isEmpty) {
+                              return '请输入单价';
+                            }
+                            if (double.tryParse(value) == null) {
+                              return '请输入有效数字';
+                            }
+                            if (double.parse(value) < 0) {
+                              return '单价不能为负数';
+                            }
+                            return null;
+                          },
+                          onChanged: (value) => _calculateTotalPrice(),
                         ),
-                        filled: true,
-                        fillColor: Colors.grey[50],
-                        prefixIcon: Icon(Icons.attach_money, color: Colors.green),
-                      ),
-                      keyboardType: TextInputType.numberWithOptions(decimal: true),
-                      validator: (value) {
-                        if (value == null || value.isEmpty) {
-                          return '请输入售价';
-                        }
-                        if (double.tryParse(value) == null) {
-                          return '请输入有效数字';
-                        }
-                        if (double.parse(value) < 0) {
-                          return '售价不能为负数';
-                        }
-                        return null;
-                      },
-              onChanged: (value) => _calculateTotalPrice(),
-            ),
+                        SizedBox(height: 4),
+                        Center(
+                          child: Text(
+                            unit.isNotEmpty ? '元 / $unit' : '元 / 单位',
+                            style: TextStyle(
+                              fontSize: 12,
+                              color: Colors.black87,
+                            ),
+                          ),
+                        ),
+                      ],
+                    ),
                   ),
                 ],
               ),
               SizedBox(height: 16),
-              
-              // 备注
-              TextFormField(
-              controller: _noteController,
-                decoration: InputDecoration(
-                  labelText: '备注',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  prefixIcon: Icon(Icons.note, color: Colors.green),
-                ),
-                maxLines: 2,
-            ),
-              SizedBox(height: 16),
-              
-              // 日期选择
-              InkWell(
-                onTap: () => _selectDate(context),
-                child: InputDecorator(
-                  decoration: InputDecoration(
-                    labelText: '销售日期',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    prefixIcon: Icon(Icons.calendar_today, color: Colors.green),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-              children: [
-                      Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
-                      Icon(Icons.arrow_drop_down),
-                    ],
-                  ),
-                ),
-              ),
-              SizedBox(height: 16),
-              
-              // 总价显示
+
+              // 总价显示（与备注位置互换：先总价）
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(12),
@@ -1376,9 +1452,49 @@ class _SalesDialogState extends State<SalesDialog> {
                         fontWeight: FontWeight.bold,
                         fontSize: 18,
                       ),
+                    ),
+                  ],
                 ),
-              ],
-            ),
+              ),
+              SizedBox(height: 16),
+
+              // 日期选择
+              InkWell(
+                onTap: () => _selectDate(context),
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: '销售日期',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    prefixIcon: Icon(Icons.calendar_today, color: Colors.green),
+                  ),
+                  child: Row(
+                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
+              children: [
+                      Text(DateFormat('yyyy-MM-dd').format(_selectedDate)),
+                      Icon(Icons.arrow_drop_down),
+                    ],
+                  ),
+                ),
+              ),
+              SizedBox(height: 16),
+
+              // 备注（与总价显示互换：后备注）
+              TextFormField(
+                controller: _noteController,
+                decoration: InputDecoration(
+                  labelText: '备注',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  prefixIcon: Icon(Icons.note, color: Colors.green),
+                ),
+                maxLines: 2,
               ),
           ],
           ),

@@ -965,7 +965,9 @@ class _IncomeDialogState extends State<IncomeDialog> {
   int? _selectedCustomerId;
   int? _selectedEmployeeId;
   String _selectedPaymentMethod = '现金';
-  bool _useOriginalPrice = false; // 是否使用优惠前价格计算模式
+  bool _isUpdatingDiscountFields = false;
+  String? _lastEditedDiscountField; // 'discount' | 'original'
+  bool _originalPriceError = false; // 优惠前价格错误状态
   
   final List<String> _paymentMethods = ['现金', '微信转账', '银行卡'];
 
@@ -990,18 +992,10 @@ class _IncomeDialogState extends State<IncomeDialog> {
     } else {
       _discountController.text = '0';
     }
-    
-    // 添加监听器来实现自动计算
-    _amountController.addListener(_updateCalculations);
-    _discountController.addListener(_updateCalculations);
-    _originalPriceController.addListener(_updateCalculations);
   }
 
   @override
   void dispose() {
-    _amountController.removeListener(_updateCalculations);
-    _discountController.removeListener(_updateCalculations);
-    _originalPriceController.removeListener(_updateCalculations);
     _amountController.dispose();
     _discountController.dispose();
     _originalPriceController.dispose();
@@ -1009,21 +1003,57 @@ class _IncomeDialogState extends State<IncomeDialog> {
     super.dispose();
   }
 
-  void _updateCalculations() {
-    if (_useOriginalPrice) {
-      // 从优惠前价格计算优惠
-      final originalPrice = double.tryParse(_originalPriceController.text) ?? 0.0;
-      final amount = double.tryParse(_amountController.text) ?? 0.0;
-      final discount = originalPrice - amount;
-      if (discount >= 0) {
-        _discountController.text = discount.toString();
+  void _updateCalculations({required String source}) {
+    if (_isUpdatingDiscountFields) return;
+    _isUpdatingDiscountFields = true;
+
+    try {
+      final double amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+
+      if (source == 'discount') {
+        _lastEditedDiscountField = 'discount';
+        final double discount = double.tryParse(_discountController.text.trim()) ?? 0.0;
+        final double originalPrice = amount + discount;
+        _originalPriceController.text = originalPrice.toString();
+        // 自动计算的情况下，优惠前价格总是有效的
+        setState(() {
+          _originalPriceError = false;
+        });
+      } else if (source == 'original') {
+        _lastEditedDiscountField = 'original';
+        final double originalPrice = double.tryParse(_originalPriceController.text.trim()) ?? 0.0;
+        final double discount = originalPrice - amount;
+        if (discount >= 0) {
+          _discountController.text = discount.toString();
+        }
+        // 检查优惠前价格是否仍然有效
+        setState(() {
+          _originalPriceError = originalPrice < amount;
+        });
+      } else if (source == 'amount') {
+        // 金额变化时，按用户最后编辑的优惠字段来更新另一个字段
+        if (_lastEditedDiscountField == 'original') {
+          final double originalPrice = double.tryParse(_originalPriceController.text.trim()) ?? 0.0;
+          final double discount = originalPrice - amount;
+          if (discount >= 0) {
+            _discountController.text = discount.toString();
+          }
+          // 检查优惠前价格是否仍然有效
+          setState(() {
+            _originalPriceError = originalPrice < amount;
+          });
+        } else {
+          final double discount = double.tryParse(_discountController.text.trim()) ?? 0.0;
+          final double originalPrice = amount + discount;
+          _originalPriceController.text = originalPrice.toString();
+          // 自动计算的情况下，优惠前价格总是有效的
+          setState(() {
+            _originalPriceError = false;
+          });
+        }
       }
-    } else {
-      // 从优惠金额计算优惠前价格
-      final amount = double.tryParse(_amountController.text) ?? 0.0;
-      final discount = double.tryParse(_discountController.text) ?? 0.0;
-      final originalPrice = amount + discount;
-      _originalPriceController.text = originalPrice.toString();
+    } finally {
+      _isUpdatingDiscountFields = false;
     }
   }
 
@@ -1060,22 +1090,25 @@ class _IncomeDialogState extends State<IncomeDialog> {
               // 日期选择
               InkWell(
                 onTap: _selectDate,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.grey[50],
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: '进账日期',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    prefixIcon: Icon(Icons.calendar_today, color: Colors.teal),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.calendar_today, color: Colors.teal),
-                      SizedBox(width: 12),
-                      Text(
-                        DateFormat('yyyy-MM-dd').format(_selectedDate),
-                        style: TextStyle(fontSize: 16),
+                      Expanded(
+                        child: Text(
+                          DateFormat('yyyy-MM-dd').format(_selectedDate),
+                          style: TextStyle(fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      Spacer(),
                       Icon(Icons.arrow_drop_down, color: Colors.grey),
                     ],
                   ),
@@ -1087,7 +1120,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
               DropdownButtonFormField<int>(
                 value: _selectedCustomerId,
                 decoration: InputDecoration(
-                  labelText: '客户',
+                  labelText: '选择客户',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1095,18 +1128,14 @@ class _IncomeDialogState extends State<IncomeDialog> {
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.person, color: Colors.teal),
                 ),
-                items: [
-                  DropdownMenuItem<int>(
-                    value: null,
-                    child: Text('未选择客户'),
-                  ),
-                  ...widget.customers.map<DropdownMenuItem<int>>((customer) {
-                    return DropdownMenuItem<int>(
-                      value: customer['id'],
-                      child: Text(customer['name']),
-                    );
-                  }).toList(),
-                ],
+                isExpanded: true,
+                hint: Text('选择客户', overflow: TextOverflow.ellipsis),
+                items: widget.customers.map<DropdownMenuItem<int>>((customer) {
+                  return DropdownMenuItem<int>(
+                    value: customer['id'],
+                    child: Text(customer['name'], overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
                 onChanged: (value) {
                   setState(() {
                     _selectedCustomerId = value;
@@ -1114,54 +1143,15 @@ class _IncomeDialogState extends State<IncomeDialog> {
                 },
               ),
               SizedBox(height: 16),
-              
-              // 计算方式选择
-              Container(
-                decoration: BoxDecoration(
-                  border: Border.all(color: Colors.grey[300]!),
-                  borderRadius: BorderRadius.circular(8),
-                  color: Colors.grey[50],
-                ),
-                child: Row(
-                  children: [
-                    Expanded(
-                      child: RadioListTile<bool>(
-                        title: Text('直接输入优惠', style: TextStyle(fontSize: 14)),
-                        value: false,
-                        groupValue: _useOriginalPrice,
-                        onChanged: (value) {
-                          setState(() {
-                            _useOriginalPrice = value!;
-                            _updateCalculations();
-                          });
-                        },
-                        dense: true,
-                      ),
-                    ),
-                    Expanded(
-                      child: RadioListTile<bool>(
-                        title: Text('优惠前价格', style: TextStyle(fontSize: 14)),
-                        value: true,
-                        groupValue: _useOriginalPrice,
-                        onChanged: (value) {
-                          setState(() {
-                            _useOriginalPrice = value!;
-                            _updateCalculations();
-                          });
-                        },
-                        dense: true,
-                      ),
-                    ),
-                  ],
-                ),
-              ),
-              SizedBox(height: 16),
-              
-              // 实际进账金额
+
+              // 实际进账金额（独占一行，放在选择客户下面）
               TextFormField(
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: '实际进账金额',
+                  // 确保 label 永远在左上角，输入框内部留空
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
+                  hintText: '',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1182,161 +1172,168 @@ class _IncomeDialogState extends State<IncomeDialog> {
                   }
                   return null;
                 },
-                onChanged: (value) => _updateCalculations(),
+                onChanged: (value) => _updateCalculations(source: 'amount'),
               ),
               SizedBox(height: 16),
-              
-              // 优惠相关输入
-              if (_useOriginalPrice) ...[
-                // 优惠前价格输入
-                TextFormField(
-                  controller: _originalPriceController,
-                  decoration: InputDecoration(
-                    labelText: '优惠前价格',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
-                    ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    prefixIcon: Icon(Icons.local_offer, color: Colors.orange),
-                  ),
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
-                  onChanged: (value) => _updateCalculations(),
-                ),
-                SizedBox(height: 16),
-                
-                // 显示计算出的优惠金额
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.orange[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.orange[200]!),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('计算出的优惠金额:', style: TextStyle(fontWeight: FontWeight.w500)),
-                      Text(
-                        '¥${_discountController.text}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.orange[800],
+
+              // 优惠金额（左）+ 优惠前价格（右）同一排：两者都可输入，自动互算
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: TextFormField(
+                      controller: _discountController,
+                      decoration: InputDecoration(
+                        labelText: '优惠金额',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        prefixIcon: Icon(Icons.discount, color: Colors.orange),
                       ),
-                    ],
-                  ),
-                ),
-              ] else ...[
-                // 直接输入优惠金额
-                TextFormField(
-                  controller: _discountController,
-                  decoration: InputDecoration(
-                    labelText: '优惠金额',
-                    border: OutlineInputBorder(
-                      borderRadius: BorderRadius.circular(8),
+                      keyboardType: TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value != null && value.isNotEmpty) {
+                          final discount = double.tryParse(value);
+                          if (discount == null) {
+                            return '请输入有效的优惠金额';
+                          }
+                          if (discount < 0) {
+                            return '优惠金额不能为负数';
+                          }
+                        }
+                        return null;
+                      },
+                      onChanged: (value) => _updateCalculations(source: 'discount'),
                     ),
-                    filled: true,
-                    fillColor: Colors.grey[50],
-                    prefixIcon: Icon(Icons.discount, color: Colors.orange),
                   ),
-                  keyboardType: TextInputType.numberWithOptions(decimal: true),
-                  validator: (value) {
-                    if (value != null && value.isNotEmpty) {
-                      final discount = double.tryParse(value);
-                      if (discount == null) {
-                        return '请输入有效的优惠金额';
-                      }
-                      if (discount < 0) {
-                        return '优惠金额不能为负数';
-                      }
-                    }
-                    return null;
-                  },
-                  onChanged: (value) => _updateCalculations(),
-                ),
-                SizedBox(height: 16),
-                
-                // 显示计算出的优惠前价格
-                Container(
-                  padding: EdgeInsets.all(12),
-                  decoration: BoxDecoration(
-                    color: Colors.blue[50],
-                    borderRadius: BorderRadius.circular(8),
-                    border: Border.all(color: Colors.blue[200]!),
-                  ),
-                  child: Row(
-                    mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                    children: [
-                      Text('优惠前价格:', style: TextStyle(fontWeight: FontWeight.w500)),
-                      Text(
-                        '¥${_originalPriceController.text}',
-                        style: TextStyle(
-                          fontWeight: FontWeight.bold,
-                          color: Colors.blue[800],
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: TextFormField(
+                      controller: _originalPriceController,
+                      decoration: InputDecoration(
+                        labelText: '优惠前价格',
+                        // 确保 label 永远在左上角，输入框内部留空（修复首次切换时 label 跑进框内）
+                        floatingLabelBehavior: FloatingLabelBehavior.always,
+                        hintText: '',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
                         ),
+                        errorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.red, width: 2),
+                        ),
+                        focusedErrorBorder: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                          borderSide: BorderSide(color: Colors.red, width: 2),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        prefixIcon: Icon(Icons.local_offer, color: Colors.orange),
+                        errorText: _originalPriceError ? '应不小于实际进账' : null,
                       ),
-                    ],
+                      keyboardType: TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value != null && value.isNotEmpty) {
+                          final original = double.tryParse(value);
+                          if (original == null) {
+                            return '请输入有效的优惠前价格';
+                          }
+                          if (original < 0) {
+                            return '优惠前价格不能为负数';
+                          }
+                          // 检查优惠前价格是否 >= 实际进账金额
+                          final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+                          if (original < amount) {
+                            return '应不小于实际进账';
+                          }
+                        }
+                        return null;
+                      },
+                      onChanged: (value) {
+                        // 实时检查优惠前价格是否 >= 实际进账金额
+                        final original = double.tryParse(value.trim());
+                        final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
+                        setState(() {
+                          if (original != null && original < amount) {
+                            _originalPriceError = true;
+                          } else {
+                            _originalPriceError = false;
+                          }
+                        });
+                        _updateCalculations(source: 'original');
+                      },
+                    ),
                   ),
-                ),
-              ],
-              SizedBox(height: 16),
-              
-              // 员工选择
-              DropdownButtonFormField<int>(
-                value: _selectedEmployeeId,
-                decoration: InputDecoration(
-                  labelText: '经办人',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  prefixIcon: Icon(Icons.badge, color: Colors.teal),
-                ),
-                items: [
-                  DropdownMenuItem<int>(
-                    value: null,
-                    child: Text('未选择经办人'),
-                  ),
-                  ...widget.employees.map<DropdownMenuItem<int>>((employee) {
-                    return DropdownMenuItem<int>(
-                      value: employee['id'],
-                      child: Text(employee['name']),
-                    );
-                  }).toList(),
                 ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedEmployeeId = value;
-                  });
-                },
               ),
               SizedBox(height: 16),
-              
-              // 付款方式选择
-              DropdownButtonFormField<String>(
-                value: _selectedPaymentMethod,
-                decoration: InputDecoration(
-                  labelText: '付款方式',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+
+              // 经办人 + 付款方式 同一排
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedEmployeeId,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: '经办人',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        prefixIcon: Icon(Icons.badge, color: Colors.teal),
+                      ),
+                      items: [
+                        DropdownMenuItem<int>(
+                          value: null,
+                          child: Text('经办人', overflow: TextOverflow.ellipsis),
+                        ),
+                        ...widget.employees.map<DropdownMenuItem<int>>((employee) {
+                          return DropdownMenuItem<int>(
+                            value: employee['id'],
+                            child: Text(employee['name'], overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedEmployeeId = value;
+                        });
+                      },
+                    ),
                   ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  prefixIcon: Icon(Icons.payment, color: Colors.teal),
-                ),
-                items: _paymentMethods.map<DropdownMenuItem<String>>((method) {
-                  return DropdownMenuItem<String>(
-                    value: method,
-                    child: Text(method),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPaymentMethod = value!;
-                  });
-                },
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedPaymentMethod,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: '付款方式',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        prefixIcon: Icon(Icons.payment, color: Colors.teal),
+                      ),
+                      items: _paymentMethods.map<DropdownMenuItem<String>>((method) {
+                        return DropdownMenuItem<String>(
+                          value: method,
+                          child: Text(method, overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedPaymentMethod = value!;
+                        });
+                      },
+                    ),
+                  ),
+                ],
               ),
               SizedBox(height: 16),
               
@@ -1364,6 +1361,84 @@ class _IncomeDialogState extends State<IncomeDialog> {
           children: [
             TextButton(
               onPressed: () {
+                // 本地验证：检查所有必填项和业务规则
+                String? errorMessage;
+                
+                // i. 进账日期已选择（默认当日，应该总是有值，但检查一下）
+                if (_selectedDate == null) {
+                  errorMessage = '请选择进账日期';
+                }
+                // i. 客户已选择
+                else if (_selectedCustomerId == null) {
+                  errorMessage = '请选择客户';
+                }
+                // ii. 实际进账金额、优惠金额、优惠前价格都已输入且 >= 0，且满足关系
+                else {
+                  final amountText = _amountController.text.trim();
+                  final discountText = _discountController.text.trim();
+                  final originalText = _originalPriceController.text.trim();
+                  
+                  if (amountText.isEmpty) {
+                    errorMessage = '请输入实际进账金额';
+                  } else {
+                    final amount = double.tryParse(amountText);
+                    if (amount == null) {
+                      errorMessage = '实际进账金额格式无效';
+                    } else if (amount <= 0) {
+                      errorMessage = '实际进账金额必须大于0';
+                    } else {
+                      // 检查优惠金额和优惠前价格
+                      final discount = discountText.isEmpty ? 0.0 : double.tryParse(discountText);
+                      final original = originalText.isEmpty ? null : double.tryParse(originalText);
+                      
+                      if (discount == null && discountText.isNotEmpty) {
+                        errorMessage = '优惠金额格式无效';
+                      } else if (discount != null && discount < 0) {
+                        errorMessage = '优惠金额不能为负数';
+                      } else if (original == null && originalText.isNotEmpty) {
+                        errorMessage = '优惠前价格格式无效';
+                      } else if (original != null && original < 0) {
+                        errorMessage = '优惠前价格不能为负数';
+                      } else if (original != null && original < amount) {
+                        errorMessage = '优惠前价格必须大于等于实际进账金额';
+                      } else {
+                        // 计算检查：实际进账金额 + 优惠金额 = 优惠前价格（浮点数计算，容忍小误差）
+                        final calculatedOriginal = amount + (discount ?? 0.0);
+                        if (original != null) {
+                          final diff = (calculatedOriginal - original).abs();
+                          if (diff > 0.01) { // 允许0.01的误差
+                            errorMessage = '金额关系不正确：实际进账金额(${amount.toStringAsFixed(2)}) + 优惠金额(${(discount ?? 0.0).toStringAsFixed(2)}) = ${calculatedOriginal.toStringAsFixed(2)}，但优惠前价格为${original.toStringAsFixed(2)}';
+                          }
+                        }
+                      }
+                    }
+                  }
+                }
+                
+                // iii. 付款方式需要选择（默认现金，应该总是有值，但检查一下）
+                if (errorMessage == null && (_selectedPaymentMethod == null || _selectedPaymentMethod.isEmpty)) {
+                  errorMessage = '请选择付款方式';
+                }
+                
+                // 如果有错误，显示弹窗
+                if (errorMessage != null) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('保存失败'),
+                      content: Text(errorMessage!),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: Text('确定'),
+                        ),
+                      ],
+                    ),
+                  );
+                  return;
+                }
+                
+                // 所有验证通过，执行保存
                 if (_formKey.currentState!.validate()) {
                   final Map<String, dynamic> income = {
                     'incomeDate': _selectedDate.toIso8601String().split('T')[0],

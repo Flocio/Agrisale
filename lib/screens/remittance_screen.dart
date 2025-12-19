@@ -989,22 +989,25 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
               // 日期选择
               InkWell(
                 onTap: _selectDate,
-                child: Container(
-                  padding: EdgeInsets.symmetric(horizontal: 12, vertical: 16),
-                  decoration: BoxDecoration(
-                    border: Border.all(color: Colors.grey[300]!),
-                    borderRadius: BorderRadius.circular(8),
-                    color: Colors.grey[50],
+                child: InputDecorator(
+                  decoration: InputDecoration(
+                    labelText: '汇款日期',
+                    border: OutlineInputBorder(
+                      borderRadius: BorderRadius.circular(8),
+                    ),
+                    filled: true,
+                    fillColor: Colors.grey[50],
+                    prefixIcon: Icon(Icons.calendar_today, color: Colors.orange),
                   ),
                   child: Row(
                     children: [
-                      Icon(Icons.calendar_today, color: Colors.orange),
-                      SizedBox(width: 12),
-                      Text(
-                        DateFormat('yyyy-MM-dd').format(_selectedDate),
-                        style: TextStyle(fontSize: 16),
+                      Expanded(
+                        child: Text(
+                          DateFormat('yyyy-MM-dd').format(_selectedDate),
+                          style: TextStyle(fontSize: 16),
+                          overflow: TextOverflow.ellipsis,
+                        ),
                       ),
-                      Spacer(),
                       Icon(Icons.arrow_drop_down, color: Colors.grey),
                     ],
                   ),
@@ -1016,7 +1019,7 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
               DropdownButtonFormField<int>(
                 value: _selectedSupplierId,
                 decoration: InputDecoration(
-                  labelText: '供应商',
+                  labelText: '选择供应商',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1024,18 +1027,14 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.business, color: Colors.orange),
                 ),
-                items: [
-                  DropdownMenuItem<int>(
-                    value: null,
-                    child: Text('未选择供应商'),
-                  ),
-                  ...widget.suppliers.map<DropdownMenuItem<int>>((supplier) {
-                    return DropdownMenuItem<int>(
-                      value: supplier['id'],
-                      child: Text(supplier['name']),
-                    );
-                  }).toList(),
-                ],
+                isExpanded: true,
+                hint: Text('选择供应商', overflow: TextOverflow.ellipsis),
+                items: widget.suppliers.map<DropdownMenuItem<int>>((supplier) {
+                  return DropdownMenuItem<int>(
+                    value: supplier['id'],
+                    child: Text(supplier['name'], overflow: TextOverflow.ellipsis),
+                  );
+                }).toList(),
                 onChanged: (value) {
                   setState(() {
                     _selectedSupplierId = value;
@@ -1049,6 +1048,8 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: '金额',
+                  floatingLabelBehavior: FloatingLabelBehavior.always,
+                  hintText: '',
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1072,61 +1073,70 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
               ),
               SizedBox(height: 16),
               
-              // 员工选择
-              DropdownButtonFormField<int>(
-                value: _selectedEmployeeId,
-                decoration: InputDecoration(
-                  labelText: '经办人',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+              // 经办人 + 汇款方式 同一排
+              Row(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  Expanded(
+                    child: DropdownButtonFormField<int>(
+                      value: _selectedEmployeeId,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: '经办人',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        prefixIcon: Icon(Icons.badge, color: Colors.orange),
+                      ),
+                      items: [
+                        DropdownMenuItem<int>(
+                          value: null,
+                          child: Text('经办人', overflow: TextOverflow.ellipsis),
+                        ),
+                        ...widget.employees.map<DropdownMenuItem<int>>((employee) {
+                          return DropdownMenuItem<int>(
+                            value: employee['id'],
+                            child: Text(employee['name'], overflow: TextOverflow.ellipsis),
+                          );
+                        }).toList(),
+                      ],
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedEmployeeId = value;
+                        });
+                      },
+                    ),
                   ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  prefixIcon: Icon(Icons.badge, color: Colors.orange),
-                ),
-                items: [
-                  DropdownMenuItem<int>(
-                    value: null,
-                    child: Text('未选择经办人'),
+                  SizedBox(width: 12),
+                  Expanded(
+                    child: DropdownButtonFormField<String>(
+                      value: _selectedPaymentMethod,
+                      isExpanded: true,
+                      decoration: InputDecoration(
+                        labelText: '汇款方式',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        prefixIcon: Icon(Icons.send, color: Colors.orange),
+                      ),
+                      items: _paymentMethods.map<DropdownMenuItem<String>>((method) {
+                        return DropdownMenuItem<String>(
+                          value: method,
+                          child: Text(method, overflow: TextOverflow.ellipsis),
+                        );
+                      }).toList(),
+                      onChanged: (value) {
+                        setState(() {
+                          _selectedPaymentMethod = value!;
+                        });
+                      },
+                    ),
                   ),
-                  ...widget.employees.map<DropdownMenuItem<int>>((employee) {
-                    return DropdownMenuItem<int>(
-                      value: employee['id'],
-                      child: Text(employee['name']),
-                    );
-                  }).toList(),
                 ],
-                onChanged: (value) {
-                  setState(() {
-                    _selectedEmployeeId = value;
-                  });
-                },
-              ),
-              SizedBox(height: 16),
-              
-              // 汇款方式选择
-              DropdownButtonFormField<String>(
-                value: _selectedPaymentMethod,
-                decoration: InputDecoration(
-                  labelText: '汇款方式',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  prefixIcon: Icon(Icons.send, color: Colors.orange),
-                ),
-                items: _paymentMethods.map<DropdownMenuItem<String>>((method) {
-                  return DropdownMenuItem<String>(
-                    value: method,
-                    child: Text(method),
-                  );
-                }).toList(),
-                onChanged: (value) {
-                  setState(() {
-                    _selectedPaymentMethod = value!;
-                  });
-                },
               ),
               SizedBox(height: 16),
               
@@ -1154,6 +1164,52 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
           children: [
             TextButton(
               onPressed: () {
+                // 本地验证：检查所有必填项和业务规则
+                String? errorMessage;
+                
+                // 1. 供应商已选择
+                if (_selectedSupplierId == null) {
+                  errorMessage = '请选择供应商';
+                }
+                // 2. 金额输入合法，为正实数
+                else {
+                  final amountText = _amountController.text.trim();
+                  if (amountText.isEmpty) {
+                    errorMessage = '请输入金额';
+                  } else {
+                    final amount = double.tryParse(amountText);
+                    if (amount == null) {
+                      errorMessage = '金额格式无效';
+                    } else if (amount <= 0) {
+                      errorMessage = '金额必须大于0';
+                    }
+                  }
+                }
+                
+                // 4. 汇款方式已选（默认已选为现金，但检查一下）
+                if (errorMessage == null && (_selectedPaymentMethod == null || _selectedPaymentMethod.isEmpty)) {
+                  errorMessage = '请选择汇款方式';
+                }
+                
+                // 如果有错误，显示弹窗
+                if (errorMessage != null) {
+                  showDialog(
+                    context: context,
+                    builder: (context) => AlertDialog(
+                      title: Text('保存失败'),
+                      content: Text(errorMessage!),
+                      actions: [
+                        TextButton(
+                          onPressed: () => Navigator.of(context).pop(),
+                          child: Text('确定'),
+                        ),
+                      ],
+                    ),
+                  );
+                  return;
+                }
+                
+                // 所有验证通过，执行保存
                 if (_formKey.currentState!.validate()) {
                   final Map<String, dynamic> remittance = {
                     'remittanceDate': _selectedDate.toIso8601String().split('T')[0],
@@ -1161,7 +1217,9 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                     'amount': double.parse(_amountController.text.trim()),
                     'employeeId': _selectedEmployeeId,
                     'paymentMethod': _selectedPaymentMethod,
-                    'note': _noteController.text.trim(),
+                    'note': _noteController.text.trim().isEmpty 
+                        ? null 
+                        : _noteController.text.trim(),
                   };
                   if (widget.remittance != null) {
                     remittance['id'] = widget.remittance!['id'];
