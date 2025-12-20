@@ -5,6 +5,7 @@ import 'package:package_info_plus/package_info_plus.dart';
 import 'package:url_launcher/url_launcher.dart';
 import '../services/update_service.dart';
 import 'update_dialog.dart';
+import 'help_screen.dart';
 
 class VersionInfoScreen extends StatefulWidget {
   @override
@@ -322,6 +323,21 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                             ),
+                          ),
+                          Divider(),
+                          ListTile(
+                            leading: Icon(Icons.help_outline, color: Colors.blue),
+                            title: Text('使用帮助'),
+                            subtitle: Text('查看系统使用说明和功能介绍'),
+                            trailing: Icon(Icons.arrow_forward_ios, size: 16),
+                            onTap: () {
+                              Navigator.push(
+                                context,
+                                MaterialPageRoute(
+                                  builder: (context) => HelpScreen(),
+                                ),
+                              );
+                            },
                           ),
                           Divider(),
                           ListTile(

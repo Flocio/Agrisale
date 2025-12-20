@@ -1140,7 +1140,7 @@ class TotalSalesTableScreen extends StatelessWidget {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '横向和纵向滑动可查看完整表格，点击右上角图标可导出CSV文件',
+                    '横向和纵向滑动可查看完整表格，点击右上角图标可导出CSV/PDF文件',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.purple[800],
