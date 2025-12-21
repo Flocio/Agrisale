@@ -651,27 +651,15 @@ class _ProductDialogState extends State<ProductDialog> {
                 },
               ),
               SizedBox(height: 16),
-              TextFormField(
-              controller: _descriptionController,
-                decoration: InputDecoration(
-                  labelText: '描述',
-                  border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
-                  ),
-                  filled: true,
-                  fillColor: Colors.grey[50],
-                  prefixIcon: Icon(Icons.description, color: Colors.green),
-            ),
-                maxLines: 2,
-              ),
-              SizedBox(height: 16),
               // 添加供应商选择
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
                 decoration: BoxDecoration(
                   color: Colors.grey[50],
                   borderRadius: BorderRadius.circular(8),
-                  border: Border.all(color: Colors.grey[400]!),
+                  border: Border.all(
+                    color: _selectedSupplierId != null ? Colors.black : Colors.grey[400]!,
+                  ),
                 ),
                 child: Row(
                   children: [
@@ -771,6 +759,20 @@ class _ProductDialogState extends State<ProductDialog> {
                   ),
                 ],
             ),
+              SizedBox(height: 16),
+              TextFormField(
+              controller: _descriptionController,
+                decoration: InputDecoration(
+                  labelText: '描述',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
+                  ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  prefixIcon: Icon(Icons.description, color: Colors.green),
+            ),
+                maxLines: 2,
+              ),
           ],
           ),
         ),

@@ -266,7 +266,16 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             final oldProduct = _products.firstWhere((p) => p['name'] == oldProductName);
             final newProduct = _products.firstWhere((p) => p['name'] == newProductName);
             
-            // 检查新产品库存是否足够（如果新数量为负）
+            // 检查原产品库存是否足够恢复（如果原数量为正数，恢复时需要减少库存）
+            if (oldQuantity > 0) {
+              final oldProductStock = oldProduct['stock'] as double;
+              if (oldProductStock < oldQuantity) {
+                _showErrorDialog('无法更改产品！原产品 ${oldProduct['name']} 当前库存: ${_formatNumber(oldProductStock)} ${oldProduct['unit']}，小于原采购数量 ${_formatNumber(oldQuantity)} ${oldProduct['unit']}');
+                return;
+              }
+            }
+            
+            // 检查新产品库存是否足够（如果新数量为负，即采购退货）
             if (newQuantity < 0) {
               final newProductStock = newProduct['stock'] as double;
               if (newProductStock < newQuantity.abs()) {

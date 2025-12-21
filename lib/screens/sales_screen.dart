@@ -1336,36 +1336,36 @@ class _SalesDialogState extends State<SalesDialog> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         TextFormField(
-                          controller: _quantityController,
-                          decoration: InputDecoration(
-                            labelText: '数量',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
-                            prefixIcon: Icon(Icons.format_list_numbered, color: Colors.green),
-                          ),
-                          keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
-                              return '请输入数量';
-                            }
-                            if (double.tryParse(value) == null) {
-                              return '请输入有效数字';
-                            }
-                            if (double.parse(value) <= 0) {
-                              return '数量必须大于0';
-                            }
-                            if (_selectedProduct != null) {
-                              final quantity = double.tryParse(value) ?? 0.0;
-                              if (quantity > _availableStock) {
-                                return '库存不足';
-                              }
-                            }
-                            return null;
-                          },
-                          onChanged: (value) => _calculateTotalPrice(),
+              controller: _quantityController,
+                      decoration: InputDecoration(
+                        labelText: '数量',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        prefixIcon: Icon(Icons.format_list_numbered, color: Colors.green),
+                      ),
+                      keyboardType: TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
+                          return '请输入数量';
+                        }
+                        if (double.tryParse(value) == null) {
+                          return '请输入有效数字';
+                        }
+                        if (double.parse(value) <= 0) {
+                          return '数量必须大于0';
+                        }
+                        if (_selectedProduct != null) {
+                          final quantity = double.tryParse(value) ?? 0.0;
+                          if (quantity > _availableStock) {
+                            return '库存不足';
+                          }
+                        }
+                        return null;
+                      },
+              onChanged: (value) => _calculateTotalPrice(),
                         ),
                         SizedBox(height: 4),
                         Center(
@@ -1378,7 +1378,7 @@ class _SalesDialogState extends State<SalesDialog> {
                           ),
                         ),
                       ],
-                    ),
+            ),
                   ),
                   SizedBox(width: 12),
                   Expanded(
@@ -1386,30 +1386,30 @@ class _SalesDialogState extends State<SalesDialog> {
                       crossAxisAlignment: CrossAxisAlignment.stretch,
                       children: [
                         TextFormField(
-                          controller: _salePriceController,
-                          decoration: InputDecoration(
+              controller: _salePriceController,
+                      decoration: InputDecoration(
                             labelText: '单价',
-                            border: OutlineInputBorder(
-                              borderRadius: BorderRadius.circular(8),
-                            ),
-                            filled: true,
-                            fillColor: Colors.grey[50],
-                            prefixIcon: Icon(Icons.attach_money, color: Colors.green),
-                          ),
-                          keyboardType: TextInputType.numberWithOptions(decimal: true),
-                          validator: (value) {
-                            if (value == null || value.isEmpty) {
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        prefixIcon: Icon(Icons.attach_money, color: Colors.green),
+                      ),
+                      keyboardType: TextInputType.numberWithOptions(decimal: true),
+                      validator: (value) {
+                        if (value == null || value.isEmpty) {
                               return '请输入单价';
-                            }
-                            if (double.tryParse(value) == null) {
-                              return '请输入有效数字';
-                            }
-                            if (double.parse(value) < 0) {
+                        }
+                        if (double.tryParse(value) == null) {
+                          return '请输入有效数字';
+                        }
+                        if (double.parse(value) < 0) {
                               return '单价不能为负数';
-                            }
-                            return null;
-                          },
-                          onChanged: (value) => _calculateTotalPrice(),
+                        }
+                        return null;
+                      },
+              onChanged: (value) => _calculateTotalPrice(),
                         ),
                         SizedBox(height: 4),
                         Center(
@@ -1422,19 +1422,19 @@ class _SalesDialogState extends State<SalesDialog> {
                           ),
                         ),
                       ],
-                    ),
+            ),
                   ),
                 ],
               ),
               SizedBox(height: 16),
-
+              
               // 总价显示（与备注位置互换：先总价）
               Container(
                 width: double.infinity,
                 padding: EdgeInsets.all(12),
                 decoration: BoxDecoration(
                   color: Colors.green[50],
-                  borderRadius: BorderRadius.circular(8),
+                    borderRadius: BorderRadius.circular(8),
                   border: Border.all(color: Colors.green[100]!),
                 ),
                 child: Row(
@@ -1455,9 +1455,9 @@ class _SalesDialogState extends State<SalesDialog> {
                     ),
                   ],
                 ),
-              ),
+            ),
               SizedBox(height: 16),
-
+              
               // 日期选择
               InkWell(
                 onTap: () => _selectDate(context),
@@ -1481,14 +1481,14 @@ class _SalesDialogState extends State<SalesDialog> {
                 ),
               ),
               SizedBox(height: 16),
-
+              
               // 备注（与总价显示互换：后备注）
               TextFormField(
                 controller: _noteController,
                 decoration: InputDecoration(
                   labelText: '备注',
                   border: OutlineInputBorder(
-                    borderRadius: BorderRadius.circular(8),
+                  borderRadius: BorderRadius.circular(8),
                   ),
                   filled: true,
                   fillColor: Colors.grey[50],
