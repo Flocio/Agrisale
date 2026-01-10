@@ -26,7 +26,7 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
   bool _isSearching = false;
   
   // 筛选相关
-  String _selectedFilter = 'all'; // all, sale, return, income
+  String _selectedFilter = 'all'; // all, sale, return, income_positive, income_negative
   String _dateFilter = 'all'; // all, today, week, month, custom
   DateTime? _startDate;
   DateTime? _endDate;
@@ -143,17 +143,19 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
             }
           }
 
+          // 根据金额正负判断是收款还是退款
+          final double amount = (income['amount'] as num).toDouble();
           allTransactions.add({
             'type': 'income',
-            'typeName': '进账',
+            'typeName': amount >= 0 ? '收款' : '退款',
             'date': income['incomeDate'],
             'amount': income['amount'],
             'discount': income['discount'] ?? 0,
             'paymentMethod': income['paymentMethod'],
             'employeeName': employeeName,
             'note': income['note'] ?? '',
-            'icon': Icons.payment,
-            'color': Colors.amber, // 改为黄色
+            'icon': amount >= 0 ? Icons.payment : Icons.money_off,
+            'color': amount >= 0 ? Colors.amber : Colors.red, // 收款黄色，退款红色
           });
         }
 
@@ -200,8 +202,15 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
     
     // 类型筛选
     if (_selectedFilter != 'all') {
-      filtered = filtered.where((transaction) => 
-          transaction['type'] == _selectedFilter).toList();
+      filtered = filtered.where((transaction) {
+        if (_selectedFilter == 'income_positive') {
+          return transaction['type'] == 'income' && (transaction['amount'] as num) >= 0;
+        } else if (_selectedFilter == 'income_negative') {
+          return transaction['type'] == 'income' && (transaction['amount'] as num) < 0;
+        } else {
+          return transaction['type'] == _selectedFilter;
+        }
+      }).toList();
     }
     
     // 日期筛选
@@ -300,7 +309,8 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
                   _buildFilterChip('all', '全部', null, setModalState),
                   _buildFilterChip('sale', '销售', Colors.green, setModalState),
                   _buildFilterChip('return', '退货', Colors.red, setModalState),
-                  _buildFilterChip('income', '进账', Colors.blue, setModalState),
+                  _buildFilterChip('income_positive', '收款', Colors.amber, setModalState),
+                  _buildFilterChip('income_negative', '退款', Colors.red, setModalState),
                 ],
               ),
               SizedBox(height: 16),
@@ -667,14 +677,14 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
                       Row(
                         children: [
                           Text(
-                            '¥${_formatAmount(transaction['amount'])}',
+                            '¥${_formatAmount((transaction['amount'] as num).abs())}',
                             style: TextStyle(
                               fontSize: 18,
                               fontWeight: FontWeight.bold,
                               color: transaction['color'],
                             ),
                           ),
-                          if (transaction['discount'] != null && transaction['discount'] > 0)
+                          if (transaction['discount'] != null && transaction['discount'] > 0 && (transaction['amount'] as num) >= 0)
                             Padding(
                               padding: EdgeInsets.only(left: 8),
                               child: Container(
@@ -866,7 +876,7 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '总计 ${_filteredTransactions.length} 条记录: 销售 ${_filteredTransactions.where((t) => t['type'] == 'sale').length} | 退货 ${_filteredTransactions.where((t) => t['type'] == 'return').length} | 进账 ${_filteredTransactions.where((t) => t['type'] == 'income').length}',
+                    '总计 ${_filteredTransactions.length} 条记录: 销售 ${_filteredTransactions.where((t) => t['type'] == 'sale').length} | 退货 ${_filteredTransactions.where((t) => t['type'] == 'return').length} | 收款 ${_filteredTransactions.where((t) => t['type'] == 'income' && (t['amount'] as num) >= 0).length} | 退款 ${_filteredTransactions.where((t) => t['type'] == 'income' && (t['amount'] as num) < 0).length}',
                     style: TextStyle(
                       color: Colors.orange[700],
                       fontSize: 12,

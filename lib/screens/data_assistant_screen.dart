@@ -315,7 +315,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         {
           'name': 'income',
           'columns': ['id', 'userId', 'incomeDate', 'customerId', 'amount', 'discount', 'employeeId', 'paymentMethod', 'note'],
-          'description': '进账记录表，记录客户付款信息。amount为REAL类型表示收款金额，discount为优惠金额（默认0）。employeeId关联到employees表表示经手人。paymentMethod可为现金、微信转账或银行卡。每个用户有独立的进账记录'
+          'description': '进账记录表，记录客户付款信息。amount为REAL类型表示收款金额（正数）或退款金额（负数），支持正负数。discount为优惠金额（默认0）。employeeId关联到employees表表示经手人。paymentMethod可为现金、微信转账或银行卡。每个用户有独立的进账记录'
         },
         {
           'name': 'remittance',

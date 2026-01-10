@@ -236,9 +236,18 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
 
     for (var record in _records) {
       // 根据类型决定金额正负
-      String amount = record['type'] == '进账' 
-          ? '+${record['amount']}' 
-          : '-${record['amount']}';
+      final double amountValue = (record['amount'] as num).toDouble();
+      String amount;
+      
+      if (record['type'] == '进账') {
+        // 进账：负数是退款，正数是收款
+        amount = amountValue >= 0 
+            ? '+${amountValue.toStringAsFixed(2)}'  // 收款: +123.45
+            : '${amountValue.toStringAsFixed(2)}';  // 退款: -123.45（负号已包含）
+      } else {
+        // 汇款：始终显示负号
+        amount = '-${amountValue.abs().toStringAsFixed(2)}';
+      }
       
       rows.add([
         record['date'],
@@ -602,13 +611,28 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                           rows: [
                             // 数据行
                             ..._records.map((record) {
-                              // 设置颜色，进账为绿色，汇款为红色
-                              Color textColor = record['type'] == '进账' ? Colors.green : Colors.red;
+                              // 获取实际金额
+                              final double actualAmount = (record['amount'] as num).toDouble();
                               
-                              // 根据类型决定金额正负
-                              String amount = record['type'] == '进账' 
-                                  ? '+${record['amount']}' 
-                                  : '-${record['amount']}';
+                              // 根据金额正负设置颜色和符号
+                              // 进账：正数为绿色（收款），负数为红色（退款）
+                              // 汇款：始终为红色
+                              Color textColor;
+                              String amount;
+                              
+                              if (record['type'] == '进账') {
+                                if (actualAmount >= 0) {
+                                  textColor = Colors.green;
+                                  amount = '+${actualAmount.toStringAsFixed(2)}';
+                                } else {
+                                  textColor = Colors.red;
+                                  amount = '-${actualAmount.abs().toStringAsFixed(2)}';
+                                }
+                              } else {
+                                // 汇款始终为红色负数
+                                textColor = Colors.red;
+                                amount = '-${actualAmount.toStringAsFixed(2)}';
+                              }
                                   
                               return DataRow(
                                 cells: [

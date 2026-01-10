@@ -27,9 +27,11 @@ class _IncomeScreenState extends State<IncomeScreen> {
   String? _selectedCustomerFilter;
   String? _selectedEmployeeFilter;
   String? _selectedPaymentMethodFilter;
+  String? _selectedTypeFilter; // 类型筛选：收款/退款
   DateTimeRange? _selectedDateRange;
   final ValueNotifier<List<String>> _activeFilters = ValueNotifier<List<String>>([]);
   final List<String> _paymentMethods = ['现金', '微信转账', '银行卡'];
+  final List<String> _incomeTypes = ['收款', '退款'];
 
   @override
   void initState() {
@@ -55,6 +57,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
       _selectedCustomerFilter = null;
       _selectedEmployeeFilter = null;
       _selectedPaymentMethodFilter = null;
+      _selectedTypeFilter = null;
       _selectedDateRange = null;
       _searchController.clear();
       _activeFilters.value = [];
@@ -78,6 +81,10 @@ class _IncomeScreenState extends State<IncomeScreen> {
     
     if (_selectedPaymentMethodFilter != null) {
       filters.add('付款方式: $_selectedPaymentMethodFilter');
+    }
+    
+    if (_selectedTypeFilter != null) {
+      filters.add('类型: $_selectedTypeFilter');
     }
     
     if (_selectedDateRange != null) {
@@ -143,6 +150,20 @@ class _IncomeScreenState extends State<IncomeScreen> {
         hasFilters = true;
         result = result.where((income) => 
           income['paymentMethod'] == _selectedPaymentMethodFilter).toList();
+      }
+      
+      // 类型筛选（收款/退款）
+      if (_selectedTypeFilter != null) {
+        hasFilters = true;
+        result = result.where((income) {
+          final amount = (income['amount'] as num?)?.toDouble() ?? 0.0;
+          if (_selectedTypeFilter == '收款') {
+            return amount >= 0;
+          } else if (_selectedTypeFilter == '退款') {
+            return amount < 0;
+          }
+          return true;
+        }).toList();
       }
       
       // 日期范围筛选
@@ -457,6 +478,52 @@ class _IncomeScreenState extends State<IncomeScreen> {
                     ),
                     SizedBox(height: 16),
                     
+                    // 类型筛选（收款/退款）
+                    Text('按类型筛选:', style: TextStyle(fontWeight: FontWeight.w500)),
+                    SizedBox(height: 8),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButton<String?>(
+                        isExpanded: true,
+                        value: _selectedTypeFilter,
+                        hint: Text('选择类型'),
+                        underline: SizedBox(),
+                        items: [
+                          DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('全部类型'),
+                          ),
+                          ..._incomeTypes.map((type) => DropdownMenuItem<String?>(
+                            value: type,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: type == '退款' ? Colors.red : Colors.green,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Text(type),
+                              ],
+                            ),
+                          )).toList(),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedTypeFilter = value;
+                          });
+                        },
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    
                     // 日期范围筛选
                     Text('按日期筛选:', style: TextStyle(fontWeight: FontWeight.w500)),
                     SizedBox(height: 8),
@@ -676,6 +743,27 @@ class _IncomeScreenState extends State<IncomeScreen> {
                                           color: Colors.grey[600],
                                         ),
                                       ),
+                                      SizedBox(width: 8),
+                                      // 收款/退款标签
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: (income['amount'] as num) < 0 ? Colors.red[50] : Colors.green[50],
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: (income['amount'] as num) < 0 ? Colors.red[300]! : Colors.green[300]!,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          (income['amount'] as num) < 0 ? '退款' : '收款',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: (income['amount'] as num) < 0 ? Colors.red[700] : Colors.green[700],
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   Row(
@@ -727,20 +815,22 @@ class _IncomeScreenState extends State<IncomeScreen> {
                                   Column(
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
-                                      // 显示实际进账金额
+                                      // 显示实际进账金额（退款用红色显示，收款用绿色显示，规范格式：-¥数字）
                                       Text(
-                                        '¥${income['amount'].toStringAsFixed(2)}',
+                                        (income['amount'] as num) < 0 
+                                            ? '-¥${(income['amount'] as num).abs().toStringAsFixed(2)}'
+                                            : '¥${(income['amount'] as num).toStringAsFixed(2)}',
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.green[600],
+                                          color: (income['amount'] as num) < 0 ? Colors.red[600] : Colors.green[600],
                                         ),
                                       ),
-                                      // 如果有优惠，显示优惠信息
-                                      if ((income['discount'] ?? 0.0) > 0) ...[
+                                      // 如果是进账且有优惠，显示优惠信息
+                                      if ((income['amount'] as num) > 0 && ((income['discount'] ?? 0.0) as num) > 0) ...[
                                         SizedBox(height: 2),
                                         Text(
-                                          '原价: ¥${((income['amount'] ?? 0.0) + (income['discount'] ?? 0.0)).toStringAsFixed(2)}',
+                                          '原价: ¥${(((income['amount'] ?? 0.0) as num) + ((income['discount'] ?? 0.0) as num)).toStringAsFixed(2)}',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.grey[600],
@@ -748,7 +838,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                                           ),
                                         ),
                                         Text(
-                                          '优惠: ¥${(income['discount'] ?? 0.0).toStringAsFixed(2)}',
+                                          '优惠: ¥${((income['discount'] ?? 0.0) as num).toStringAsFixed(2)}',
                                           style: TextStyle(
                                             fontSize: 12,
                                             color: Colors.orange[700],
@@ -1010,6 +1100,16 @@ class _IncomeDialogState extends State<IncomeDialog> {
     try {
       final double amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
 
+      // 如果是退款（负数），清空并禁用优惠相关字段
+      if (amount < 0) {
+        _discountController.text = '0';
+        _originalPriceController.text = '';
+        setState(() {
+          _originalPriceError = false;
+        });
+        return;
+      }
+
       if (source == 'discount') {
         _lastEditedDiscountField = 'discount';
         final double discount = double.tryParse(_discountController.text.trim()) ?? 0.0;
@@ -1149,17 +1249,21 @@ class _IncomeDialogState extends State<IncomeDialog> {
                 controller: _amountController,
                 decoration: InputDecoration(
                   labelText: '实际进账金额',
-                  // 确保 label 永远在左上角，输入框内部留空
                   floatingLabelBehavior: FloatingLabelBehavior.always,
-                  hintText: '',
+                  hintText: '正数表示进账，负数表示退款',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
                   filled: true,
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.attach_money, color: Colors.teal),
+                  helperText: double.tryParse(_amountController.text) != null && double.parse(_amountController.text) < 0 
+                      ? '⚠️ 退款模式：优惠金额已自动设为0'
+                      : null,
+                  helperStyle: TextStyle(color: Colors.orange[700]),
                 ),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return '请输入实际进账金额';
@@ -1167,8 +1271,8 @@ class _IncomeDialogState extends State<IncomeDialog> {
                   if (double.tryParse(value) == null) {
                     return '请输入有效的金额';
                   }
-                  if (double.parse(value) <= 0) {
-                    return '金额必须大于0';
+                  if (double.parse(value) == 0) {
+                    return '金额不能为0';
                   }
                   return null;
                 },
@@ -1177,20 +1281,29 @@ class _IncomeDialogState extends State<IncomeDialog> {
               SizedBox(height: 16),
 
               // 优惠金额（左）+ 优惠前价格（右）同一排：两者都可输入，自动互算
+              // 退款模式时禁用
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
                   Expanded(
                     child: TextFormField(
                       controller: _discountController,
+                      enabled: double.tryParse(_amountController.text) == null || double.parse(_amountController.text) >= 0,
                       decoration: InputDecoration(
                         labelText: '优惠金额',
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[50],
-                        prefixIcon: Icon(Icons.discount, color: Colors.orange),
+                        fillColor: (double.tryParse(_amountController.text) != null && double.parse(_amountController.text) < 0) 
+                            ? Colors.grey[300] 
+                            : Colors.grey[50],
+                        prefixIcon: Icon(
+                          Icons.discount, 
+                          color: (double.tryParse(_amountController.text) != null && double.parse(_amountController.text) < 0) 
+                              ? Colors.grey 
+                              : Colors.orange
+                        ),
                       ),
                       keyboardType: TextInputType.numberWithOptions(decimal: true),
                       validator: (value) {
@@ -1212,9 +1325,9 @@ class _IncomeDialogState extends State<IncomeDialog> {
                   Expanded(
                     child: TextFormField(
                       controller: _originalPriceController,
+                      enabled: double.tryParse(_amountController.text) == null || double.parse(_amountController.text) >= 0,
                       decoration: InputDecoration(
                         labelText: '优惠前价格',
-                        // 确保 label 永远在左上角，输入框内部留空（修复首次切换时 label 跑进框内）
                         floatingLabelBehavior: FloatingLabelBehavior.always,
                         hintText: '',
                         border: OutlineInputBorder(
@@ -1229,8 +1342,15 @@ class _IncomeDialogState extends State<IncomeDialog> {
                           borderSide: BorderSide(color: Colors.red, width: 2),
                         ),
                         filled: true,
-                        fillColor: Colors.grey[50],
-                        prefixIcon: Icon(Icons.local_offer, color: Colors.orange),
+                        fillColor: (double.tryParse(_amountController.text) != null && double.parse(_amountController.text) < 0) 
+                            ? Colors.grey[300] 
+                            : Colors.grey[50],
+                        prefixIcon: Icon(
+                          Icons.local_offer, 
+                          color: (double.tryParse(_amountController.text) != null && double.parse(_amountController.text) < 0) 
+                              ? Colors.grey 
+                              : Colors.orange
+                        ),
                         errorText: _originalPriceError ? '应不小于实际进账' : null,
                       ),
                       keyboardType: TextInputType.numberWithOptions(decimal: true),
@@ -1287,10 +1407,11 @@ class _IncomeDialogState extends State<IncomeDialog> {
                         fillColor: Colors.grey[50],
                         prefixIcon: Icon(Icons.badge, color: Colors.teal),
                       ),
+                      hint: Text('经办人', style: TextStyle(color: Colors.grey[400]), overflow: TextOverflow.ellipsis),
                       items: [
                         DropdownMenuItem<int>(
                           value: null,
-                          child: Text('经办人', overflow: TextOverflow.ellipsis),
+                          child: Text('经办人', style: TextStyle(color: Colors.grey[400]), overflow: TextOverflow.ellipsis),
                         ),
                         ...widget.employees.map<DropdownMenuItem<int>>((employee) {
                           return DropdownMenuItem<int>(
@@ -1384,10 +1505,13 @@ class _IncomeDialogState extends State<IncomeDialog> {
                     final amount = double.tryParse(amountText);
                     if (amount == null) {
                       errorMessage = '实际进账金额格式无效';
-                    } else if (amount <= 0) {
-                      errorMessage = '实际进账金额必须大于0';
+                    } else if (amount == 0) {
+                      errorMessage = '金额不能为0';
+                    } else if (amount < 0) {
+                      // 退款模式：只需要检查金额不为0即可
+                      // 优惠金额和优惠前价格应该已经被自动设为0或清空
                     } else {
-                      // 检查优惠金额和优惠前价格
+                      // 进账模式：检查优惠金额和优惠前价格
                       final discount = discountText.isEmpty ? 0.0 : double.tryParse(discountText);
                       final original = originalText.isEmpty ? null : double.tryParse(originalText);
                       
@@ -1447,11 +1571,10 @@ class _IncomeDialogState extends State<IncomeDialog> {
                     'discount': double.tryParse(_discountController.text.trim()) ?? 0.0,
                     'employeeId': _selectedEmployeeId,
                     'paymentMethod': _selectedPaymentMethod,
-                    'note': _noteController.text.trim(),
+                    'note': _noteController.text.trim().isEmpty 
+                        ? null 
+                        : _noteController.text.trim(),
                   };
-                  if (widget.income != null) {
-                    income['id'] = widget.income!['id'];
-                  }
                   Navigator.of(context).pop(income);
                 }
               },
