@@ -567,7 +567,7 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
             ),
             IconButton(
               icon: Icon(Icons.share),
-              tooltip: '导出 CSV',
+              tooltip: '导出',
               onPressed: _exportToCSV,
             ),
           ],

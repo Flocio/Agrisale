@@ -311,7 +311,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
           ),
           IconButton(
             icon: Icon(Icons.share),
-            tooltip: '导出 CSV',
+            tooltip: '导出',
             onPressed: _exportToCSV,
           ),
         ],

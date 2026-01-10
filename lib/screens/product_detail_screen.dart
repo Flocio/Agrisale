@@ -532,7 +532,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           ),
           IconButton(
             icon: Icon(Icons.share),
-            tooltip: '导出 CSV',
+            tooltip: '导出',
             onPressed: _exportToCSV,
           ),
         ],

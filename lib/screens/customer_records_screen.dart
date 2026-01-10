@@ -357,7 +357,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
           ),
           IconButton(
             icon: Icon(Icons.share),
-            tooltip: '导出 CSV',
+            tooltip: '导出',
             onPressed: _exportToCSV,
           ),
         ],
