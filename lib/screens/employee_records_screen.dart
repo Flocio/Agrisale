@@ -245,8 +245,10 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
             ? '+${amountValue.toStringAsFixed(2)}'  // 收款: +123.45
             : '${amountValue.toStringAsFixed(2)}';  // 退款: -123.45（负号已包含）
       } else {
-        // 汇款：始终显示负号
-        amount = '-${amountValue.abs().toStringAsFixed(2)}';
+        // 汇款：正数汇出显示负号，负数退款显示正号
+        amount = amountValue >= 0
+            ? '-${amountValue.toStringAsFixed(2)}'  // 汇出: -123.45
+            : '+${amountValue.abs().toStringAsFixed(2)}';  // 退款: +123.45
       }
       
       rows.add([
@@ -616,7 +618,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                               
                               // 根据金额正负设置颜色和符号
                               // 进账：正数为绿色（收款），负数为红色（退款）
-                              // 汇款：始终为红色
+                              // 汇款：正数为红色（汇出），负数为绿色（退款）
                               Color textColor;
                               String amount;
                               
@@ -629,9 +631,14 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                                   amount = '-${actualAmount.abs().toStringAsFixed(2)}';
                                 }
                               } else {
-                                // 汇款始终为红色负数
-                                textColor = Colors.red;
-                                amount = '-${actualAmount.toStringAsFixed(2)}';
+                                // 汇款：正数汇出为红色负数，负数退款为绿色正数
+                                if (actualAmount >= 0) {
+                                  textColor = Colors.red;
+                                  amount = '-${actualAmount.toStringAsFixed(2)}';
+                                } else {
+                                  textColor = Colors.green;
+                                  amount = '+${actualAmount.abs().toStringAsFixed(2)}';
+                                }
                               }
                                   
                               return DataRow(
@@ -866,15 +873,15 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                         SizedBox(width: 16),
                   _buildSummaryItem('汇款记录数', '${_remittanceCount}', Colors.red),
                         SizedBox(width: 16),
-                  _buildSummaryItem('进账总额', '+¥${_totalIncomeAmount.toStringAsFixed(2)}', Colors.green),
+                  _buildSummaryItem('进账总额', '${_totalIncomeAmount >= 0 ? '+' : '-'}¥${_totalIncomeAmount.abs().toStringAsFixed(2)}', _totalIncomeAmount >= 0 ? Colors.green : Colors.red),
                         SizedBox(width: 16),
-                  _buildSummaryItem('汇款总额', '-¥${_totalRemittanceAmount.toStringAsFixed(2)}', Colors.red),
+                  _buildSummaryItem('汇款总额', '${_totalRemittanceAmount > 0 ? '-' : '+'}¥${_totalRemittanceAmount.abs().toStringAsFixed(2)}', _totalRemittanceAmount > 0 ? Colors.red : Colors.green),
                         SizedBox(width: 16),
                         _buildSummaryItem('净收入', '${_netAmount >= 0 ? '+' : '-'}¥${_netAmount.abs().toStringAsFixed(2)}', _netAmount >= 0 ? Colors.green : Colors.red),
                         SizedBox(width: 16),
-                        _buildSummaryItem('平均进账', _incomeCount > 0 ? '¥${(_totalIncomeAmount / _incomeCount).toStringAsFixed(2)}' : '¥0.00', Colors.green),
+                        _buildSummaryItem('平均进账', _incomeCount > 0 ? '${(_totalIncomeAmount / _incomeCount) >= 0 ? '+' : '-'}¥${((_totalIncomeAmount / _incomeCount).abs()).toStringAsFixed(2)}' : '¥0.00', _incomeCount > 0 ? ((_totalIncomeAmount / _incomeCount) >= 0 ? Colors.green : Colors.red) : Colors.green),
                         SizedBox(width: 16),
-                        _buildSummaryItem('平均汇款', _remittanceCount > 0 ? '¥${(_totalRemittanceAmount / _remittanceCount).toStringAsFixed(2)}' : '¥0.00', Colors.red),
+                        _buildSummaryItem('平均汇款', _remittanceCount > 0 ? '${(_totalRemittanceAmount / _remittanceCount) > 0 ? '-' : '+'}¥${((_totalRemittanceAmount / _remittanceCount).abs()).toStringAsFixed(2)}' : '¥0.00', _remittanceCount > 0 ? ((_totalRemittanceAmount / _remittanceCount) > 0 ? Colors.red : Colors.green) : Colors.red),
                         SizedBox(width: 8),
                   ],
                 ),

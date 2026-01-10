@@ -27,9 +27,11 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
   String? _selectedSupplierFilter;
   String? _selectedEmployeeFilter;
   String? _selectedPaymentMethodFilter;
+  String? _selectedTypeFilter; // 类型筛选：汇款/退款
   DateTimeRange? _selectedDateRange;
   final ValueNotifier<List<String>> _activeFilters = ValueNotifier<List<String>>([]);
   final List<String> _paymentMethods = ['现金', '微信转账', '银行卡'];
+  final List<String> _remittanceTypes = ['汇款', '退款'];
 
   @override
   void initState() {
@@ -55,6 +57,7 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
       _selectedSupplierFilter = null;
       _selectedEmployeeFilter = null;
       _selectedPaymentMethodFilter = null;
+      _selectedTypeFilter = null;
       _selectedDateRange = null;
       _searchController.clear();
       _activeFilters.value = [];
@@ -78,6 +81,10 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
     
     if (_selectedPaymentMethodFilter != null) {
       filters.add('汇款方式: $_selectedPaymentMethodFilter');
+    }
+    
+    if (_selectedTypeFilter != null) {
+      filters.add('类型: $_selectedTypeFilter');
     }
     
     if (_selectedDateRange != null) {
@@ -141,6 +148,20 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
         hasFilters = true;
         result = result.where((remittance) => 
           remittance['paymentMethod'] == _selectedPaymentMethodFilter).toList();
+      }
+      
+      // 类型筛选（汇款/退款）
+      if (_selectedTypeFilter != null) {
+        hasFilters = true;
+        result = result.where((remittance) {
+          final amount = (remittance['amount'] as num?)?.toDouble() ?? 0.0;
+          if (_selectedTypeFilter == '汇款') {
+            return amount >= 0;
+          } else if (_selectedTypeFilter == '退款') {
+            return amount < 0;
+          }
+          return true;
+        }).toList();
       }
       
       // 日期范围筛选
@@ -455,6 +476,52 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
                     ),
                     SizedBox(height: 16),
                     
+                    // 类型筛选（汇款/退款）
+                    Text('按类型筛选:', style: TextStyle(fontWeight: FontWeight.w500)),
+                    SizedBox(height: 8),
+                    Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12),
+                      decoration: BoxDecoration(
+                        border: Border.all(color: Colors.grey.shade300),
+                        borderRadius: BorderRadius.circular(8),
+                      ),
+                      child: DropdownButton<String?>(
+                        isExpanded: true,
+                        value: _selectedTypeFilter,
+                        hint: Text('选择类型'),
+                        underline: SizedBox(),
+                        items: [
+                          DropdownMenuItem<String?>(
+                            value: null,
+                            child: Text('全部类型'),
+                          ),
+                          ..._remittanceTypes.map((type) => DropdownMenuItem<String?>(
+                            value: type,
+                            child: Row(
+                              children: [
+                                Container(
+                                  width: 8,
+                                  height: 8,
+                                  decoration: BoxDecoration(
+                                    color: type == '退款' ? Colors.green : Colors.red,
+                                    shape: BoxShape.circle,
+                                  ),
+                                ),
+                                SizedBox(width: 8),
+                                Text(type),
+                              ],
+                            ),
+                          )).toList(),
+                        ],
+                        onChanged: (value) {
+                          setState(() {
+                            _selectedTypeFilter = value;
+                          });
+                        },
+                      ),
+                    ),
+                    SizedBox(height: 16),
+                    
                     // 日期范围筛选
                     Text('按日期筛选:', style: TextStyle(fontWeight: FontWeight.w500)),
                     SizedBox(height: 8),
@@ -674,6 +741,27 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
                                           color: Colors.grey[600],
                                         ),
                                       ),
+                                      SizedBox(width: 8),
+                                      // 汇款/退款标签
+                                      Container(
+                                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                                        decoration: BoxDecoration(
+                                          color: (remittance['amount'] as num) < 0 ? Colors.green[50] : Colors.red[50],
+                                          borderRadius: BorderRadius.circular(4),
+                                          border: Border.all(
+                                            color: (remittance['amount'] as num) < 0 ? Colors.green[300]! : Colors.red[300]!,
+                                            width: 1,
+                                          ),
+                                        ),
+                                        child: Text(
+                                          (remittance['amount'] as num) < 0 ? '退款' : '汇款',
+                                          style: TextStyle(
+                                            fontSize: 11,
+                                            color: (remittance['amount'] as num) < 0 ? Colors.green[700] : Colors.red[700],
+                                            fontWeight: FontWeight.w600,
+                                          ),
+                                        ),
+                                      ),
                                     ],
                                   ),
                                   Row(
@@ -726,11 +814,13 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
                                     crossAxisAlignment: CrossAxisAlignment.end,
                                     children: [
                                       Text(
-                                        '¥${remittance['amount'].toStringAsFixed(2)}',
+                                        (remittance['amount'] as num) < 0 
+                                            ? '-¥${((remittance['amount'] as num).abs()).toStringAsFixed(2)}'
+                                            : '¥${((remittance['amount'] as num)).toStringAsFixed(2)}',
                                         style: TextStyle(
                                           fontSize: 18,
                                           fontWeight: FontWeight.bold,
-                                          color: Colors.red[600],
+                                          color: (remittance['amount'] as num) < 0 ? Colors.green[600] : Colors.red[600],
                                         ),
                                       ),
                                       SizedBox(height: 4),
@@ -1049,7 +1139,8 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                 decoration: InputDecoration(
                   labelText: '金额',
                   floatingLabelBehavior: FloatingLabelBehavior.always,
-                  hintText: '',
+                  hintText: '正数表示汇款，负数表示退款',
+                  hintStyle: TextStyle(color: Colors.grey[400]),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1057,7 +1148,7 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.attach_money, color: Colors.orange),
                 ),
-                keyboardType: TextInputType.numberWithOptions(decimal: true),
+                keyboardType: TextInputType.numberWithOptions(decimal: true, signed: true),
                 validator: (value) {
                   if (value == null || value.trim().isEmpty) {
                     return '请输入金额';
@@ -1065,8 +1156,8 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                   if (double.tryParse(value) == null) {
                     return '请输入有效的金额';
                   }
-                  if (double.parse(value) <= 0) {
-                    return '金额必须大于0';
+                  if (double.parse(value) == 0) {
+                    return '金额不能为0';
                   }
                   return null;
                 },
@@ -1090,10 +1181,11 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                         fillColor: Colors.grey[50],
                         prefixIcon: Icon(Icons.badge, color: Colors.orange),
                       ),
+                      hint: Text('经办人', style: TextStyle(color: Colors.grey[400]), overflow: TextOverflow.ellipsis),
                       items: [
                         DropdownMenuItem<int>(
                           value: null,
-                          child: Text('经办人', overflow: TextOverflow.ellipsis),
+                          child: Text('经办人', style: TextStyle(color: Colors.grey[400]), overflow: TextOverflow.ellipsis),
                         ),
                         ...widget.employees.map<DropdownMenuItem<int>>((employee) {
                           return DropdownMenuItem<int>(
@@ -1171,7 +1263,7 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                 if (_selectedSupplierId == null) {
                   errorMessage = '请选择供应商';
                 }
-                // 2. 金额输入合法，为正实数
+                // 2. 金额输入合法，为非零实数（支持正负）
                 else {
                   final amountText = _amountController.text.trim();
                   if (amountText.isEmpty) {
@@ -1180,8 +1272,8 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                     final amount = double.tryParse(amountText);
                     if (amount == null) {
                       errorMessage = '金额格式无效';
-                    } else if (amount <= 0) {
-                      errorMessage = '金额必须大于0';
+                    } else if (amount == 0) {
+                      errorMessage = '金额不能为0';
                     }
                   }
                 }

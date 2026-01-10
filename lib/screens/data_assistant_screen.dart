@@ -320,7 +320,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         {
           'name': 'remittance',
           'columns': ['id', 'userId', 'remittanceDate', 'supplierId', 'amount', 'employeeId', 'paymentMethod', 'note'],
-          'description': '汇款记录表，记录向供应商付款信息。amount为REAL类型表示汇款金额。employeeId关联到employees表表示经手人。paymentMethod可为现金、微信转账或银行卡。每个用户有独立的汇款记录'
+          'description': '汇款记录表，记录向供应商付款信息。amount为REAL类型表示汇款金额（正数）或退款金额（负数），支持正负数。employeeId关联到employees表表示经手人。paymentMethod可为现金、微信转账或银行卡。每个用户有独立的汇款记录'
         },
         {
           'name': 'user_settings',
@@ -444,8 +444,8 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
 - 产品的stock、采购/销售/退货的quantity、金额amount都是REAL类型，支持小数
 - 采购的quantity可为负数，表示采购退货（退货给供应商）
 - 产品表中的supplierId关联到供应商，表示该产品来自哪个供应商
-- income表记录客户的付款，可包含优惠discount
-- remittance表记录向供应商的汇款
+- income表记录客户的付款，可包含优惠discount，amount支持正负数（正数为收款，负数为退款）
+- remittance表记录向供应商的汇款，amount支持正负数（正数为汇款，负数为退款）
 - employees表记录经手人，与income和remittance关联
 
 请根据用户提问，分析相关数据并提供专业、准确的回答。请以中文回复用户的所有问题，确保回复是有意义且可读的中文文本。

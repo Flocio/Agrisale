@@ -26,7 +26,7 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
   bool _isSearching = false;
   
   // 筛选相关
-  String _selectedFilter = 'all'; // all, purchase, return, remittance
+  String _selectedFilter = 'all'; // all, purchase, return, remittance, refund
   String _dateFilter = 'all'; // all, today, week, month, custom
   DateTime? _startDate;
   DateTime? _endDate;
@@ -118,16 +118,18 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
             }
           }
 
+          // 根据金额正负判断是汇款还是退款
+          final double amount = (remittance['amount'] as num).toDouble();
           allTransactions.add({
-            'type': 'remittance',
-            'typeName': '汇款',
+            'type': amount >= 0 ? 'remittance' : 'refund',
+            'typeName': amount >= 0 ? '汇款' : '退款',
             'date': remittance['remittanceDate'],
             'amount': remittance['amount'],
             'paymentMethod': remittance['paymentMethod'],
             'employeeName': employeeName,
             'note': remittance['note'] ?? '',
-            'icon': Icons.payment,
-            'color': Colors.blue,
+            'icon': amount >= 0 ? Icons.payment : Icons.money_off,
+            'color': amount >= 0 ? Colors.blue : Colors.green,
           });
         }
 
@@ -261,13 +263,14 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
                   SizedBox(height: 16),
                   Text('按类型筛选:', style: TextStyle(fontWeight: FontWeight.w500)),
                   SizedBox(height: 8),
-                  Wrap(
+                    Wrap(
                     spacing: 8,
                     children: [
                       _buildFilterChip('all', '全部', null, setModalState),
                       _buildFilterChip('purchase', '采购', Colors.green, setModalState),
                       _buildFilterChip('return', '退货', Colors.orange, setModalState),
                       _buildFilterChip('remittance', '汇款', Colors.blue, setModalState),
+                      _buildFilterChip('refund', '退款', Colors.green, setModalState),
                     ],
                   ),
                   SizedBox(height: 16),
@@ -578,6 +581,36 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
     }
   }
 
+  Widget _buildDetailRow(String label, String value) {
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Container(
+            width: 80,
+            child: Text(
+              '$label:',
+              style: TextStyle(
+                color: Colors.grey[600],
+                fontSize: 14,
+              ),
+            ),
+          ),
+          Expanded(
+            child: Text(
+              value,
+              style: TextStyle(
+                fontSize: 14,
+                fontWeight: FontWeight.w500,
+              ),
+            ),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -676,7 +709,7 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
                   SizedBox(width: 8),
                   Expanded(
                     child: Text(
-                      '总计 ${_filteredTransactions.length} 条记录: 采购 ${_filteredTransactions.where((t) => t['type'] == 'purchase').length} | 退货 ${_filteredTransactions.where((t) => t['type'] == 'return').length} | 汇款 ${_filteredTransactions.where((t) => t['type'] == 'remittance').length}',
+                      '总计 ${_filteredTransactions.length} 条记录: 采购 ${_filteredTransactions.where((t) => t['type'] == 'purchase').length} | 退货 ${_filteredTransactions.where((t) => t['type'] == 'return').length} | 汇款 ${_filteredTransactions.where((t) => t['type'] == 'remittance').length} | 退款 ${_filteredTransactions.where((t) => t['type'] == 'refund').length}',
                       style: TextStyle(
                         color: Colors.blue[700],
                         fontSize: 12,
@@ -793,7 +826,7 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
                                               ),
                                               SizedBox(height: 4),
                                               Text(
-                                                '¥${_formatAmount(transaction['amount'])}',
+                                                '¥${_formatAmount((transaction['amount'] as num).abs())}',
                                                 style: TextStyle(
                                                   fontSize: 18,
                                                   fontWeight: FontWeight.bold,
@@ -805,32 +838,38 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
                                         ),
                                       ],
                                     ),
-                                    if (transaction['productName'] != null || transaction['note'] != null)
-                                      Padding(
-                                        padding: EdgeInsets.only(top: 12),
-                                        child: Container(
-                                          padding: EdgeInsets.all(12),
-                                          decoration: BoxDecoration(
-                                            color: Colors.grey[50],
-                                            borderRadius: BorderRadius.circular(8),
-                                          ),
-                                          child: Column(
-                                            crossAxisAlignment: CrossAxisAlignment.start,
-                                            children: [
-                                              if (transaction['productName'] != null)
-                                                Text('产品: ${transaction['productName']}'),
-                                              if (transaction['quantity'] != null)
-                                                Text('数量: ${_formatNumber(transaction['quantity'])} ${transaction['unit'] ?? ''}'),
-                                              if (transaction['paymentMethod'] != null)
-                                                Text('支付方式: ${transaction['paymentMethod']}'),
-                                              if (transaction['employeeName'] != null && transaction['employeeName'].isNotEmpty)
-                                                Text('经手员工: ${transaction['employeeName']}'),
-                                              if (transaction['note'] != null && transaction['note'].isNotEmpty)
-                                                Text('备注: ${transaction['note']}'),
-                                            ],
-                                          ),
-                                        ),
+                                    // 详细信息
+                                    SizedBox(height: 12),
+                                    Container(
+                                      padding: EdgeInsets.all(12),
+                                      decoration: BoxDecoration(
+                                        color: Colors.grey[50],
+                                        borderRadius: BorderRadius.circular(8),
                                       ),
+                                      child: Column(
+                                        crossAxisAlignment: CrossAxisAlignment.start,
+                                        children: [
+                                          // 产品信息（采购和退货）
+                                          if (transaction['productName'] != null)
+                                            _buildDetailRow('产品', transaction['productName']),
+                                          
+                                          if (transaction['quantity'] != null)
+                                            _buildDetailRow('数量', '${_formatNumber(transaction['quantity'])} ${transaction['unit'] ?? ''}'),
+                                          
+                                          // 支付方式（汇款）
+                                          if (transaction['paymentMethod'] != null)
+                                            _buildDetailRow('支付方式', transaction['paymentMethod']),
+                                          
+                                          // 员工信息（汇款）
+                                          if (transaction['employeeName'] != null && transaction['employeeName'].isNotEmpty)
+                                            _buildDetailRow('经手员工', transaction['employeeName']),
+                                          
+                                          // 备注
+                                          if (transaction['note'] != null && transaction['note'].toString().isNotEmpty)
+                                            _buildDetailRow('备注', transaction['note']),
+                                        ],
+                                      ),
+                                    ),
                                   ],
                                 ),
                               ),
