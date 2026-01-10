@@ -355,7 +355,7 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                                   width: 50,
                                   height: 50,
                                 ),
-                                applicationLegalese: '© 2025 Agrisale',
+                                applicationLegalese: '© 2026 Agrisale',
                               );
                             },
                           ),
