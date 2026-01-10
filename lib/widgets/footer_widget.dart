@@ -8,7 +8,7 @@ class FooterWidget extends StatelessWidget {
     return Padding(
       padding: const EdgeInsets.all(8.0),
       child: Text(
-        'Copyright © 2025 Yikang. All Rights Reserved.',
+        'Copyright © 2025 Agrisale. All Rights Reserved.',
         style: TextStyle(
           fontSize: 12,
           color: Colors.grey,
