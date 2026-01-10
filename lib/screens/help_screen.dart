@@ -24,6 +24,7 @@ class HelpScreen extends StatelessWidget {
               children: [
                 _buildParagraph('Agrisale 是一款专业的农业销售管理系统，帮助您轻松管理产品库存、客户关系、采购销售等业务。系统支持多用户使用，每个用户的数据相互独立，确保数据安全。'),
                 _buildParagraph('系统支持 iOS、Android、macOS、Windows 全平台使用，数据本地存储，保护您的隐私安全。'),
+                _buildParagraph('当前版本：v3.0.0 - 新增 PDF 导出功能和退款管理功能，优化了界面显示和统计计算。'),
               ],
             ),
             
@@ -90,12 +91,16 @@ class HelpScreen extends StatelessWidget {
                   _buildParagraph('• 付款方式：支持现金、微信转账、银行卡三种付款方式'),
                   _buildParagraph('• 经手人：可选择员工作为经手人'),
                   _buildParagraph('• 日期默认：默认使用当天日期，可手动修改'),
+                  _buildParagraph('• 退款记录（v3.0新增）：支持负数金额，用于记录客户退款，金额显示为绿色带正号'),
+                  _buildParagraph('• 类型筛选（v3.0新增）：支持按"收款"或"退款"类型筛选进账记录'),
                 ]),
                 _buildSubSection('汇款管理', [
                   _buildParagraph('• 添加汇款：记录向供应商付款信息'),
                   _buildParagraph('• 付款方式：支持现金、微信转账、银行卡三种付款方式'),
                   _buildParagraph('• 经手人：可选择员工作为经手人'),
                   _buildParagraph('• 日期默认：默认使用当天日期，可手动修改'),
+                  _buildParagraph('• 退款记录（v3.0新增）：支持负数金额，用于记录供应商退款，金额显示为绿色带正号'),
+                  _buildParagraph('• 类型筛选（v3.0新增）：支持按"汇款"或"退款"类型筛选汇款记录'),
                 ]),
               ],
             ),
@@ -130,16 +135,17 @@ class HelpScreen extends StatelessWidget {
             SizedBox(height: 24),
             
             _buildSection(
-              title: '数据导出',
+              title: '数据导出（v3.0增强）',
               icon: Icons.file_download,
               color: Colors.teal,
               children: [
-                _buildParagraph('• 导出格式：支持 CSV 和 PDF 两种格式'),
+                _buildParagraph('• 导出格式：支持 CSV 和 PDF 两种格式（PDF 为 v3.0 新增功能）'),
                 _buildParagraph('• CSV 格式：适合在 Excel 等表格软件中打开和编辑'),
-                _buildParagraph('• PDF 格式：适合打印和分享，支持中文字体显示'),
+                _buildParagraph('• PDF 格式（新）：适合打印和分享，支持中文字体显示，自动生成美观的表格布局'),
                 _buildParagraph('• 导出内容：包含报表数据、表头、汇总信息等完整内容'),
                 _buildParagraph('• 保存方式：可以保存到本地文件，也可以直接分享给其他应用'),
                 _buildParagraph('• 使用场景：适用于数据备份、报表打印、数据分析等需求'),
+                _buildParagraph('• 格式选择：点击导出按钮后，先选择 CSV 或 PDF，再选择保存或分享'),
               ],
             ),
             
@@ -194,6 +200,35 @@ class HelpScreen extends StatelessWidget {
                 _buildParagraph('• 数据验证：所有输入都会进行验证，确保数据准确性和完整性'),
                 _buildParagraph('• 多用户：不同用户的数据相互独立，登录后只能看到自己的数据'),
                 _buildParagraph('• 产品关联：删除供应商前，请先修改或删除关联的产品'),
+              ],
+            ),
+            
+            SizedBox(height: 24),
+            
+            _buildSection(
+              title: '版本更新历史',
+              icon: Icons.update,
+              color: Colors.indigo,
+              children: [
+                _buildSubSection('v3.0.0（最新版本）', [
+                  _buildParagraph('✨ 新增 PDF 导出功能，支持所有报表导出为 PDF 文件'),
+                  _buildParagraph('✨ 进账和汇款功能支持负数金额，用于记录退款操作'),
+                  _buildParagraph('🎨 供应商往来界面优化，记录卡片详细信息对齐显示'),
+                  _buildParagraph('🎨 退款记录添加绿色标签和图标，收款/汇款显示红色'),
+                  _buildParagraph('🎨 金额显示优化：退款显示正号（+¥），收款/汇款显示负号（-¥）'),
+                  _buildParagraph('🐛 修复编辑采购记录时库存计算错误的问题'),
+                  _buildParagraph('🐛 修复员工记录界面统计数据显示双重负号的问题'),
+                  _buildParagraph('🔧 macOS 新增 DMG 安装包，Windows 新增 EXE 安装程序'),
+                ]),
+                _buildSubSection('v2.9.0', [
+                  _buildParagraph('📚 新增完整的使用帮助文档'),
+                  _buildParagraph('🐛 修复产品编辑时库存计算问题'),
+                  _buildParagraph('🎨 优化产品管理界面布局'),
+                ]),
+                _buildSubSection('v2.8.0', [
+                  _buildParagraph('✨ 新增 PDF 导出功能基础支持'),
+                  _buildParagraph('🎨 优化数据导出流程'),
+                ]),
               ],
             ),
             
