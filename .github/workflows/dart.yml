@@ -262,25 +262,15 @@ jobs:
       - name: Build Android APK
         run: flutter build apk --release
 
-      - name: Build Android App Bundle
-        run: flutter build appbundle --release
-
-      - name: Rename Build Files
+      - name: Rename APK File
         run: |
           mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/agrisale-android-${{ env.VERSION_TAG }}.apk
-          mv build/app/outputs/bundle/release/app-release.aab build/app/outputs/bundle/release/agrisale-android-${{ env.VERSION_TAG }}.aab
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: Android-APK
           path: build/app/outputs/flutter-apk/agrisale-android-${{ env.VERSION_TAG }}.apk
-
-      - name: Upload Android Bundle
-        uses: actions/upload-artifact@v4
-        with:
-          name: Android-Bundle
-          path: build/app/outputs/bundle/release/agrisale-android-${{ env.VERSION_TAG }}.aab
 
   # macOS 构建
   build-macos:
@@ -310,16 +300,40 @@ jobs:
       - name: Build macOS Release
         run: flutter build macos --release
 
-      - name: Create macOS Archive
+      - name: Create macOS ZIP Archive
         run: |
           cd build/macos/Build/Products/Release
           zip -qq -r -9 ../../../../../agrisale-macos-${{ env.VERSION_TAG }}.zip agrisale.app
 
-      - name: Upload macOS Artifact
+      - name: Create macOS DMG
+        run: |
+          # 创建临时目录用于 DMG 内容
+          mkdir -p dmg_temp
+          cp -R build/macos/Build/Products/Release/agrisale.app dmg_temp/
+          
+          # 创建 Applications 文件夹的符号链接
+          ln -s /Applications dmg_temp/Applications
+          
+          # 创建 DMG 文件
+          hdiutil create -volname "Agrisale" \
+            -srcfolder dmg_temp \
+            -ov -format UDZO \
+            agrisale-macos-${{ env.VERSION_TAG }}.dmg
+          
+          # 清理临时目录
+          rm -rf dmg_temp
+
+      - name: Upload macOS ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: macOS-Build
+          name: macOS-ZIP
           path: agrisale-macos-${{ env.VERSION_TAG }}.zip
+
+      - name: Upload macOS DMG Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: macOS-DMG
+          path: agrisale-macos-${{ env.VERSION_TAG }}.dmg
 
   # Windows 构建
   build-windows:
@@ -344,15 +358,69 @@ jobs:
       - name: Build Windows Release
         run: flutter build windows --release
 
-      - name: Create Windows Archive
+      - name: Create Windows ZIP Archive
         run: |
           Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "agrisale-windows-${{ env.VERSION_TAG }}.zip"
 
-      - name: Upload Windows Artifact
+      - name: Install Inno Setup
+        run: |
+          choco install innosetup -y
+
+      - name: Create Inno Setup Script
+        run: |
+          $version = "${{ env.VERSION_TAG }}".TrimStart('v')
+          @"
+          [Setup]
+          AppName=Agrisale
+          AppVersion=$version
+          AppPublisher=Agrisale Team
+          AppPublisherURL=https://github.com/yourusername/agrisale
+          DefaultDirName={autopf}\Agrisale
+          DefaultGroupName=Agrisale
+          OutputDir=.
+          OutputBaseFilename=agrisale-windows-${{ env.VERSION_TAG }}-installer
+          Compression=lzma2
+          SolidCompression=yes
+          ArchitecturesAllowed=x64
+          ArchitecturesInstallIn64BitMode=x64
+          PrivilegesRequired=admin
+          SetupIconFile=windows\runner\resources\app_icon.ico
+          UninstallDisplayIcon={app}\agrisale.exe
+          
+          [Languages]
+          Name: "english"; MessagesFile: "compiler:Default.isl"
+          Name: "chinesesimp"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
+          
+          [Tasks]
+          Name: "desktopicon"; Description: "{cm:CreateDesktopIcon}"; GroupDescription: "{cm:AdditionalIcons}"; Flags: unchecked
+          
+          [Files]
+          Source: "build\windows\x64\runner\Release\*"; DestDir: "{app}"; Flags: ignoreversion recursesubdirs createallsubdirs
+          
+          [Icons]
+          Name: "{group}\Agrisale"; Filename: "{app}\agrisale.exe"
+          Name: "{group}\{cm:UninstallProgram,Agrisale}"; Filename: "{uninstallexe}"
+          Name: "{autodesktop}\Agrisale"; Filename: "{app}\agrisale.exe"; Tasks: desktopicon
+          
+          [Run]
+          Filename: "{app}\agrisale.exe"; Description: "{cm:LaunchProgram,Agrisale}"; Flags: nowait postinstall skipifsilent
+          "@ | Out-File -FilePath "setup.iss" -Encoding UTF8
+
+      - name: Build Windows Installer
+        run: |
+          & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
+
+      - name: Upload Windows ZIP Artifact
         uses: actions/upload-artifact@v4
         with:
-          name: Windows-Build
+          name: Windows-ZIP
           path: agrisale-windows-${{ env.VERSION_TAG }}.zip
+
+      - name: Upload Windows Installer Artifact
+        uses: actions/upload-artifact@v4
+        with:
+          name: Windows-Installer
+          path: agrisale-windows-${{ env.VERSION_TAG }}-installer.exe
 
   # 创建 GitHub Release
   create-release:
@@ -399,17 +467,50 @@ jobs:
             - 数据完整性增强：完善了编辑采购、销售、退货记录时的库存验证逻辑，确保数据准确性
             - 用户体验提升：优化了界面布局和交互反馈，提升了整体使用体验
             
-            ### 下载说明
-            - iOS用户: 下载 `agrisale-ios-${{ env.VERSION_TAG }}.ipa` 文件
-            - Android用户: 下载 `agrisale-android-${{ env.VERSION_TAG }}.apk` 文件
-            - macOS用户: 下载 `agrisale-macos-${{ env.VERSION_TAG }}.zip` 文件
-            - Windows用户: 下载 `agrisale-windows-${{ env.VERSION_TAG }}.zip` 文件
+            ### 📥 下载说明
             
-            ### 安装说明
-            - iOS: 需要使用第三方工具如 AltStore 或企业证书安装
-            - Android: 开启"未知来源应用"后直接安装
-            - macOS: 解压后拖拽到应用程序文件夹
-            - Windows: 解压后运行 agrisale.exe
+            #### iOS 用户
+            - 下载 `agrisale-ios-${{ env.VERSION_TAG }}.ipa` 文件
+            
+            #### Android 用户
+            - 下载 `agrisale-android-${{ env.VERSION_TAG }}.apk` 文件
+            
+            #### macOS 用户（推荐 DMG）
+            - **推荐**: `agrisale-macos-${{ env.VERSION_TAG }}.dmg` - 标准安装包，带安装向导
+            - **备选**: `agrisale-macos-${{ env.VERSION_TAG }}.zip` - 绿色版本，解压即用
+            
+            #### Windows 用户（推荐 EXE）
+            - **推荐**: `agrisale-windows-${{ env.VERSION_TAG }}-installer.exe` - 安装向导，自动配置
+            - **备选**: `agrisale-windows-${{ env.VERSION_TAG }}.zip` - 绿色版本，解压即用
+            
+            ### 📲 安装说明
+            
+            #### iOS
+            - 需要使用第三方工具如 AltStore 或企业证书安装 IPA 文件
+            
+            #### Android
+            - 开启"未知来源应用"后直接安装 APK 文件
+            
+            #### macOS
+            - **DMG 文件**（推荐）：
+              1. 双击 DMG 文件挂载磁盘镜像
+              2. 将 agrisale.app 拖拽到 Applications 文件夹
+              3. 首次打开可能需要在"系统偏好设置 → 安全性与隐私"中允许
+            - **ZIP 文件**：
+              1. 解压 ZIP 文件
+              2. 将 agrisale.app 拖拽到应用程序文件夹
+              3. 首次打开可能需要在系统设置中允许
+            
+            #### Windows
+            - **EXE 安装程序**（推荐）：
+              1. 双击运行安装程序
+              2. 按照安装向导提示完成安装
+              3. 自动创建开始菜单和桌面快捷方式（可选）
+              4. 可通过"添加/删除程序"卸载
+            - **ZIP 文件**：
+              1. 解压到任意文件夹
+              2. 运行 agrisale.exe
+              3. 可手动创建快捷方式
             
             ---
             
@@ -417,9 +518,10 @@ jobs:
           files: |
             artifacts/iOS-Build/agrisale-ios-${{ env.VERSION_TAG }}.ipa
             artifacts/Android-APK/agrisale-android-${{ env.VERSION_TAG }}.apk
-            artifacts/Android-Bundle/agrisale-android-${{ env.VERSION_TAG }}.aab
-            artifacts/macOS-Build/agrisale-macos-${{ env.VERSION_TAG }}.zip
-            artifacts/Windows-Build/agrisale-windows-${{ env.VERSION_TAG }}.zip
+            artifacts/macOS-ZIP/agrisale-macos-${{ env.VERSION_TAG }}.zip
+            artifacts/macOS-DMG/agrisale-macos-${{ env.VERSION_TAG }}.dmg
+            artifacts/Windows-ZIP/agrisale-windows-${{ env.VERSION_TAG }}.zip
+            artifacts/Windows-Installer/agrisale-windows-${{ env.VERSION_TAG }}-installer.exe
           draft: false
           prerelease: false
         env:
