@@ -163,9 +163,9 @@ class UpdateService {
         // 清理URL中的空格和特殊字符
         final originalUrl = (asset['browser_download_url'] as String).trim().replaceAll(' ', '');
         
-        if (assetName.startsWith('agrisale-android-') && assetName.endsWith('.apk')) {
+        if (assetName.startsWith('Agrisale-android-') && assetName.endsWith('.apk')) {
           apkUrl = originalUrl;
-        } else if (assetName.startsWith('agrisale-android-') && assetName.endsWith('.aab')) {
+        } else if (assetName.startsWith('Agrisale-android-') && assetName.endsWith('.aab')) {
           aabUrl = originalUrl;
         }
       }
@@ -188,11 +188,11 @@ class UpdateService {
       String fileName;
       
       if (platform == 'ios') {
-      fileName = 'agrisale-ios-';
+      fileName = 'Agrisale-ios-';
     } else if (platform == 'macos') {
-      fileName = 'agrisale-macos-';
+      fileName = 'Agrisale-macos-';
     } else if (platform == 'windows') {
-      fileName = 'agrisale-windows-';
+      fileName = 'Agrisale-windows-';
     } else {
       return null;
     }
