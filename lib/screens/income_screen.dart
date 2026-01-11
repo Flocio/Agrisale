@@ -1251,7 +1251,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                   labelText: '实际进账金额',
                   floatingLabelBehavior: FloatingLabelBehavior.always,
                   hintText: '正数表示进账，负数表示退款',
-                  hintStyle: TextStyle(color: Colors.grey[400]),
+                  hintStyle: TextStyle(color: Colors.grey[600]),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
                   ),
@@ -1407,11 +1407,11 @@ class _IncomeDialogState extends State<IncomeDialog> {
                         fillColor: Colors.grey[50],
                         prefixIcon: Icon(Icons.badge, color: Colors.teal),
                       ),
-                      hint: Text('经办人', style: TextStyle(color: Colors.grey[400]), overflow: TextOverflow.ellipsis),
+                      hint: Text('经办人', style: TextStyle(color: Colors.grey[600]), overflow: TextOverflow.ellipsis),
                       items: [
                         DropdownMenuItem<int>(
                           value: null,
-                          child: Text('经办人', style: TextStyle(color: Colors.grey[400]), overflow: TextOverflow.ellipsis),
+                          child: Text('经办人', style: TextStyle(color: Colors.grey[600]), overflow: TextOverflow.ellipsis),
                         ),
                         ...widget.employees.map<DropdownMenuItem<int>>((employee) {
                           return DropdownMenuItem<int>(
