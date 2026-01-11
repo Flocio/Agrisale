@@ -398,7 +398,7 @@ class _CustomerScreenState extends State<CustomerScreen> {
                                       SizedBox(width: 4),
                       IconButton(
                                         icon: Icon(Icons.list_alt, color: Colors.blue),
-                                        tooltip: '查看记录',
+                                        tooltip: '销售记录',
                                         onPressed: () => _viewCustomerRecords(
                                           customer['id'] as int, 
                                           customer['name'] as String

@@ -475,7 +475,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                 SizedBox(width: 8),
                 Expanded(
                   child: Text(
-                    '横向和纵向滑动可查看完整表格，进账以绿色显示，汇款以红色显示',
+                    '横向和纵向滑动可查看完整表格，进账以绿色显示（进账退款为红色），汇款以红色显示（汇款退款为绿色）',
                     style: TextStyle(
                       fontSize: 12,
                       color: Colors.purple[800],

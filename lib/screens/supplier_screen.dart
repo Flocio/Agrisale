@@ -395,7 +395,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
                                       SizedBox(width: 4),
                       IconButton(
                                         icon: Icon(Icons.list_alt, color: Colors.blue),
-                                        tooltip: '查看记录',
+                                        tooltip: '采购记录',
                                         onPressed: () => _viewSupplierRecords(
                                           supplier['id'] as int, 
                                           supplier['name'] as String
