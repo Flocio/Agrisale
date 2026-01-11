@@ -5,6 +5,7 @@ import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'supplier_records_screen.dart';
 import 'supplier_transactions_screen.dart';
+import 'supplier_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class SupplierScreen extends StatefulWidget {
@@ -226,6 +227,15 @@ class _SupplierScreenState extends State<SupplierScreen> {
     );
   }
 
+  void _viewSupplierDetail(int supplierId, String supplierName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => SupplierDetailScreen(supplierId: supplierId, supplierName: supplierName),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -327,6 +337,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
                           ),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
+                            onTap: () => _viewSupplierDetail(supplier['id'] as int, supplier['name'] as String),
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                               child: Row(
