@@ -6,6 +6,7 @@ import 'package:url_launcher/url_launcher.dart';
 import '../services/update_service.dart';
 import 'update_dialog.dart';
 import 'help_screen.dart';
+import '../widgets/footer_widget.dart';
 
 class VersionInfoScreen extends StatefulWidget {
   @override
@@ -86,11 +87,12 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
       ),
       body: _packageInfo == null
           ? Center(child: CircularProgressIndicator())
-          : SingleChildScrollView(
-              padding: EdgeInsets.all(16),
-              child: Column(
-                crossAxisAlignment: CrossAxisAlignment.start,
-                children: [
+          : Column(
+              children: [
+                Expanded(
+                  child: ListView(
+                    padding: EdgeInsets.all(16),
+                    children: [
                   // 当前版本信息卡片
                   Card(
                     elevation: 2,
@@ -363,8 +365,11 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                       ),
                     ),
                   ),
-                ],
-              ),
+                    ],
+                  ),
+                ),
+                FooterWidget(),
+              ],
             ),
     );
   }
