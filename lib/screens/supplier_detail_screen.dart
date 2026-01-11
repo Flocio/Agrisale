@@ -1,5 +1,5 @@
 // lib/screens/supplier_detail_screen.dart
-// 供应商详细对账单页面
+// 供应商对账单页面
 
 import 'package:flutter/material.dart';
 import 'package:csv/csv.dart';
@@ -293,7 +293,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
     
     List<List<dynamic>> rows = [];
     // 添加用户信息和导出时间
-    rows.add(['供应商详细对账单 - 用户: $username']);
+    rows.add(['供应商对账单 - 用户: $username']);
     rows.add(['导出时间: ${DateTime.now().toString().substring(0, 19)}']);
     rows.add(['供应商: ${widget.supplierName}']);
     
@@ -356,7 +356,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
     String csv = const ListToCsvConverter().convert(rows);
 
     // 生成文件名
-    String baseFileName = '${widget.supplierName}_详细对账单';
+    String baseFileName = '${widget.supplierName}_对账单';
 
     // 使用统一的导出服务
     await ExportService.showExportOptions(
@@ -431,7 +431,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.supplierName}的详细对账单', style: TextStyle(
+        title: Text('${widget.supplierName}的对账单', style: TextStyle(
           fontWeight: FontWeight.bold,
           color: Colors.white,
         )),
@@ -590,7 +590,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
                 ),
                 SizedBox(width: 8),
                 Text(
-                  '供应商详细对账单',
+                  '供应商对账单',
                   style: TextStyle(
                     fontSize: 16,
                     fontWeight: FontWeight.bold,

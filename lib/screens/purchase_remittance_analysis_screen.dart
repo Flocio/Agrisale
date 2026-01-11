@@ -328,7 +328,7 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
     final username = prefs.getString('current_username') ?? '未知用户';
     
     List<List<dynamic>> rows = [];
-    rows.add(['采购-汇款明细分析 - 用户: $username']);
+    rows.add(['采购与汇款分析 - 用户: $username']);
     rows.add(['导出时间: ${DateTime.now().toString().substring(0, 19)}']);
     
     // 添加筛选条件

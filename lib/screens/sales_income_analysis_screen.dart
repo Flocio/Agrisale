@@ -389,7 +389,7 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
     final username = prefs.getString('current_username') ?? '未知用户';
     
     List<List<dynamic>> rows = [];
-    rows.add(['总销售-进账明细分析 - 用户: $username']);
+    rows.add(['总销售与进账分析 - 用户: $username']);
     rows.add(['导出时间: ${DateTime.now().toString().substring(0, 19)}']);
     
     // 添加筛选条件
