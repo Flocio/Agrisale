@@ -5,6 +5,7 @@ import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'customer_records_screen.dart';
 import 'customer_transactions_screen.dart';
+import 'customer_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 
 class CustomerScreen extends StatefulWidget {
@@ -237,6 +238,15 @@ class _CustomerScreenState extends State<CustomerScreen> {
     );
   }
 
+  void _viewCustomerDetail(int customerId, String customerName) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => CustomerDetailScreen(customerId: customerId, customerName: customerName),
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -338,6 +348,10 @@ class _CustomerScreenState extends State<CustomerScreen> {
                           ),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
+                            onTap: () => _viewCustomerDetail(
+                              customer['id'] as int,
+                              customer['name'] as String
+                            ),
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                               child: Row(
