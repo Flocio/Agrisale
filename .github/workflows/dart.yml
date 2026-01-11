@@ -40,14 +40,14 @@ jobs:
         run: |
           mkdir Payload
           mv Runner.app/ Payload
-          zip -qq -r -9 agrisale-ios-${{ env.VERSION_TAG }}.ipa Payload
+          zip -qq -r -9 Agrisale-ios-${{ env.VERSION_TAG }}.ipa Payload
         working-directory: build/ios/iphoneos
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: iOS-Build
-          path: build/ios/iphoneos/agrisale-ios-${{ env.VERSION_TAG }}.ipa
+          path: build/ios/iphoneos/Agrisale-ios-${{ env.VERSION_TAG }}.ipa
 
   # Android 构建
   build-android:
@@ -264,13 +264,13 @@ jobs:
 
       - name: Rename APK File
         run: |
-          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/agrisale-android-${{ env.VERSION_TAG }}.apk
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/Agrisale-android-${{ env.VERSION_TAG }}.apk
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: Android-APK
-          path: build/app/outputs/flutter-apk/agrisale-android-${{ env.VERSION_TAG }}.apk
+          path: build/app/outputs/flutter-apk/Agrisale-android-${{ env.VERSION_TAG }}.apk
 
   # macOS 构建
   build-macos:
@@ -303,7 +303,7 @@ jobs:
       - name: Create macOS ZIP Archive
         run: |
           cd build/macos/Build/Products/Release
-          zip -qq -r -9 ../../../../../agrisale-macos-${{ env.VERSION_TAG }}.zip agrisale.app
+          zip -qq -r -9 ../../../../../Agrisale-macos-${{ env.VERSION_TAG }}.zip agrisale.app
 
       - name: Create macOS DMG
         run: |
@@ -318,7 +318,7 @@ jobs:
           hdiutil create -volname "Agrisale" \
             -srcfolder dmg_temp \
             -ov -format UDZO \
-            agrisale-macos-${{ env.VERSION_TAG }}.dmg
+            Agrisale-macos-${{ env.VERSION_TAG }}.dmg
           
           # 清理临时目录
           rm -rf dmg_temp
@@ -327,13 +327,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: macOS-ZIP
-          path: agrisale-macos-${{ env.VERSION_TAG }}.zip
+          path: Agrisale-macos-${{ env.VERSION_TAG }}.zip
 
       - name: Upload macOS DMG Artifact
         uses: actions/upload-artifact@v4
         with:
           name: macOS-DMG
-          path: agrisale-macos-${{ env.VERSION_TAG }}.dmg
+          path: Agrisale-macos-${{ env.VERSION_TAG }}.dmg
 
   # Windows 构建
   build-windows:
@@ -360,7 +360,7 @@ jobs:
 
       - name: Create Windows ZIP Archive
         run: |
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "agrisale-windows-${{ env.VERSION_TAG }}.zip"
+          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "Agrisale-windows-${{ env.VERSION_TAG }}.zip"
 
       - name: Install Inno Setup
         run: |
@@ -378,7 +378,7 @@ jobs:
           DefaultDirName={autopf}\Agrisale
           DefaultGroupName=Agrisale
           OutputDir=.
-          OutputBaseFilename=agrisale-windows-${{ env.VERSION_TAG }}-installer
+          OutputBaseFilename=Agrisale-windows-${{ env.VERSION_TAG }}-installer
           Compression=lzma2
           SolidCompression=yes
           ArchitecturesAllowed=x64
@@ -413,13 +413,13 @@ jobs:
         uses: actions/upload-artifact@v4
         with:
           name: Windows-ZIP
-          path: agrisale-windows-${{ env.VERSION_TAG }}.zip
+          path: Agrisale-windows-${{ env.VERSION_TAG }}.zip
 
       - name: Upload Windows Installer Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Windows-Installer
-          path: agrisale-windows-${{ env.VERSION_TAG }}-installer.exe
+          path: Agrisale-windows-${{ env.VERSION_TAG }}-installer.exe
 
   # 创建 GitHub Release
   create-release:
@@ -507,18 +507,18 @@ jobs:
             ### 📥 下载说明
             
             #### iOS 用户
-            - 下载 `agrisale-ios-${{ env.VERSION_TAG }}.ipa` 文件
+            - 下载 `Agrisale-ios-${{ env.VERSION_TAG }}.ipa` 文件
             
             #### Android 用户
-            - 下载 `agrisale-android-${{ env.VERSION_TAG }}.apk` 文件
+            - 下载 `Agrisale-android-${{ env.VERSION_TAG }}.apk` 文件
             
             #### macOS 用户（推荐 DMG）
-            - **推荐**: `agrisale-macos-${{ env.VERSION_TAG }}.dmg` - 标准安装包，带安装向导
-            - **备选**: `agrisale-macos-${{ env.VERSION_TAG }}.zip` - 绿色版本，解压即用
+            - **推荐**: `Agrisale-macos-${{ env.VERSION_TAG }}.dmg` - 标准安装包，带安装向导
+            - **备选**: `Agrisale-macos-${{ env.VERSION_TAG }}.zip` - 绿色版本，解压即用
             
             #### Windows 用户（推荐 EXE）
-            - **推荐**: `agrisale-windows-${{ env.VERSION_TAG }}-installer.exe` - 安装向导，自动配置
-            - **备选**: `agrisale-windows-${{ env.VERSION_TAG }}.zip` - 绿色版本，解压即用
+            - **推荐**: `Agrisale-windows-${{ env.VERSION_TAG }}-installer.exe` - 安装向导，自动配置
+            - **备选**: `Agrisale-windows-${{ env.VERSION_TAG }}.zip` - 绿色版本，解压即用
             
             ### 📲 安装说明
             
@@ -553,12 +553,12 @@ jobs:
             
             完整跨平台支持 | 原生用户体验 | 开源免费
           files: |
-            artifacts/iOS-Build/agrisale-ios-${{ env.VERSION_TAG }}.ipa
-            artifacts/Android-APK/agrisale-android-${{ env.VERSION_TAG }}.apk
-            artifacts/macOS-ZIP/agrisale-macos-${{ env.VERSION_TAG }}.zip
-            artifacts/macOS-DMG/agrisale-macos-${{ env.VERSION_TAG }}.dmg
-            artifacts/Windows-ZIP/agrisale-windows-${{ env.VERSION_TAG }}.zip
-            artifacts/Windows-Installer/agrisale-windows-${{ env.VERSION_TAG }}-installer.exe
+            artifacts/iOS-Build/Agrisale-ios-${{ env.VERSION_TAG }}.ipa
+            artifacts/Android-APK/Agrisale-android-${{ env.VERSION_TAG }}.apk
+            artifacts/macOS-ZIP/Agrisale-macos-${{ env.VERSION_TAG }}.zip
+            artifacts/macOS-DMG/Agrisale-macos-${{ env.VERSION_TAG }}.dmg
+            artifacts/Windows-ZIP/Agrisale-windows-${{ env.VERSION_TAG }}.zip
+            artifacts/Windows-Installer/Agrisale-windows-${{ env.VERSION_TAG }}-installer.exe
           draft: false
           prerelease: false
         env:
