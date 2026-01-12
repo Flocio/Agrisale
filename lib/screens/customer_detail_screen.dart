@@ -356,19 +356,6 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
     
     rows.add([]); // 空行
     
-    // 添加汇总信息
-    rows.add(['汇总信息']);
-    rows.add(['销售总额', '+¥${_totalSalesAmount.toStringAsFixed(2)}']);
-    rows.add(['退货总额', '-¥${_totalReturnsAmount.toStringAsFixed(2)}']);
-    rows.add(['收款金额', '-¥${_totalIncomeAmount.toStringAsFixed(2)}']);
-    rows.add(['退款金额', '+¥${_totalRefundAmount.toStringAsFixed(2)}']);
-    rows.add(['优惠金额', '-¥${_totalDiscountAmount.toStringAsFixed(2)}']);
-    rows.add(['应收余额', '${_accountBalance >= 0 ? '+' : ''}¥${_accountBalance.toStringAsFixed(2)}']);
-    rows.add([]);
-    rows.add(['计算公式: 应收余额 = 销售总额 - 退货总额 - 收款金额 + 退款金额 - 优惠金额']);
-    
-    rows.add([]); // 空行
-    
     // 添加详细记录表头
     rows.add(['日期', '类型', '产品', '数量', '单位', '金额', '优惠', '付款方式', '经手人', '备注']);
 
@@ -404,6 +391,18 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
         record['note'] ?? '',
       ]);
     }
+
+    // 添加汇总信息（在表格之后）
+    rows.add([]); // 空行
+    rows.add(['汇总信息']);
+    rows.add(['销售总额', '+${_totalSalesAmount.toStringAsFixed(2)}']);
+    rows.add(['退货总额', '-${_totalReturnsAmount.toStringAsFixed(2)}']);
+    rows.add(['收款金额', '-${_totalIncomeAmount.toStringAsFixed(2)}']);
+    rows.add(['退款金额', '+${_totalRefundAmount.toStringAsFixed(2)}']);
+    rows.add(['优惠金额', '-${_totalDiscountAmount.toStringAsFixed(2)}']);
+    rows.add(['应收余额', '${_accountBalance >= 0 ? '+' : '-'}${_accountBalance.abs().toStringAsFixed(2)}']);
+    rows.add([]);
+    rows.add(['计算公式: 应收余额 = 销售总额 - 退货总额 - 收款金额 + 退款金额 - 优惠金额']);
 
     String csv = const ListToCsvConverter().convert(rows);
 

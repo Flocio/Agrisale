@@ -308,18 +308,6 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
     
     rows.add([]); // 空行
     
-    // 添加汇总信息
-    rows.add(['汇总信息']);
-    rows.add(['采购总额', '+¥${_totalPurchasesAmount.toStringAsFixed(2)}']);
-    rows.add(['退货总额', '-¥${_totalReturnsAmount.toStringAsFixed(2)}']);
-    rows.add(['汇款金额', '-¥${_totalRemittanceAmount.toStringAsFixed(2)}']);
-    rows.add(['退款金额', '+¥${_totalRefundAmount.toStringAsFixed(2)}']);
-    rows.add(['应付余额', '${_accountPayable >= 0 ? '+' : ''}¥${_accountPayable.toStringAsFixed(2)}']);
-    rows.add([]);
-    rows.add(['计算公式: 应付余额 = 采购总额 - 退货总额 - 汇款金额 + 退款金额']);
-    
-    rows.add([]); // 空行
-    
     // 添加详细记录表头
     rows.add(['日期', '类型', '产品', '数量', '单位', '金额', '付款方式', '经手人', '备注']);
 
@@ -352,6 +340,17 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
         record['note'] ?? '',
       ]);
     }
+
+    // 添加汇总信息（在表格之后）
+    rows.add([]); // 空行
+    rows.add(['汇总信息']);
+    rows.add(['采购总额', '+${_totalPurchasesAmount.toStringAsFixed(2)}']);
+    rows.add(['退货总额', '-${_totalReturnsAmount.toStringAsFixed(2)}']);
+    rows.add(['汇款金额', '-${_totalRemittanceAmount.toStringAsFixed(2)}']);
+    rows.add(['退款金额', '+${_totalRefundAmount.toStringAsFixed(2)}']);
+    rows.add(['应付余额', '${_accountPayable >= 0 ? '+' : '-'}${_accountPayable.abs().toStringAsFixed(2)}']);
+    rows.add([]);
+    rows.add(['计算公式: 应付余额 = 采购总额 - 退货总额 - 汇款金额 + 退款金额']);
 
     String csv = const ListToCsvConverter().convert(rows);
 
