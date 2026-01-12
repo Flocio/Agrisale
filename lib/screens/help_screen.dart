@@ -24,7 +24,7 @@ class HelpScreen extends StatelessWidget {
               children: [
                 _buildParagraph('Agrisale 是一款专业的农业销售管理系统，帮助您轻松管理产品库存、客户关系、采购销售等业务。系统支持多用户使用，每个用户的数据相互独立，确保数据安全。'),
                 _buildParagraph('系统支持 iOS、Android、macOS、Windows 全平台使用，数据本地存储，保护您的隐私安全。'),
-                _buildParagraph('当前版本：v3.0.0 - 新增 PDF 导出功能和退款管理功能，优化了界面显示和统计计算。'),
+                _buildParagraph('当前版本：v3.1.0 - 新增客户和供应商详细对账单界面，优化 UI 显示，修复导出功能问题。'),
               ],
             ),
             
@@ -210,15 +210,15 @@ class HelpScreen extends StatelessWidget {
               icon: Icons.update,
               color: Colors.indigo,
               children: [
-                _buildSubSection('v3.0.0（最新版本）', [
-                  _buildParagraph('✨ 新增 PDF 导出功能，支持所有报表导出为 PDF 文件'),
-                  _buildParagraph('✨ 进账和汇款功能支持负数金额，用于记录退款操作'),
-                  _buildParagraph('🎨 供应商往来界面优化，记录卡片详细信息对齐显示'),
-                  _buildParagraph('🎨 退款记录添加绿色标签和图标，收款/汇款显示红色'),
-                  _buildParagraph('🎨 金额显示优化：退款显示正号（+¥），收款/汇款显示负号（-¥）'),
-                  _buildParagraph('🐛 修复编辑采购记录时库存计算错误的问题'),
-                  _buildParagraph('🐛 修复员工记录界面统计数据显示双重负号的问题'),
-                  _buildParagraph('🔧 macOS 新增 DMG 安装包，Windows 新增 EXE 安装程序'),
+                _buildSubSection('v3.1.0（最新版本）', [
+                  _buildParagraph('✨ 新增客户详细对账单界面，支持查看客户完整的交易记录和应收余额'),
+                  _buildParagraph('✨ 新增供应商详细对账单界面，支持查看供应商完整的交易记录和应付余额'),
+                  _buildParagraph('🎨 UI 界面优化，提升用户体验和视觉效果'),
+                  _buildParagraph('🎨 为缺少版权脚注的界面统一添加 FooterWidget 脚注'),
+                  _buildParagraph('🔧 GitHub Actions 构建系统优化，统一软件包命名规范'),
+                  _buildParagraph('🔧 更新检查功能适配新的软件包命名规范'),
+                  _buildParagraph('🐛 修复客户记录和供应商记录导出 PDF 时总计行显示位置错误的问题'),
+                  _buildParagraph('🐛 修复导出功能中 CSV 和 PDF 格式的各种显示问题'),
                 ]),
                 _buildSubSection('v2.9.0', [
                   _buildParagraph('📚 新增完整的使用帮助文档'),

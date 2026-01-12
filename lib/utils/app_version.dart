@@ -19,7 +19,7 @@
 class AppVersion {
   // 应用版本号（主版本号，格式：x.y.z）
   // ⚠️ 必须与 pubspec.yaml 中的 version 字段保持一致（不包括构建号）
-  static const String version = '3.0.0';
+  static const String version = '3.1.0';
   
   // 获取完整版本号（带v前缀，用于显示）
   static String get versionWithPrefix => 'v$version';
