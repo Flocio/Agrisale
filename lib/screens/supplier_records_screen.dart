@@ -258,9 +258,9 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
       ]);
     }
 
-    // 添加总计行
-    rows.add([]);
-    rows.add(['总计', '', '', 
+    // 添加总计行（紧跟数据行，作为表格的一部分）
+    // 注意：总计放在第二列（类型列），第一列留空，避免被 ExportService 识别为汇总信息
+    rows.add(['', '总计', '', 
               '${_netQuantity >= 0 ? '+' : ''}${_formatNumber(_netQuantity)}', 
               _selectedProduct != '所有产品' 
                   ? (_products.firstWhere((p) => p['name'] == _selectedProduct, orElse: () => {'unit': ''})['unit'] ?? '')

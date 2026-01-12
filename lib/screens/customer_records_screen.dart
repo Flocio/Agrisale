@@ -278,9 +278,9 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
       ]);
     }
 
-    // 添加总计行
-    rows.add([]);
-    rows.add(['总计', '', '', 
+    // 添加总计行（紧跟数据行，作为表格的一部分）
+    // 注意：总计放在第二列（类型列），第一列留空，避免被 ExportService 识别为汇总信息
+    rows.add(['', '总计', '', 
               _formatNumber(_netQuantity), 
               _selectedProduct != '所有产品' 
                   ? (_products.firstWhere((p) => p['name'] == _selectedProduct, orElse: () => {'unit': ''})['unit'] ?? '')
@@ -288,7 +288,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
               _netAmount.toStringAsFixed(2), 
               '']);
     
-    // 添加汇总信息
+    // 添加汇总信息（在表格之后）
     rows.add([]);
     rows.add(['汇总信息']);
     rows.add(['总记录数', '$_totalRecordCount']);
