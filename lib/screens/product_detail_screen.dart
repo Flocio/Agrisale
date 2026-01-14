@@ -22,6 +22,9 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   bool _isDescending = true; // 默认按时间倒序排列
   bool _isSummaryExpanded = true; // 汇总信息是否展开
   
+  // 添加日期筛选相关变量
+  DateTimeRange? _selectedDateRange;
+  
   // 交易类型排序顺序，数字越小越靠前
   Map<String, int> _typeOrderMap = {
     '采购': 1,
@@ -231,6 +234,24 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       if (userId != null) {
         final productName = widget.product['name'];
         
+        // 构建日期筛选条件
+        String dateFilter = '';
+        List<dynamic> purchaseParams = [productName, userId];
+        List<dynamic> salesParams = [productName, userId];
+        List<dynamic> returnsParams = [productName, userId];
+        
+        if (_selectedDateRange != null) {
+          dateFilter = 'AND purchaseDate >= ? AND purchaseDate <= ?';
+          purchaseParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
+          purchaseParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
+          
+          salesParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
+          salesParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
+          
+          returnsParams.add(_selectedDateRange!.start.toIso8601String().split('T')[0]);
+          returnsParams.add(_selectedDateRange!.end.toIso8601String().split('T')[0]);
+        }
+        
         // 获取当前用户的采购数据
         final purchases = await db.rawQuery('''
           SELECT 
@@ -242,8 +263,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             note,
             'purchase' AS recordType
           FROM purchases
-          WHERE productName = ? AND userId = ?
-        ''', [productName, userId]);
+          WHERE productName = ? AND userId = ? ${dateFilter.isNotEmpty ? dateFilter : ''}
+        ''', purchaseParams);
 
         // 获取当前用户的销售数据
         final sales = await db.rawQuery('''
@@ -256,8 +277,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             note,
             'sale' AS recordType
           FROM sales
-          WHERE productName = ? AND userId = ?
-        ''', [productName, userId]);
+          WHERE productName = ? AND userId = ? ${dateFilter.isNotEmpty ? dateFilter.replaceAll('purchaseDate', 'saleDate') : ''}
+        ''', salesParams);
 
         // 获取当前用户的退货数据
         final returns = await db.rawQuery('''
@@ -270,8 +291,8 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
             note,
             'return' AS recordType
           FROM returns
-          WHERE productName = ? AND userId = ?
-        ''', [productName, userId]);
+          WHERE productName = ? AND userId = ? ${dateFilter.isNotEmpty ? dateFilter.replaceAll('purchaseDate', 'returnDate') : ''}
+        ''', returnsParams);
 
         // 获取当前用户的供应商和客户数据
         final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
@@ -434,6 +455,17 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     });
   }
 
+  // 格式化日期显示
+  String _formatDate(String? dateStr) {
+    if (dateStr == null || dateStr.isEmpty) return '';
+    try {
+      DateTime date = DateTime.parse(dateStr);
+      return '${date.year}-${date.month.toString().padLeft(2, '0')}-${date.day.toString().padLeft(2, '0')}';
+    } catch (e) {
+      return dateStr;
+    }
+  }
+
   // 格式化数字显示：整数显示为整数，小数显示为小数
   String _formatNumber(dynamic number) {
     if (number == null) return '0';
@@ -457,6 +489,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
     if (_productSupplierName != null) {
       csvData += '关联供应商: $_productSupplierName\n';
     }
+    
+    // 添加日期筛选信息
+    if (_selectedDateRange != null) {
+      csvData += '日期筛选: ${_formatDate(_selectedDateRange!.start.toIso8601String())} 至 ${_formatDate(_selectedDateRange!.end.toIso8601String())}\n';
+    } else {
+      csvData += '日期筛选: 所有日期\n';
+    }
+    
     csvData += '\n';
     csvData += '日期,类型,产品,数量,单位,交易方,金额,备注\n';
     
@@ -539,6 +579,89 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
       ),
       body: Column(
         children: [
+          // 日期筛选
+          Container(
+            padding: const EdgeInsets.symmetric(horizontal: 16, vertical: 12),
+            color: Colors.green[50],
+            child: Row(
+              children: [
+                Icon(Icons.date_range, color: Colors.green[700], size: 20),
+                SizedBox(width: 8),
+                Expanded(
+                  child: InkWell(
+                    onTap: () async {
+                      final now = DateTime.now();
+                      final initialDateRange = _selectedDateRange ??
+                          DateTimeRange(
+                            start: now.subtract(Duration(days: 30)),
+                            end: now,
+                          );
+                      
+                      final pickedRange = await showDateRangePicker(
+                        context: context,
+                        initialDateRange: initialDateRange,
+                        firstDate: DateTime(2000),
+                        lastDate: DateTime.now(),
+                        builder: (context, child) {
+                          return Theme(
+                            data: Theme.of(context).copyWith(
+                              colorScheme: ColorScheme.light(primary: Colors.green),
+                            ),
+                            child: child!,
+                          );
+                        },
+                      );
+                      
+                      if (pickedRange != null) {
+                        setState(() {
+                          _selectedDateRange = pickedRange;
+                          _fetchData();
+                        });
+                      }
+                    },
+                    child: Container(
+                      padding: EdgeInsets.symmetric(horizontal: 12, vertical: 12),
+                      decoration: BoxDecoration(
+                        borderRadius: BorderRadius.circular(8),
+                        border: Border.all(color: Colors.green[300]!),
+                        color: Colors.white,
+                      ),
+                      child: Row(
+                        children: [
+                          Expanded(
+                            child: Text(
+                              _selectedDateRange != null
+                                  ? '${_formatDate(_selectedDateRange!.start.toIso8601String())} 至 ${_formatDate(_selectedDateRange!.end.toIso8601String())}'
+                                  : '选择日期范围',
+                              style: TextStyle(
+                                color: _selectedDateRange != null ? Colors.black87 : Colors.grey[600],
+                                fontSize: 14,
+                              ),
+                            ),
+                          ),
+                          if (_selectedDateRange != null)
+                            GestureDetector(
+                              onTap: () {
+                                setState(() {
+                                  _selectedDateRange = null;
+                                  _fetchData();
+                                });
+                              },
+                              child: Padding(
+                                padding: EdgeInsets.only(right: 8),
+                                child: Icon(Icons.clear, color: Colors.green[700], size: 18),
+                              ),
+                            ),
+                          Icon(Icons.arrow_drop_down, color: Colors.green[700]),
+                        ],
+                      ),
+                    ),
+                  ),
+                ),
+              ],
+            ),
+          ),
+
           // 产品信息和汇总信息合并卡片
           _buildCombinedInfoCard(),
           
