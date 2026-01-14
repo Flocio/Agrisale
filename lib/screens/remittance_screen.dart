@@ -110,8 +110,8 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
       if (searchTerms.isNotEmpty) {
         hasFilters = true;
         result = result.where((remittance) {
-          final supplierName = (remittance['supplierName'] ?? '').toString().toLowerCase();
-          final employeeName = (remittance['employeeName'] ?? '').toString().toLowerCase();
+          final supplierName = (remittance['supplierName'] ?? '未指定').toString().toLowerCase();
+          final employeeName = (remittance['employeeName'] ?? '未指定').toString().toLowerCase();
           final date = remittance['remittanceDate'].toString().toLowerCase();
           final note = (remittance['note'] ?? '').toString().toLowerCase();
           final amount = remittance['amount'].toString().toLowerCase();
@@ -1030,6 +1030,8 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
   int? _selectedSupplierId;
   int? _selectedEmployeeId;
   String _selectedPaymentMethod = '现金';
+  String? _missingSupplierInfo; // 记录已删除的供应商信息
+  String? _missingEmployeeInfo; // 记录已删除的员工信息
   
   final List<String> _paymentMethods = ['现金', '微信转账', '银行卡'];
 
@@ -1038,8 +1040,37 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
     super.initState();
     if (widget.remittance != null) {
       _selectedDate = DateTime.parse(widget.remittance!['remittanceDate']);
-      _selectedSupplierId = widget.remittance!['supplierId'];
-      _selectedEmployeeId = widget.remittance!['employeeId'];
+      
+      // 检查供应商是否存在
+      final supplierId = widget.remittance!['supplierId'];
+      if (supplierId != null && supplierId != 0) {
+        final supplierExists = widget.suppliers.any((s) => s['id'] == supplierId);
+        if (supplierExists) {
+          _selectedSupplierId = supplierId;
+        } else {
+          _selectedSupplierId = null;
+          _missingSupplierInfo = '原供应商(ID: $supplierId)已被删除';
+        }
+      } else if (supplierId == 0) {
+        _selectedSupplierId = null;
+        _missingSupplierInfo = '原供应商已被删除';
+      }
+      
+      // 检查员工是否存在
+      final employeeId = widget.remittance!['employeeId'];
+      if (employeeId != null && employeeId != 0) {
+        final employeeExists = widget.employees.any((e) => e['id'] == employeeId);
+        if (employeeExists) {
+          _selectedEmployeeId = employeeId;
+        } else {
+          _selectedEmployeeId = null;
+          _missingEmployeeInfo = '原员工(ID: $employeeId)已被删除';
+        }
+      } else if (employeeId == 0) {
+        _selectedEmployeeId = null;
+        _missingEmployeeInfo = '原员工已被删除';
+      }
+      
       _selectedPaymentMethod = widget.remittance!['paymentMethod'];
       _amountController.text = widget.remittance!['amount'].toString();
       _noteController.text = widget.remittance!['note'] ?? '';
@@ -1105,6 +1136,30 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
               ),
               SizedBox(height: 16),
               
+              // 供应商已删除警告
+              if (_missingSupplierInfo != null)
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$_missingSupplierInfo，请重新选择供应商',
+                          style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
               // 供应商选择
               DropdownButtonFormField<int>(
                 value: _selectedSupplierId,
@@ -1128,6 +1183,7 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                 onChanged: (value) {
                   setState(() {
                     _selectedSupplierId = value;
+                    _missingSupplierInfo = null; // 用户选择后清除警告
                   });
                 },
               ),
@@ -1164,6 +1220,30 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
               ),
               SizedBox(height: 16),
               
+              // 员工已删除警告
+              if (_missingEmployeeInfo != null)
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$_missingEmployeeInfo，请重新选择经办人',
+                          style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
               // 经办人 + 汇款方式 同一排
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1197,6 +1277,7 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                       onChanged: (value) {
                         setState(() {
                           _selectedEmployeeId = value;
+                          _missingEmployeeInfo = null; // 用户选择后清除警告
                         });
                       },
                     ),

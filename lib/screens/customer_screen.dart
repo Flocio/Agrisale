@@ -165,11 +165,62 @@ class _CustomerScreenState extends State<CustomerScreen> {
   }
 
   Future<void> _deleteCustomer(int id, String name) async {
+    final db = await DatabaseHelper().database;
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    
+    if (username == null) return;
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+    
+    // 查询该客户相关的记录数量
+    final salesCount = (await db.rawQuery(
+      'SELECT COUNT(*) as count FROM sales WHERE customerId = ? AND userId = ?',
+      [id, userId],
+    )).first['count'] as int;
+    
+    final returnsCount = (await db.rawQuery(
+      'SELECT COUNT(*) as count FROM returns WHERE customerId = ? AND userId = ?',
+      [id, userId],
+    )).first['count'] as int;
+    
+    final incomeCount = (await db.rawQuery(
+      'SELECT COUNT(*) as count FROM income WHERE customerId = ? AND userId = ?',
+      [id, userId],
+    )).first['count'] as int;
+    
+    final totalRelatedRecords = salesCount + returnsCount + incomeCount;
+    
+    // 构建警告消息
+    String warningMessage = '您确定要删除客户 "$name" 吗？';
+    
+    if (totalRelatedRecords > 0) {
+      warningMessage += '\n\n⚠️ 警告：该客户有以下关联记录：';
+      if (salesCount > 0) {
+        warningMessage += '\n• 销售记录: $salesCount 条';
+      }
+      if (returnsCount > 0) {
+        warningMessage += '\n• 退货记录: $returnsCount 条';
+      }
+      if (incomeCount > 0) {
+        warningMessage += '\n• 进账记录: $incomeCount 条';
+      }
+      warningMessage += '\n\n删除后，这些记录的客户将显示为"未知客户"。';
+    }
+    
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('确认删除'),
-        content: Text('您确定要删除客户 "$name" 吗？'),
+        title: Row(
+          children: [
+            if (totalRelatedRecords > 0)
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            if (totalRelatedRecords > 0)
+              SizedBox(width: 8),
+            Text('确认删除'),
+          ],
+        ),
+        content: Text(warningMessage),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -179,7 +230,10 @@ class _CustomerScreenState extends State<CustomerScreen> {
             children: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: Text('确认'),
+                style: totalRelatedRecords > 0 
+                    ? TextButton.styleFrom(foregroundColor: Colors.red)
+                    : null,
+                child: Text(totalRelatedRecords > 0 ? '确认删除' : '确认'),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -192,30 +246,40 @@ class _CustomerScreenState extends State<CustomerScreen> {
     );
 
     if (confirm == true) {
-      final db = await DatabaseHelper().database;
-      final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString('current_username');
+      // 只删除当前用户的客户
+      await db.delete('customers', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
+      // 更新当前用户的销售记录，将删除的客户ID设为0
+      await db.update(
+        'sales',
+        {'customerId': 0},
+        where: 'customerId = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
+      // 更新当前用户的退货记录，将删除的客户ID设为0
+      await db.update(
+        'returns',
+        {'customerId': 0},
+        where: 'customerId = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
+      // 更新当前用户的进账记录，将删除的客户ID设为0
+      await db.update(
+        'income',
+        {'customerId': 0},
+        where: 'customerId = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
+      _fetchCustomers();
       
-      if (username != null) {
-        final userId = await DatabaseHelper().getCurrentUserId(username);
-        if (userId != null) {
-          // 只删除当前用户的客户
-          await db.delete('customers', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
-          // 更新当前用户的销售和退货记录，将删除的客户ID设为0
-          await db.update(
-            'sales',
-            {'customerId': 0},
-            where: 'customerId = ? AND userId = ?',
-            whereArgs: [id, userId],
-          );
-          await db.update(
-            'returns',
-            {'customerId': 0},
-            where: 'customerId = ? AND userId = ?',
-            whereArgs: [id, userId],
-          );
-          _fetchCustomers();
-        }
+      // 显示删除成功提示
+      if (totalRelatedRecords > 0) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已删除客户"$name"，$totalRelatedRecords 条关联记录的客户已设为"未知客户"'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }

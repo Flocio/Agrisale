@@ -163,11 +163,54 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
   }
 
   Future<void> _deleteEmployee(int id, String name) async {
+    final db = await DatabaseHelper().database;
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    
+    if (username == null) return;
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+    
+    // 查询该员工相关的记录数量
+    final incomeCount = (await db.rawQuery(
+      'SELECT COUNT(*) as count FROM income WHERE employeeId = ? AND userId = ?',
+      [id, userId],
+    )).first['count'] as int;
+    
+    final remittanceCount = (await db.rawQuery(
+      'SELECT COUNT(*) as count FROM remittance WHERE employeeId = ? AND userId = ?',
+      [id, userId],
+    )).first['count'] as int;
+    
+    final totalRelatedRecords = incomeCount + remittanceCount;
+    
+    // 构建警告消息
+    String warningMessage = '您确定要删除员工 "$name" 吗？';
+    
+    if (totalRelatedRecords > 0) {
+      warningMessage += '\n\n⚠️ 警告：该员工有以下关联记录：';
+      if (incomeCount > 0) {
+        warningMessage += '\n• 进账记录: $incomeCount 条';
+      }
+      if (remittanceCount > 0) {
+        warningMessage += '\n• 汇款记录: $remittanceCount 条';
+      }
+      warningMessage += '\n\n删除后，这些记录的经办人将显示为"未知员工"。';
+    }
+    
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('确认删除'),
-        content: Text('您确定要删除员工 "$name" 吗？'),
+        title: Row(
+          children: [
+            if (totalRelatedRecords > 0)
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            if (totalRelatedRecords > 0)
+              SizedBox(width: 8),
+            Text('确认删除'),
+          ],
+        ),
+        content: Text(warningMessage),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -177,7 +220,10 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
             children: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: Text('确认'),
+                style: totalRelatedRecords > 0 
+                    ? TextButton.styleFrom(foregroundColor: Colors.red)
+                    : null,
+                child: Text(totalRelatedRecords > 0 ? '确认删除' : '确认'),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -190,17 +236,33 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
     );
 
     if (confirm == true) {
-      final db = await DatabaseHelper().database;
-      final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString('current_username');
+      // 只删除当前用户的员工
+      await db.delete('employees', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
+      // 更新当前用户的进账记录，将删除的员工ID设为0
+      await db.update(
+        'income',
+        {'employeeId': 0},
+        where: 'employeeId = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
+      // 更新当前用户的汇款记录，将删除的员工ID设为0
+      await db.update(
+        'remittance',
+        {'employeeId': 0},
+        where: 'employeeId = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
+      _fetchEmployees();
       
-      if (username != null) {
-        final userId = await DatabaseHelper().getCurrentUserId(username);
-        if (userId != null) {
-          // 只删除当前用户的员工
-          await db.delete('employees', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
-          _fetchEmployees();
-        }
+      // 显示删除成功提示
+      if (totalRelatedRecords > 0) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已删除员工"$name"，$totalRelatedRecords 条关联记录的经办人已设为"未知员工"'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }

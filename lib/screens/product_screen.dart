@@ -171,9 +171,127 @@ class _ProductScreenState extends State<ProductScreen> {
               ),
             );
           } else {
+            final oldProductName = product['name'] as String;
+            final newProductName = result['name'] as String;
+            final oldSupplierId = product['supplierId'];
+            final newSupplierId = result['supplierId'];
+            
+            // 检查供应商是否发生变化
+            bool supplierChanged = (oldSupplierId != newSupplierId) && 
+                (oldSupplierId != null && oldSupplierId != 0);
+            bool shouldSyncSupplier = false;
+            
+            if (supplierChanged) {
+              // 查询该产品的采购记录数量
+              final purchaseCount = (await db.rawQuery(
+                'SELECT COUNT(*) as count FROM purchases WHERE productName = ? AND userId = ? AND supplierId = ?',
+                [oldProductName, userId, oldSupplierId],
+              )).first['count'] as int;
+              
+              if (purchaseCount > 0) {
+                // 获取供应商名称用于显示
+                final oldSupplierName = _getSupplierName(oldSupplierId is int ? oldSupplierId : int.tryParse(oldSupplierId.toString()));
+                final newSupplierName = newSupplierId != null && newSupplierId != 0
+                    ? _getSupplierName(newSupplierId is int ? newSupplierId : int.tryParse(newSupplierId.toString()))
+                    : '未分配';
+                
+                // 弹出对话框询问用户是否同步修改采购记录的供应商
+                // 返回值: true=同步修改, false=不修改, null=取消整个操作
+                final syncChoice = await showDialog<bool?>(
+                  context: context,
+                  builder: (context) => AlertDialog(
+                    title: Row(
+                      children: [
+                        Icon(Icons.sync, color: Colors.blue, size: 24),
+                        SizedBox(width: 8),
+                        Expanded(child: Text('同步供应商信息')),
+                      ],
+                    ),
+                    content: Text(
+                      '检测到产品"$oldProductName"的供应商从"$oldSupplierName"变更为"$newSupplierName"。\n\n'
+                      '该产品有 $purchaseCount 条采购记录关联到原供应商"$oldSupplierName"。\n\n'
+                      '是否将这些采购记录的供应商也同步修改为"$newSupplierName"？',
+                    ),
+                    shape: RoundedRectangleBorder(
+                      borderRadius: BorderRadius.circular(12),
+                    ),
+                    actions: [
+                      Row(
+                        children: [
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(true),
+                            child: Text('同步修改'),
+                          ),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(false),
+                            child: Text('不修改'),
+                          ),
+                          Spacer(),
+                          TextButton(
+                            onPressed: () => Navigator.of(context).pop(null),
+                            style: TextButton.styleFrom(foregroundColor: Colors.grey),
+                            child: Text('取消'),
+                          ),
+                        ],
+                      ),
+                    ],
+                  ),
+                );
+                
+                // 如果用户选择取消，终止整个编辑操作
+                if (syncChoice == null) {
+                  return;
+                }
+                shouldSyncSupplier = syncChoice;
+              }
+            }
+            
             // 确保userId不变
             result['userId'] = userId;
             await db.update('products', result, where: 'id = ? AND userId = ?', whereArgs: [product['id'], userId]);
+            
+            // 如果产品名称发生变化，同步更新 purchases/sales/returns 表中的 productName
+            if (oldProductName != newProductName) {
+              await db.update(
+                'purchases',
+                {'productName': newProductName},
+                where: 'productName = ? AND userId = ?',
+                whereArgs: [oldProductName, userId],
+              );
+              await db.update(
+                'sales',
+                {'productName': newProductName},
+                where: 'productName = ? AND userId = ?',
+                whereArgs: [oldProductName, userId],
+              );
+              await db.update(
+                'returns',
+                {'productName': newProductName},
+                where: 'productName = ? AND userId = ?',
+                whereArgs: [oldProductName, userId],
+              );
+            }
+            
+            // 如果用户选择同步修改供应商，更新采购记录的供应商
+            if (shouldSyncSupplier) {
+              // 使用新的产品名称（可能已经改变）
+              final productNameToUse = newProductName;
+              await db.update(
+                'purchases',
+                {'supplierId': newSupplierId},
+                where: 'productName = ? AND userId = ? AND supplierId = ?',
+                whereArgs: [productNameToUse, userId, oldSupplierId],
+              );
+              
+              ScaffoldMessenger.of(context).hideCurrentSnackBar();
+              ScaffoldMessenger.of(context).showSnackBar(
+                SnackBar(
+                  content: Text('已同步修改采购记录的供应商信息'),
+                  behavior: SnackBarBehavior.floating,
+                ),
+              );
+            }
+            
             _fetchProducts();
           }
         }
@@ -182,16 +300,67 @@ class _ProductScreenState extends State<ProductScreen> {
   }
 
   Future<void> _deleteProduct(Map<String, dynamic> product) async {
+    final db = await DatabaseHelper().database;
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    
+    if (username == null) return;
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+    
+    final productName = product['name'] as String;
+    
+    // 查询该产品相关的记录数量
+    final purchaseCount = (await db.rawQuery(
+      'SELECT COUNT(*) as count FROM purchases WHERE productName = ? AND userId = ?',
+      [productName, userId],
+    )).first['count'] as int;
+    
+    final salesCount = (await db.rawQuery(
+      'SELECT COUNT(*) as count FROM sales WHERE productName = ? AND userId = ?',
+      [productName, userId],
+    )).first['count'] as int;
+    
+    final returnsCount = (await db.rawQuery(
+      'SELECT COUNT(*) as count FROM returns WHERE productName = ? AND userId = ?',
+      [productName, userId],
+    )).first['count'] as int;
+    
+    final totalRelatedRecords = purchaseCount + salesCount + returnsCount;
+    
+    // 构建警告消息
+    String warningMessage = '您确定要删除以下产品吗？\n\n'
+        '产品名称: ${product['name']}\n'
+        '描述: ${product['description'] ?? '无描述'}\n'
+        '库存: ${_formatNumber(product['stock'])} ${product['unit']}';
+    
+    if (totalRelatedRecords > 0) {
+      warningMessage += '\n\n⚠️ 警告：删除此产品将同时删除以下关联记录：';
+      if (purchaseCount > 0) {
+        warningMessage += '\n• 采购记录: $purchaseCount 条';
+      }
+      if (salesCount > 0) {
+        warningMessage += '\n• 销售记录: $salesCount 条';
+      }
+      if (returnsCount > 0) {
+        warningMessage += '\n• 退货记录: $returnsCount 条';
+      }
+      warningMessage += '\n\n此操作不可恢复，请谨慎操作！';
+    }
+    
     final confirm = await showDialog<bool>(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('确认删除'),
-        content: Text(
-          '您确定要删除以下产品吗？\n\n'
-              '产品名称: ${product['name']}\n'
-              '描述: ${product['description'] ?? '无描述'}\n'
-              '库存: ${_formatNumber(product['stock'])} ${product['unit']}',
+        title: Row(
+          children: [
+            if (totalRelatedRecords > 0)
+              Icon(Icons.warning_amber_rounded, color: Colors.orange, size: 28),
+            if (totalRelatedRecords > 0)
+              SizedBox(width: 8),
+            Text('确认删除'),
+          ],
         ),
+        content: Text(warningMessage),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
         ),
@@ -202,7 +371,10 @@ class _ProductScreenState extends State<ProductScreen> {
             children: [
               TextButton(
                 onPressed: () => Navigator.of(context).pop(true),
-                child: Text('确认'),
+                style: totalRelatedRecords > 0 
+                    ? TextButton.styleFrom(foregroundColor: Colors.red)
+                    : null,
+                child: Text(totalRelatedRecords > 0 ? '确认删除' : '确认'),
               ),
               TextButton(
                 onPressed: () => Navigator.of(context).pop(false),
@@ -215,16 +387,23 @@ class _ProductScreenState extends State<ProductScreen> {
     );
 
     if (confirm == true) {
-      final db = await DatabaseHelper().database;
-      final prefs = await SharedPreferences.getInstance();
-      final username = prefs.getString('current_username');
+      // 级联删除所有相关记录
+      await db.delete('purchases', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
+      await db.delete('sales', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
+      await db.delete('returns', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
+      // 删除产品本身
+      await db.delete('products', where: 'id = ? AND userId = ?', whereArgs: [product['id'], userId]);
+      _fetchProducts();
       
-      if (username != null) {
-        final userId = await DatabaseHelper().getCurrentUserId(username);
-        if (userId != null) {
-          await db.delete('products', where: 'id = ? AND userId = ?', whereArgs: [product['id'], userId]);
-          _fetchProducts();
-        }
+      // 显示删除成功提示
+      if (totalRelatedRecords > 0) {
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(
+            content: Text('已删除产品"$productName"及其 $totalRelatedRecords 条关联记录'),
+            behavior: SnackBarBehavior.floating,
+          ),
+        );
       }
     }
   }
@@ -603,6 +782,7 @@ class _ProductDialogState extends State<ProductDialog> {
   final _formKey = GlobalKey<FormState>();
   String _selectedUnit = '斤'; // 默认单位
   String? _selectedSupplierId; // 选中的供应商ID
+  String? _missingSupplierInfo; // 记录已删除的供应商信息用于显示警告
 
   @override
   void initState() {
@@ -614,7 +794,16 @@ class _ProductDialogState extends State<ProductDialog> {
       _selectedUnit = widget.product!['unit'];
       // 加载供应商ID
       if (widget.product!['supplierId'] != null && widget.product!['supplierId'] != 0) {
-        _selectedSupplierId = widget.product!['supplierId'].toString();
+        final supplierId = widget.product!['supplierId'].toString();
+        // 检查供应商是否存在于当前供应商列表中
+        final supplierExists = widget.suppliers.any((s) => s['id'].toString() == supplierId);
+        if (supplierExists) {
+          _selectedSupplierId = supplierId;
+        } else {
+          // 供应商已被删除，设为null并记录警告信息
+          _selectedSupplierId = null;
+          _missingSupplierInfo = '原供应商(ID: $supplierId)已被删除';
+        }
       }
     }
   }
@@ -651,6 +840,29 @@ class _ProductDialogState extends State<ProductDialog> {
                 },
               ),
               SizedBox(height: 16),
+              // 供应商已删除警告
+              if (_missingSupplierInfo != null)
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$_missingSupplierInfo，请重新选择供应商',
+                          style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
               // 添加供应商选择
               Container(
                 padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
@@ -675,6 +887,8 @@ class _ProductDialogState extends State<ProductDialog> {
                           onChanged: (String? newValue) {
                             setState(() {
                               _selectedSupplierId = newValue;
+                              // 用户选择后清除警告
+                              _missingSupplierInfo = null;
                             });
                           },
                           items: [

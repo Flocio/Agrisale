@@ -112,7 +112,7 @@ class _SalesScreenState extends State<SalesScreen> {
           final customerName = _customers
               .firstWhere(
                 (c) => c['id'] == sale['customerId'],
-                orElse: () => {'name': ''},
+                orElse: () => {'name': '未知客户'},
               )['name']
               .toString()
               .toLowerCase();
@@ -1061,6 +1061,8 @@ class _SalesDialogState extends State<SalesDialog> {
   double _totalSalePrice = 0.0;
   double _availableStock = 0.0;
   bool _isEditMode = false;
+  String? _missingProductName; // 记录不存在的产品名称
+  String? _missingCustomerInfo; // 记录已删除的客户信息
 
   @override
   void initState() {
@@ -1069,22 +1071,54 @@ class _SalesDialogState extends State<SalesDialog> {
     if (widget.existingSale != null) {
       _isEditMode = true;
       final sale = widget.existingSale!;
-      _selectedProduct = sale['productName'];
-      _selectedCustomer = sale['customerId'].toString();
+      final productName = sale['productName'] as String;
+      
+      // 检查产品是否存在于当前产品列表中
+      final productExists = widget.products.any((p) => p['name'] == productName);
+      if (productExists) {
+        _selectedProduct = productName;
+        
+        // 根据已选产品反推供应商（用于供应商筛选默认值）
+        final Map<String, dynamic> product = widget.products.firstWhere(
+          (p) => p['name'] == _selectedProduct,
+          orElse: () => <String, dynamic>{},
+        );
+        final dynamic rawSupplierId = product['supplierId'];
+        final int? sid = rawSupplierId is int ? rawSupplierId : int.tryParse(rawSupplierId?.toString() ?? '');
+        if (sid != null && sid != 0) {
+          _selectedSupplier = sid.toString();
+        }
+        
+        // 更新可用库存
+        _updateAvailableStock();
+      } else {
+        // 产品不存在，记录产品名称以便显示警告
+        _selectedProduct = null;
+        _missingProductName = productName;
+      }
+      
+      // 检查客户是否存在
+      final customerId = sale['customerId'];
+      if (customerId != null && customerId != 0) {
+        final customerIdStr = customerId.toString();
+        final customerExists = widget.customers.any((c) => c['id'].toString() == customerIdStr);
+        if (customerExists) {
+          _selectedCustomer = customerIdStr;
+        } else {
+          _selectedCustomer = null;
+          _missingCustomerInfo = '原客户(ID: $customerIdStr)已被删除';
+        }
+      } else {
+        // customerId 为 0 或 null，表示客户已被删除
+        _selectedCustomer = null;
+        if (customerId == 0) {
+          _missingCustomerInfo = '原客户已被删除';
+        }
+      }
+      
       _quantityController.text = sale['quantity'].toString();
       _noteController.text = sale['note'] ?? '';
       _selectedDate = DateTime.parse(sale['saleDate']);
-
-      // 根据已选产品反推供应商（用于供应商筛选默认值）
-      final Map<String, dynamic> product = widget.products.firstWhere(
-        (p) => p['name'] == _selectedProduct,
-        orElse: () => <String, dynamic>{},
-      );
-      final dynamic rawSupplierId = product['supplierId'];
-      final int? sid = rawSupplierId is int ? rawSupplierId : int.tryParse(rawSupplierId?.toString() ?? '');
-      if (sid != null && sid != 0) {
-        _selectedSupplier = sid.toString();
-      }
       
       // 根据总价和数量计算单价
       final quantity = sale['quantity'] as double;
@@ -1094,9 +1128,6 @@ class _SalesDialogState extends State<SalesDialog> {
         _salePriceController.text = unitPrice.toString();
       }
       _totalSalePrice = totalPrice;
-      
-      // 更新可用库存
-      _updateAvailableStock();
     }
   }
 
@@ -1141,7 +1172,18 @@ class _SalesDialogState extends State<SalesDialog> {
 
   void _updateAvailableStock() {
     if (_selectedProduct != null) {
-    final product = widget.products.firstWhere((p) => p['name'] == _selectedProduct);
+      final product = widget.products.firstWhere(
+        (p) => p['name'] == _selectedProduct,
+        orElse: () => <String, dynamic>{},
+      );
+      // 如果找不到产品（可能被删除或名称已更改），重置选择
+      if (product.isEmpty) {
+        setState(() {
+          _selectedProduct = null;
+          _availableStock = 0.0;
+        });
+        return;
+      }
       setState(() {
         // 如果是编辑模式，需要加上原来销售的数量（因为这部分可以"释放"出来）
         if (_isEditMode && widget.existingSale != null) {
@@ -1152,7 +1194,7 @@ class _SalesDialogState extends State<SalesDialog> {
             _availableStock = product['stock'] + oldQuantity;
           } else {
             // 如果改变了产品，只显示新产品的库存
-        _availableStock = product['stock'];
+            _availableStock = product['stock'];
           }
         } else {
           // 添加模式，直接显示库存
@@ -1177,8 +1219,11 @@ class _SalesDialogState extends State<SalesDialog> {
   Widget build(BuildContext context) {
     String unit = '';
     if (_selectedProduct != null) {
-      final product = widget.products.firstWhere((p) => p['name'] == _selectedProduct);
-      unit = product['unit'];
+      final product = widget.products.firstWhere(
+        (p) => p['name'] == _selectedProduct,
+        orElse: () => <String, dynamic>{'unit': ''},
+      );
+      unit = product['unit'] ?? '';
     }
 
     final int? selectedSupplierId = int.tryParse(_selectedSupplier ?? '');
@@ -1202,6 +1247,29 @@ class _SalesDialogState extends State<SalesDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 产品不存在警告
+            if (_missingProductName != null)
+              Container(
+                margin: EdgeInsets.only(bottom: 16),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '原产品"$_missingProductName"已不存在，请重新选择产品',
+                        style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // 供应商筛选：用于过滤产品列表（不影响原有保存数据结构）
             DropdownButtonFormField<String>(
               value: _selectedSupplier,
@@ -1233,16 +1301,23 @@ class _SalesDialogState extends State<SalesDialog> {
 
                   // 若已选产品不属于该供应商，则清空，避免 Dropdown value 不在 items 里导致断言崩溃
                   if (_selectedProduct != null && _selectedSupplier != null) {
-                    final Map<String, dynamic> p =
-                        widget.products.firstWhere((p) => p['name'] == _selectedProduct);
-                    final dynamic raw = p['supplierId'];
-                    final int? productSid =
-                        raw is int ? raw : int.tryParse(raw?.toString() ?? '');
-                    final int? selectedSid = int.tryParse(_selectedSupplier ?? '');
-                    if (selectedSid != null &&
-                        (productSid == null || productSid == 0 || productSid != selectedSid)) {
+                    final Map<String, dynamic> p = widget.products.firstWhere(
+                      (p) => p['name'] == _selectedProduct,
+                      orElse: () => <String, dynamic>{},
+                    );
+                    if (p.isEmpty) {
                       _selectedProduct = null;
                       _availableStock = 0.0;
+                    } else {
+                      final dynamic raw = p['supplierId'];
+                      final int? productSid =
+                          raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+                      final int? selectedSid = int.tryParse(_selectedSupplier ?? '');
+                      if (selectedSid != null &&
+                          (productSid == null || productSid == 0 || productSid != selectedSid)) {
+                        _selectedProduct = null;
+                        _availableStock = 0.0;
+                      }
                     }
                   }
                 });
@@ -1295,6 +1370,30 @@ class _SalesDialogState extends State<SalesDialog> {
             ),
               SizedBox(height: 16),
               
+              // 客户已删除警告
+              if (_missingCustomerInfo != null)
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$_missingCustomerInfo，请重新选择客户',
+                          style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
             DropdownButtonFormField<String>(
               value: _selectedCustomer,
                 decoration: InputDecoration(
@@ -1322,6 +1421,7 @@ class _SalesDialogState extends State<SalesDialog> {
               onChanged: (value) {
                 setState(() {
                   _selectedCustomer = value;
+                  _missingCustomerInfo = null; // 用户选择后清除警告
                 });
               },
             ),

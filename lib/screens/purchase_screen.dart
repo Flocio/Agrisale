@@ -111,7 +111,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
           final supplierName = _suppliers
               .firstWhere(
                 (s) => s['id'] == purchase['supplierId'],
-                orElse: () => {'name': ''},
+                orElse: () => {'name': '未知供应商'},
               )['name']
               .toString()
               .toLowerCase();
@@ -1099,6 +1099,8 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
   DateTime _selectedDate = DateTime.now();
   double _totalPurchasePrice = 0.0;
   bool _isEditMode = false;
+  String? _missingProductName; // 记录不存在的产品名称
+  String? _missingSupplierInfo; // 记录已删除的供应商信息
 
   @override
   void initState() {
@@ -1107,8 +1109,37 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
     if (widget.existingPurchase != null) {
       _isEditMode = true;
       final purchase = widget.existingPurchase!;
-      _selectedProduct = purchase['productName'];
-      _selectedSupplier = purchase['supplierId'].toString();
+      final productName = purchase['productName'] as String;
+      
+      // 检查产品是否存在于当前产品列表中
+      final productExists = widget.products.any((p) => p['name'] == productName);
+      if (productExists) {
+        _selectedProduct = productName;
+      } else {
+        // 产品不存在，记录产品名称以便显示警告
+        _selectedProduct = null;
+        _missingProductName = productName;
+      }
+      
+      // 检查供应商是否存在
+      final supplierId = purchase['supplierId'];
+      if (supplierId != null && supplierId != 0) {
+        final supplierIdStr = supplierId.toString();
+        final supplierExists = widget.suppliers.any((s) => s['id'].toString() == supplierIdStr);
+        if (supplierExists) {
+          _selectedSupplier = supplierIdStr;
+        } else {
+          _selectedSupplier = null;
+          _missingSupplierInfo = '原供应商(ID: $supplierIdStr)已被删除';
+        }
+      } else {
+        // supplierId 为 0 或 null，表示供应商已被删除
+        _selectedSupplier = null;
+        if (supplierId == 0) {
+          _missingSupplierInfo = '原供应商已被删除';
+        }
+      }
+      
       _quantityController.text = purchase['quantity'].toString();
       _noteController.text = purchase['note'] ?? '';
       _selectedDate = DateTime.parse(purchase['purchaseDate']);
@@ -1167,8 +1198,11 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
   Widget build(BuildContext context) {
     String unit = '';
     if (_selectedProduct != null) {
-      final product = widget.products.firstWhere((p) => p['name'] == _selectedProduct);
-      unit = product['unit'];
+      final product = widget.products.firstWhere(
+        (p) => p['name'] == _selectedProduct,
+        orElse: () => <String, dynamic>{'unit': ''},
+      );
+      unit = product['unit'] ?? '';
     }
 
     final int? selectedSupplierId = int.tryParse(_selectedSupplier ?? '');
@@ -1192,6 +1226,52 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
             mainAxisSize: MainAxisSize.min,
             crossAxisAlignment: CrossAxisAlignment.start,
           children: [
+            // 产品不存在警告
+            if (_missingProductName != null)
+              Container(
+                margin: EdgeInsets.only(bottom: 16),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '原产品"$_missingProductName"已不存在，请重新选择产品',
+                        style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+            // 供应商已删除警告
+            if (_missingSupplierInfo != null)
+              Container(
+                margin: EdgeInsets.only(bottom: 16),
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.orange[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.orange[300]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '$_missingSupplierInfo，请重新选择供应商',
+                        style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
             // 先选择供应商（手动选择），再选择产品（产品列表按供应商过滤）
             DropdownButtonFormField<String>(
               value: _selectedSupplier,
@@ -1220,16 +1300,24 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
               onChanged: (value) {
                 setState(() {
                   _selectedSupplier = value;
+                  _missingSupplierInfo = null; // 用户选择后清除警告
 
                   // 如果当前已选产品不属于该供应商，则清空产品选择
                   if (_selectedProduct != null) {
-                    final p = widget.products.firstWhere((p) => p['name'] == _selectedProduct);
-                    final dynamic raw = p['supplierId'];
-                    final int? sid = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
-                    final int? selectedSid = int.tryParse(_selectedSupplier ?? '');
-                    // sid 为 null/0 代表未分配供应商；或者 sid != selectedSid，都必须清空产品
-                    if (selectedSid != null && (sid == null || sid == 0 || sid != selectedSid)) {
+                    final p = widget.products.firstWhere(
+                      (p) => p['name'] == _selectedProduct,
+                      orElse: () => <String, dynamic>{},
+                    );
+                    if (p.isEmpty) {
                       _selectedProduct = null;
+                    } else {
+                      final dynamic raw = p['supplierId'];
+                      final int? sid = raw is int ? raw : int.tryParse(raw?.toString() ?? '');
+                      final int? selectedSid = int.tryParse(_selectedSupplier ?? '');
+                      // sid 为 null/0 代表未分配供应商；或者 sid != selectedSid，都必须清空产品
+                      if (selectedSid != null && (sid == null || sid == 0 || sid != selectedSid)) {
+                        _selectedProduct = null;
+                      }
                     }
                   }
                 });
@@ -1266,8 +1354,11 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
                   _selectedProduct = value;
                   // 保留原有行为：如果用户未先选供应商，则根据产品自动同步供应商
                   if (_selectedSupplier == null && value != null) {
-                    final product = widget.products.firstWhere((p) => p['name'] == value);
-                    if (product['supplierId'] != null && product['supplierId'] != 0) {
+                    final product = widget.products.firstWhere(
+                      (p) => p['name'] == value,
+                      orElse: () => <String, dynamic>{},
+                    );
+                    if (product.isNotEmpty && product['supplierId'] != null && product['supplierId'] != 0) {
                       _selectedSupplier = product['supplierId'].toString();
                     }
                   }
@@ -1486,8 +1577,31 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
                   // 额外健壮性校验：产品必须已分配供应商，且与所选供应商一致
                   final int? selectedSid = int.tryParse(_selectedSupplier ?? '');
                   if (_selectedProduct != null && selectedSid != null) {
-                    final Map<String, dynamic> p =
-                        widget.products.firstWhere((p) => p['name'] == _selectedProduct);
+                    final Map<String, dynamic> p = widget.products.firstWhere(
+                      (p) => p['name'] == _selectedProduct,
+                      orElse: () => <String, dynamic>{},
+                    );
+                    
+                    if (p.isEmpty) {
+                      showDialog(
+                        context: context,
+                        builder: (context) => AlertDialog(
+                          title: Text('保存失败'),
+                          content: Text('所选产品不存在，请刷新页面后重试。'),
+                          shape: RoundedRectangleBorder(
+                            borderRadius: BorderRadius.circular(12),
+                          ),
+                          actions: [
+                            TextButton(
+                              onPressed: () => Navigator.of(context).pop(),
+                              child: Text('确定'),
+                            ),
+                          ],
+                        ),
+                      );
+                      return;
+                    }
+                    
                     final dynamic raw = p['supplierId'];
                     final int? productSid =
                         raw is int ? raw : int.tryParse(raw?.toString() ?? '');

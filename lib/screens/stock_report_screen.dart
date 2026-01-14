@@ -85,8 +85,15 @@ class _StockReportScreenState extends State<StockReportScreen> {
     setState(() {
       _filteredProducts = _products.where((product) {
         // 供应商筛选
-        if (_selectedSupplierId != null && product['supplierId'] != _selectedSupplierId) {
-          return false;
+        if (_selectedSupplierId != null) {
+          if (_selectedSupplierId == -1) {
+            // "未分配供应商" - supplierId 为 null 或 0
+            if (product['supplierId'] != null && product['supplierId'] != 0) {
+              return false;
+            }
+          } else if (product['supplierId'] != _selectedSupplierId) {
+            return false;
+          }
         }
         
         // 搜索文本筛选
@@ -108,9 +115,11 @@ class _StockReportScreenState extends State<StockReportScreen> {
   
   // 显示供应商筛选对话框
   Future<void> _showSupplierFilterDialog() async {
-    // 创建选项列表：第一个是"所有供应商"，后面是所有供应商
+    // 创建选项列表：第一个是"所有供应商"，第二个是"未分配供应商"，后面是所有供应商
+    // 使用 -1 表示"未分配供应商"
     final List<MapEntry<int?, String>> supplierOptions = [
       MapEntry<int?, String>(null, '所有供应商'),
+      MapEntry<int?, String>(-1, '未分配供应商'),
       ..._suppliers.map((s) => MapEntry<int?, String>(s['id'] as int, s['name'] as String)),
     ];
     

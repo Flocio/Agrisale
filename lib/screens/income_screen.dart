@@ -110,8 +110,8 @@ class _IncomeScreenState extends State<IncomeScreen> {
       if (searchTerms.isNotEmpty) {
         hasFilters = true;
         result = result.where((income) {
-          final customerName = (income['customerName'] ?? '').toString().toLowerCase();
-          final employeeName = (income['employeeName'] ?? '').toString().toLowerCase();
+          final customerName = (income['customerName'] ?? '未指定').toString().toLowerCase();
+          final employeeName = (income['employeeName'] ?? '未指定').toString().toLowerCase();
           final date = income['incomeDate'].toString().toLowerCase();
           final note = (income['note'] ?? '').toString().toLowerCase();
           final amount = income['amount'].toString().toLowerCase();
@@ -1058,6 +1058,8 @@ class _IncomeDialogState extends State<IncomeDialog> {
   bool _isUpdatingDiscountFields = false;
   String? _lastEditedDiscountField; // 'discount' | 'original'
   bool _originalPriceError = false; // 优惠前价格错误状态
+  String? _missingCustomerInfo; // 记录已删除的客户信息
+  String? _missingEmployeeInfo; // 记录已删除的员工信息
   
   final List<String> _paymentMethods = ['现金', '微信转账', '银行卡'];
 
@@ -1066,8 +1068,37 @@ class _IncomeDialogState extends State<IncomeDialog> {
     super.initState();
     if (widget.income != null) {
       _selectedDate = DateTime.parse(widget.income!['incomeDate']);
-      _selectedCustomerId = widget.income!['customerId'];
-      _selectedEmployeeId = widget.income!['employeeId'];
+      
+      // 检查客户是否存在
+      final customerId = widget.income!['customerId'];
+      if (customerId != null && customerId != 0) {
+        final customerExists = widget.customers.any((c) => c['id'] == customerId);
+        if (customerExists) {
+          _selectedCustomerId = customerId;
+        } else {
+          _selectedCustomerId = null;
+          _missingCustomerInfo = '原客户(ID: $customerId)已被删除';
+        }
+      } else if (customerId == 0) {
+        _selectedCustomerId = null;
+        _missingCustomerInfo = '原客户已被删除';
+      }
+      
+      // 检查员工是否存在
+      final employeeId = widget.income!['employeeId'];
+      if (employeeId != null && employeeId != 0) {
+        final employeeExists = widget.employees.any((e) => e['id'] == employeeId);
+        if (employeeExists) {
+          _selectedEmployeeId = employeeId;
+        } else {
+          _selectedEmployeeId = null;
+          _missingEmployeeInfo = '原员工(ID: $employeeId)已被删除';
+        }
+      } else if (employeeId == 0) {
+        _selectedEmployeeId = null;
+        _missingEmployeeInfo = '原员工已被删除';
+      }
+      
       _selectedPaymentMethod = widget.income!['paymentMethod'];
       _amountController.text = widget.income!['amount'].toString();
       _discountController.text = (widget.income!['discount'] ?? 0.0).toString();
@@ -1216,6 +1247,30 @@ class _IncomeDialogState extends State<IncomeDialog> {
               ),
               SizedBox(height: 16),
               
+              // 客户已删除警告
+              if (_missingCustomerInfo != null)
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$_missingCustomerInfo，请重新选择客户',
+                          style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+              
               // 客户选择
               DropdownButtonFormField<int>(
                 value: _selectedCustomerId,
@@ -1239,6 +1294,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                 onChanged: (value) {
                   setState(() {
                     _selectedCustomerId = value;
+                    _missingCustomerInfo = null; // 用户选择后清除警告
                   });
                 },
               ),
@@ -1390,6 +1446,30 @@ class _IncomeDialogState extends State<IncomeDialog> {
               ),
               SizedBox(height: 16),
 
+              // 员工已删除警告
+              if (_missingEmployeeInfo != null)
+                Container(
+                  margin: EdgeInsets.only(bottom: 16),
+                  padding: EdgeInsets.all(12),
+                  decoration: BoxDecoration(
+                    color: Colors.orange[50],
+                    borderRadius: BorderRadius.circular(8),
+                    border: Border.all(color: Colors.orange[300]!),
+                  ),
+                  child: Row(
+                    children: [
+                      Icon(Icons.warning_amber_rounded, color: Colors.orange[700], size: 20),
+                      SizedBox(width: 8),
+                      Expanded(
+                        child: Text(
+                          '$_missingEmployeeInfo，请重新选择经办人',
+                          style: TextStyle(color: Colors.orange[800], fontSize: 13),
+                        ),
+                      ),
+                    ],
+                  ),
+                ),
+
               // 经办人 + 付款方式 同一排
               Row(
                 crossAxisAlignment: CrossAxisAlignment.start,
@@ -1423,6 +1503,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                       onChanged: (value) {
                         setState(() {
                           _selectedEmployeeId = value;
+                          _missingEmployeeInfo = null; // 用户选择后清除警告
                         });
                       },
                     ),
