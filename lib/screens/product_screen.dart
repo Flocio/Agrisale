@@ -197,6 +197,7 @@ class _ProductScreenState extends State<ProductScreen> {
                 
                 // 弹出对话框询问用户是否同步修改采购记录的供应商
                 // 返回值: true=同步修改, false=不修改, null=取消整个操作
+                final bool nameAlsoChanged = oldProductName != newProductName;
                 final syncChoice = await showDialog<bool?>(
                   context: context,
                   builder: (context) => AlertDialog(
@@ -208,9 +209,10 @@ class _ProductScreenState extends State<ProductScreen> {
                       ],
                     ),
                     content: Text(
-                      '检测到产品"$oldProductName"的供应商从"$oldSupplierName"变更为"$newSupplierName"。\n\n'
+                      '检测到产品"$oldProductName"${nameAlsoChanged ? '（将修改为"$newProductName"）' : ''}的供应商从"$oldSupplierName"变更为"$newSupplierName"。\n\n'
                       '该产品有 $purchaseCount 条采购记录关联到原供应商"$oldSupplierName"。\n\n'
-                      '是否将这些采购记录的供应商也同步修改为"$newSupplierName"？',
+                      '是否将这些采购记录的供应商也同步修改为"$newSupplierName"？'
+                      '${nameAlsoChanged ? '\n\n（注：产品名称修改将自动同步到所有相关记录）' : ''}',
                     ),
                     shape: RoundedRectangleBorder(
                       borderRadius: BorderRadius.circular(12),
@@ -282,15 +284,24 @@ class _ProductScreenState extends State<ProductScreen> {
                 where: 'productName = ? AND userId = ? AND supplierId = ?',
                 whereArgs: [productNameToUse, userId, oldSupplierId],
               );
-              
-              ScaffoldMessenger.of(context).hideCurrentSnackBar();
-              ScaffoldMessenger.of(context).showSnackBar(
-                SnackBar(
-                  content: Text('已同步修改采购记录的供应商信息'),
-                  behavior: SnackBarBehavior.floating,
-                ),
-              );
             }
+            
+            // 显示操作结果提示
+            ScaffoldMessenger.of(context).hideCurrentSnackBar();
+            String successMessage = '产品已更新';
+            if (oldProductName != newProductName && shouldSyncSupplier) {
+              successMessage = '产品已更新，名称和供应商已同步到相关记录';
+            } else if (oldProductName != newProductName) {
+              successMessage = '产品已更新，名称已同步到相关记录';
+            } else if (shouldSyncSupplier) {
+              successMessage = '产品已更新，供应商已同步到采购记录';
+            }
+            ScaffoldMessenger.of(context).showSnackBar(
+              SnackBar(
+                content: Text(successMessage),
+                behavior: SnackBarBehavior.floating,
+              ),
+            );
             
             _fetchProducts();
           }
