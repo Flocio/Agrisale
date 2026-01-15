@@ -24,7 +24,7 @@ class HelpScreen extends StatelessWidget {
               children: [
                 _buildParagraph('Agrisale 是一款专业的农业销售管理系统，帮助您轻松管理产品库存、客户关系、采购销售等业务。系统支持多用户使用，每个用户的数据相互独立，确保数据安全。'),
                 _buildParagraph('系统支持 iOS、Android、macOS、Windows 全平台使用，数据本地存储，保护您的隐私安全。'),
-                _buildParagraph('当前版本：v3.1.0 - 新增客户和供应商详细对账单界面，优化 UI 显示，修复导出功能问题。'),
+                _buildParagraph('当前版本：v3.2.0 - 库存统计筛选增强，重大鲁棒性修复，UI 改进。'),
               ],
             ),
             
@@ -210,7 +210,20 @@ class HelpScreen extends StatelessWidget {
               icon: Icons.update,
               color: Colors.indigo,
               children: [
-                _buildSubSection('v3.1.0（最新版本）', [
+                _buildSubSection('v3.2.0（最新版本）', [
+                  _buildParagraph('✨ 库存统计界面新增日期范围筛选功能，支持按日期范围查看产品交易记录'),
+                  _buildParagraph('✨ 库存统计界面新增"未分配供应商"筛选选项，方便查看未关联供应商的产品'),
+                  _buildParagraph('🛡️ 修复产品名称修改时相关记录未同步更新的重大数据一致性问题'),
+                  _buildParagraph('🛡️ 产品删除时自动删除所有关联记录，并显示详细警告信息'),
+                  _buildParagraph('🛡️ 产品供应商修改时，可选择是否同步更新历史采购记录的供应商信息'),
+                  _buildParagraph('🛡️ 修复客户/供应商/员工删除后，相关记录的 ID 未正确设置的问题'),
+                  _buildParagraph('🛡️ 修复编辑记录时，关联实体已删除导致的崩溃问题'),
+                  _buildParagraph('🛡️ 搜索功能增强，现在可以正确搜索"未知客户"、"未知供应商"、"未指定"等条目'),
+                  _buildParagraph('🎨 删除基础数据时显示详细的关联记录警告信息'),
+                  _buildParagraph('🎨 编辑记录时，关联实体已删除时显示友好的警告提示'),
+                  _buildParagraph('🎨 产品编辑时，根据实际修改情况显示更精确的操作结果提示'),
+                ]),
+                _buildSubSection('v3.1.0', [
                   _buildParagraph('✨ 新增客户详细对账单界面，支持查看客户完整的交易记录和应收余额'),
                   _buildParagraph('✨ 新增供应商详细对账单界面，支持查看供应商完整的交易记录和应付余额'),
                   _buildParagraph('🎨 UI 界面优化，提升用户体验和视觉效果'),
