@@ -244,6 +244,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final backupUsername = importData['exportInfo']['username'] ?? '未知';
         final backupVersion = importData['exportInfo']['version'] ?? '未知';
         final backupTime = importData['exportInfo']['exportTime'] ?? '未知';
+        final backupTimeDisplay = _formatImportTime(backupTime);
         final isFromDifferentUser = backupUsername != username;
         
         // 检查数据量
@@ -262,13 +263,15 @@ class _SettingsScreenState extends State<SettingsScreen> {
         final confirm = await showDialog<bool>(
           context: context,
           builder: (context) => AlertDialog(
-            title: Text('确认覆盖数据', style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.bold)),
+            title: Text('确认导入（覆盖）数据', style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.bold)),
             content: SingleChildScrollView(
-              child: Column(
+              child: ConstrainedBox(
+                constraints: BoxConstraints(minWidth: 420),
+                child: Column(
                 mainAxisSize: MainAxisSize.min,
                 crossAxisAlignment: CrossAxisAlignment.start,
                 children: [
-                  // 数据来源信息
+                  // 备份信息
                   Container(
                     padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -288,51 +291,73 @@ class _SettingsScreenState extends State<SettingsScreen> {
                         ),
                         Divider(height: 16),
                         _buildInfoRow('来源用户', backupUsername),
-                        _buildInfoRow('导出时间', backupTime.split('T')[0]),
+                        _buildInfoRow('导出时间', backupTimeDisplay),
                         _buildInfoRow('数据版本', backupVersion),
-                        Divider(height: 16),
-                        Text('数据统计:', style: TextStyle(fontSize: 13, fontWeight: FontWeight.bold)),
-                        SizedBox(height: 4),
-                        _buildDataCountRow('供应商', backupSupplierCount),
-                        _buildDataCountRow('客户', backupCustomerCount),
-                        _buildDataCountRow('产品', backupProductCount),
-                        _buildDataCountRow('员工', backupEmployeeCount),
-                        _buildDataCountRow('采购记录', backupPurchaseCount),
-                        _buildDataCountRow('销售记录', backupSaleCount),
-                        _buildDataCountRow('退货记录', backupReturnCount),
-                        _buildDataCountRow('进账记录', backupIncomeCount),
-                        _buildDataCountRow('汇款记录', backupRemittanceCount),
                       ],
                     ),
                   ),
-                  
-                  // 不同用户警告
-                  if (isFromDifferentUser) ...[
-                    SizedBox(height: 12),
-                    Container(
-                      padding: EdgeInsets.all(12),
-                      decoration: BoxDecoration(
-                        color: Colors.orange[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.orange[300]!, width: 2),
-                      ),
-                      child: Row(
-                        children: [
-                          Icon(Icons.warning_amber, color: Colors.orange[700], size: 20),
-                          SizedBox(width: 8),
-                          Expanded(
-                            child: Text(
-                              '警告：此备份来自不同用户（$backupUsername）！',
-                              style: TextStyle(fontSize: 13, color: Colors.orange[900], fontWeight: FontWeight.w500),
-                            ),
-                          ),
-                        ],
-                      ),
-                    ),
-                  ],
-                  
-                  // 覆盖警告
+
                   SizedBox(height: 12),
+
+                  // 数据统计（两行表格）
+                  Container(
+                    padding: EdgeInsets.all(12),
+                    decoration: BoxDecoration(
+                      color: Colors.grey[50],
+                      borderRadius: BorderRadius.circular(8),
+                      border: Border.all(color: Colors.grey[300]!),
+                    ),
+                    child: Column(
+                      crossAxisAlignment: CrossAxisAlignment.start,
+                      children: [
+                        Row(
+                          children: [
+                            Icon(Icons.table_chart, color: Colors.teal[700], size: 18),
+                            SizedBox(width: 8),
+                            Text('数据统计', style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15)),
+                          ],
+                        ),
+                        Divider(height: 16),
+                        SizedBox(
+                          width: 420,
+                          child: Table(
+                            border: TableBorder.all(color: Colors.grey[300]!, width: 0.8),
+                            columnWidths: const <int, TableColumnWidth>{
+                              0: FlexColumnWidth(),
+                              1: FlexColumnWidth(),
+                              2: FlexColumnWidth(),
+                              3: FlexColumnWidth(),
+                              4: FlexColumnWidth(),
+                            },
+                            children: [
+                              TableRow(
+                                children: [
+                                  _buildStatCell('产品', backupProductCount),
+                                  _buildStatCell('供应商', backupSupplierCount),
+                                  _buildStatCell('客户', backupCustomerCount),
+                                  _buildStatCell('员工', backupEmployeeCount),
+                                  _buildStatCell('', 0, isEmpty: true),
+                                ],
+                              ),
+                              TableRow(
+                                children: [
+                                  _buildStatCell('采购', backupPurchaseCount),
+                                  _buildStatCell('销售', backupSaleCount),
+                                  _buildStatCell('退货', backupReturnCount),
+                                  _buildStatCell('进账', backupIncomeCount),
+                                  _buildStatCell('汇款', backupRemittanceCount),
+                                ],
+                              ),
+                            ],
+                          ),
+                        ),
+                      ],
+                    ),
+                  ),
+
+                  SizedBox(height: 12),
+
+                  // 警告汇总
                   Container(
                     padding: EdgeInsets.all(12),
                     decoration: BoxDecoration(
@@ -349,40 +374,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
                             SizedBox(width: 8),
                             Expanded(
                               child: Text(
-                                '覆盖模式',
+                                '警告提示',
                                 style: TextStyle(fontWeight: FontWeight.bold, fontSize: 15, color: Colors.red[900]),
                               ),
                             ),
                           ],
                         ),
                         Divider(height: 12, color: Colors.red[300]),
+                        if (isFromDifferentUser)
+                          Text(
+                            '• 该备份来自不同用户（$backupUsername）',
+                            style: TextStyle(fontSize: 13, color: Colors.red[800]),
+                          ),
                         Text('• 将删除当前所有业务数据', style: TextStyle(fontSize: 13, color: Colors.red[800])),
                         Text('• 完全替换为备份中的数据', style: TextStyle(fontSize: 13, color: Colors.red[800])),
                         Text('• 此操作不可撤销！', style: TextStyle(fontSize: 13, color: Colors.red[900], fontWeight: FontWeight.bold)),
-                        SizedBox(height: 8),
-                        Container(
-                          padding: EdgeInsets.all(8),
-                          decoration: BoxDecoration(
-                            color: Colors.white,
-                            borderRadius: BorderRadius.circular(4),
-                          ),
-                          child: Row(
-                            children: [
-                              Icon(Icons.check_circle, color: Colors.green[600], size: 16),
-                              SizedBox(width: 8),
-                              Expanded(
-                                child: Text(
-                                  '您的个人设置（API Key等）不会改变',
-                                  style: TextStyle(fontSize: 12, color: Colors.green[800]),
-                                ),
-                              ),
-                            ],
-                          ),
-                        ),
                       ],
                     ),
                   ),
                 ],
+                ),
               ),
             ),
             actions: [
@@ -762,6 +773,39 @@ class _SettingsScreenState extends State<SettingsScreen> {
       padding: EdgeInsets.only(left: 8, top: 2),
       child: Text('• $label: $count 条', style: TextStyle(fontSize: 12)),
     );
+  }
+
+  // 辅助方法：构建统计表格单元格
+  Widget _buildStatCell(String label, int count, {bool isEmpty = false}) {
+    if (isEmpty) {
+      return SizedBox.shrink();
+    }
+    return Padding(
+      padding: EdgeInsets.symmetric(vertical: 6, horizontal: 4),
+      child: Column(
+        mainAxisSize: MainAxisSize.min,
+        children: [
+          Text(
+            label,
+            maxLines: 1,
+            overflow: TextOverflow.ellipsis,
+            style: TextStyle(fontSize: 12, fontWeight: FontWeight.w600),
+          ),
+          SizedBox(height: 2),
+          Text('$count', style: TextStyle(fontSize: 12, color: Colors.grey[700])),
+        ],
+      ),
+    );
+  }
+
+  String _formatImportTime(String value) {
+    if (value.isEmpty || value == '未知') {
+      return value;
+    }
+    if (value.contains('T')) {
+      return value.replaceFirst('T', ' ').replaceFirst(RegExp(r'\.\d+Z?$'), '');
+    }
+    return value;
   }
   
   // 退出登录
