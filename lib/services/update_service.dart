@@ -18,37 +18,26 @@ class UpdateService {
   static const String GITHUB_REPO = 'Flocio/Agrisale';
   static const String GITHUB_RELEASES_URL = 'https://github.com/$GITHUB_REPO/releases/latest';
   
-  // 下载源配置（按优先级排序）
+  // 下载取消令牌
+  static CancelToken? _cancelToken;
+  
+  // 下载源配置
   static List<DownloadSource> get DOWNLOAD_SOURCES => [
+    // Agrisale官网（Cloudflare Pages）
     DownloadSource(
-      name: 'GitHub 直连',
+      name: 'Agrisale官网',
+      apiUrl: 'https://agrisale.drflo.org/api/agrisale/latest.json',
+    ),
+    // 123网盘（国内直连，速度快）
+    DownloadSource(
+      name: '123网盘',
+      downloadUrlBase: 'https://1819203311.v.123pan.cn/1819203311/releases/agrisale',
+      requiresApkRename: true, // .apk 会被改为 .apk.bak，下载后需要重命名
+    ),
+    // GitHub 直连（备用）
+    DownloadSource(
+      name: 'GitHub',
       apiUrl: 'https://api.github.com/repos/$GITHUB_REPO/releases/latest',
-      proxyBase: null,
-    ),
-    DownloadSource(
-      name: 'GitHub 代理 1 (ghproxy.com)',
-      apiUrl: 'https://ghproxy.com/https://api.github.com/repos/$GITHUB_REPO/releases/latest',
-      proxyBase: 'https://ghproxy.com',
-    ),
-    DownloadSource(
-      name: 'GitHub 代理 2 (ghps.cc)',
-      apiUrl: 'https://ghps.cc/https://api.github.com/repos/$GITHUB_REPO/releases/latest',
-      proxyBase: 'https://ghps.cc',
-    ),
-    DownloadSource(
-      name: 'GitHub 代理 3 (mirror.ghproxy.com)',
-      apiUrl: 'https://mirror.ghproxy.com/https://api.github.com/repos/$GITHUB_REPO/releases/latest',
-      proxyBase: 'https://mirror.ghproxy.com',
-    ),
-    DownloadSource(
-      name: 'GitHub 代理 4 (ghp.ci)',
-      apiUrl: 'https://ghp.ci/https://api.github.com/repos/$GITHUB_REPO/releases/latest',
-      proxyBase: 'https://ghp.ci',
-    ),
-    DownloadSource(
-      name: 'GitHub 代理 5 (ghproxy.net)',
-      apiUrl: 'https://ghproxy.net/https://api.github.com/repos/$GITHUB_REPO/releases/latest',
-      proxyBase: 'https://ghproxy.net',
     ),
   ];
   
@@ -60,7 +49,7 @@ class UpdateService {
     // 按优先级尝试每个下载源
     for (var source in DOWNLOAD_SOURCES) {
       try {
-        final updateInfo = await _checkFromSource(source, currentVersion);
+        final updateInfo = await checkFromSource(source, currentVersion);
         
         if (updateInfo != null) {
           return updateInfo;
@@ -82,14 +71,19 @@ class UpdateService {
     );
   }
   
-  // 从指定源检查更新
-  static Future<UpdateInfo?> _checkFromSource(DownloadSource source, String currentVersion) async {
+  // 从指定源检查更新（公开方法，供UI选择源使用）
+  static Future<UpdateInfo?> checkFromSource(DownloadSource source, String currentVersion) async {
+    // 纯下载源不支持 API 检查
+    if (!source.isApiSource) {
+      throw Exception('此下载源不支持 API 检查，请使用其他方式获取版本信息');
+    }
+    
     try {
       final response = await http.get(
-        Uri.parse(source.apiUrl),
+        Uri.parse(source.apiUrl!),
         headers: {
           'Accept': 'application/json',
-          'User-Agent': 'AgriSale-Update-Checker/${AppVersion.versionForUserAgent}',
+          'User-Agent': 'Agrisale-Update-Checker/${AppVersion.versionForUserAgent}',
         },
       ).timeout(Duration(seconds: 20)); // 增加到20秒超时
       
@@ -121,7 +115,6 @@ class UpdateService {
           final downloadUrl = _getDownloadUrl(
             data['assets'] as List,
             Platform.operatingSystem,
-            source.proxyBase,
           );
           
           return UpdateInfo(
@@ -151,8 +144,8 @@ class UpdateService {
     }
   }
   
-  // 获取下载链接（支持代理）
-  static String? _getDownloadUrl(List assets, String platform, String? proxyBase) {
+  // 获取下载链接
+  static String? _getDownloadUrl(List assets, String platform) {
     if (platform == 'android') {
       // Android优先查找APK文件（可以直接安装），如果没有再查找AAB文件
       String? apkUrl;
@@ -171,49 +164,30 @@ class UpdateService {
       }
       
       // 优先返回APK，如果没有APK则返回AAB（虽然不能直接安装，但至少可以提示用户）
-      final selectedUrl = apkUrl ?? aabUrl;
-      if (selectedUrl != null) {
-        // 如果使用代理，添加代理前缀
-        if (proxyBase != null) {
-          final proxiedUrl = '$proxyBase/$selectedUrl';
-          return proxiedUrl;
-        } else {
-          return selectedUrl;
-        }
-      }
-      
-      return null;
+      return apkUrl ?? aabUrl;
     } else {
       // 其他平台的处理
       String fileName;
       
       if (platform == 'ios') {
-      fileName = 'Agrisale-ios-';
-    } else if (platform == 'macos') {
-      fileName = 'Agrisale-macos-';
-    } else if (platform == 'windows') {
-      fileName = 'Agrisale-windows-';
-    } else {
-      return null;
-    }
-    
-    for (var asset in assets) {
-      final assetName = asset['name'] as String;
-      if (assetName.startsWith(fileName)) {
-        // 清理URL中的空格和特殊字符
-        final originalUrl = (asset['browser_download_url'] as String).trim().replaceAll(' ', '');
-        
-        // 如果使用代理，添加代理前缀
-        if (proxyBase != null) {
-          final proxiedUrl = '$proxyBase/$originalUrl';
-          return proxiedUrl;
-        } else {
-          return originalUrl;
+        fileName = 'Agrisale-ios-';
+      } else if (platform == 'macos') {
+        fileName = 'Agrisale-macos-';
+      } else if (platform == 'windows') {
+        fileName = 'Agrisale-windows-';
+      } else {
+        return null;
+      }
+      
+      for (var asset in assets) {
+        final assetName = asset['name'] as String;
+        if (assetName.startsWith(fileName)) {
+          // 清理URL中的空格和特殊字符
+          return (asset['browser_download_url'] as String).trim().replaceAll(' ', '');
         }
       }
-    }
-    
-    return null;
+      
+      return null;
     }
   }
   
@@ -233,194 +207,149 @@ class UpdateService {
     return 0;
   }
   
-  // 下载并安装更新（支持多个源重试）
+  // 取消当前下载
+  static void cancelDownload() {
+    if (_cancelToken != null && !_cancelToken!.isCancelled) {
+      _cancelToken!.cancel('用户取消下载');
+    }
+  }
+  
+  // 下载并安装更新
   static Future<void> downloadAndInstall(
-    String originalDownloadUrl,
-    Function(int received, int total, String? downloadPath) onProgress,
-  ) async {
+    String downloadUrl,
+    Function(int received, int total, String? downloadPath, String? downloadSource) onProgress, {
+    bool requiresApkRename = false, // 是否需要处理 .apk.bak -> .apk 重命名
+  }) async {
+    // 创建新的取消令牌
+    _cancelToken = CancelToken();
+    
     // Android: 预先检查并请求安装权限
     if (Platform.isAndroid) {
       await _checkAndRequestInstallPermission();
     }
     
     // 预先删除旧的APK文件（避免因文件存在导致下载失败）
-    await _deleteOldApkFiles(originalDownloadUrl);
+    await _deleteOldApkFiles(downloadUrl);
     
-    // 构建多个下载源（原始链接 + 代理链接）
-    final downloadUrls = _buildDownloadUrls(originalDownloadUrl);
+    // 清理URL中的空格和特殊字符
+    final cleanDownloadUrl = downloadUrl.trim().replaceAll(' ', '');
     
-    Exception? lastError;
+    // 配置Dio
+    final dio = Dio();
     
-    // 尝试从每个源下载
-    for (var downloadUrl in downloadUrls) {
+    // 创建自定义HttpClient，禁用SSL证书验证（仅用于下载更新文件）
+    if (Platform.isAndroid || Platform.isIOS || Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
+      final httpClient = HttpClient()
+        ..badCertificateCallback = (X509Certificate cert, String host, int port) {
+          return true;
+        };
+      
+      final adapter = IOHttpClientAdapter();
+      adapter.createHttpClient = () {
+        return httpClient;
+      };
+      dio.httpClientAdapter = adapter;
+    }
+    
+    // 使用外部存储目录，确保安装程序可以访问
+    Directory downloadDir;
+    if (Platform.isAndroid) {
+      // Android: 尝试使用外部存储的Download目录
       try {
-        
-        // 配置Dio以允许不验证SSL证书（仅用于下载场景）
-        final dio = Dio();
-        
-        // 创建自定义HttpClient，禁用SSL证书验证
-        // 注意：这仅用于从GitHub下载更新文件，即使通过代理也是安全的
-        if (Platform.isAndroid || Platform.isIOS || Platform.isWindows || Platform.isMacOS || Platform.isLinux) {
-          final httpClient = HttpClient()
-            ..badCertificateCallback = (X509Certificate cert, String host, int port) {
-              // 允许所有证书（仅用于下载更新文件）
-              return true;
-            };
-          
-          // 配置Dio使用自定义HttpClient（dio 5.x方式）
-          final adapter = IOHttpClientAdapter();
-          adapter.createHttpClient = () {
-            return httpClient;
-          };
-          dio.httpClientAdapter = adapter;
-        }
-        
-        // 使用外部存储目录，确保安装程序可以访问
-        Directory downloadDir;
-        if (Platform.isAndroid) {
-          // Android: 尝试使用外部存储的Download目录
-          try {
-            downloadDir = Directory('/storage/emulated/0/Download');
-            if (!await downloadDir.exists()) {
-              // 如果外部存储不可用，使用应用缓存目录
-              downloadDir = await getTemporaryDirectory();
-            }
-          } catch (e) {
-            // 如果外部存储访问失败，使用应用缓存目录
-            downloadDir = await getTemporaryDirectory();
-          }
-        } else {
+        downloadDir = Directory('/storage/emulated/0/Download');
+        if (!await downloadDir.exists()) {
           downloadDir = await getTemporaryDirectory();
         }
-        
-        // 清理URL并提取文件名
-        final cleanOriginalUrl = originalDownloadUrl.trim().replaceAll(' ', '');
-        final fileName = cleanOriginalUrl.split('/').last;
-        var filePath = '${downloadDir.path}/$fileName';
-        
-        
-        // 检查是否是AAB文件（Android App Bundle不能直接安装）
-        if (Platform.isAndroid && fileName.toLowerCase().endsWith('.aab')) {
-          throw Exception('下载的文件是AAB格式（Android App Bundle），无法直接安装。\n\n'
-              'AAB文件需要通过Google Play商店安装。\n'
-              '请从GitHub Releases下载APK文件进行安装。');
-        }
-        
-        // 检查并删除旧文件，如果无法删除则使用新文件名
-        final oldFile = File(filePath);
-        if (await oldFile.exists()) {
-          try {
-            await oldFile.delete();
-          } catch (e) {
-            // 使用带时间戳的文件名
-            final timestamp = DateTime.now().millisecondsSinceEpoch;
-            final ext = fileName.contains('.') ? '.${fileName.split('.').last}' : '';
-            final baseName = fileName.contains('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
-            filePath = '${downloadDir.path}/${baseName}_$timestamp$ext';
-          }
-        }
-        
-        // 清理URL中的空格和特殊字符
-        final cleanDownloadUrl = (downloadUrl['url'] as String).trim().replaceAll(' ', '');
-        
-        // 下载文件（30秒超时）
-        await dio.download(
-          cleanDownloadUrl,
-          filePath,
-          options: Options(
-            receiveTimeout: Duration(seconds: 30),
-            followRedirects: true,
-            validateStatus: (status) => status! < 500, // 允许重定向和客户端错误
-          ),
-          onReceiveProgress: (received, total) {
-            onProgress(received, total, filePath);
-          },
-        ).timeout(Duration(minutes: 10)); // 总超时10分钟
-        
-        
-        // 验证下载的文件
-        try {
-          if (Platform.isAndroid) {
-            await _validateApkFile(filePath);
-          } else if (Platform.isWindows) {
-            await _validateZipFile(filePath);
-          } else if (Platform.isMacOS) {
-            await _validateZipFile(filePath);
-          }
-        } catch (validationError) {
-          // 验证失败，删除无效文件
-          try {
-            final file = File(filePath);
-            if (await file.exists()) {
-              await file.delete();
-            }
-          } catch (deleteError) {
-          }
-          // 重新抛出验证错误，让外层catch处理
-          throw validationError;
-        }
-        
-        // 根据平台安装
-        if (Platform.isAndroid) {
-          // 记录下载的APK文件名，用于验证
-          
-          await _installAndroid(filePath);
-          
-          // 安装启动后，等待一小段时间让安装完成
-          await Future.delayed(Duration(seconds: 3));
-          
-          // 验证安装（注意：当前运行的进程还是旧版本，所以这里只是检查文件）
-          final installedFile = File(filePath);
-          if (await installedFile.exists()) {
-          }
-        } else if (Platform.isIOS) {
-          await _installIOS();
-        } else if (Platform.isWindows) {
-          await _installWindows(filePath);
-        } else if (Platform.isMacOS) {
-          await _installMacOS(filePath);
-        }
-        
-        // 下载成功，返回
-        return;
       } catch (e) {
-        lastError = e is Exception ? e : Exception(e.toString());
-        continue; // 尝试下一个源
+        downloadDir = await getTemporaryDirectory();
+      }
+    } else {
+      downloadDir = await getTemporaryDirectory();
+    }
+    
+    // 提取文件名
+    final fileName = cleanDownloadUrl.split('/').last;
+    var filePath = '${downloadDir.path}/$fileName';
+    
+    // 检查是否是AAB文件（Android App Bundle不能直接安装）
+    if (Platform.isAndroid && fileName.toLowerCase().endsWith('.aab')) {
+      throw Exception('下载的文件是AAB格式（Android App Bundle），无法直接安装。\n\n'
+          'AAB文件需要通过Google Play商店安装。\n'
+          '请从GitHub Releases下载APK文件进行安装。');
+    }
+    
+    // 检查并删除旧文件，如果无法删除则使用新文件名
+    final oldFile = File(filePath);
+    if (await oldFile.exists()) {
+      try {
+        await oldFile.delete();
+      } catch (e) {
+        // 使用带时间戳的文件名
+        final timestamp = DateTime.now().millisecondsSinceEpoch;
+        final ext = fileName.contains('.') ? '.${fileName.split('.').last}' : '';
+        final baseName = fileName.contains('.') ? fileName.substring(0, fileName.lastIndexOf('.')) : fileName;
+        filePath = '${downloadDir.path}/${baseName}_$timestamp$ext';
       }
     }
     
-    // 所有源都失败
-    throw lastError ?? Exception('所有下载源都失败');
-  }
-  
-  // 构建多个下载源 URL
-  static List<Map<String, String>> _buildDownloadUrls(String originalUrl) {
-    final urls = <Map<String, String>>[];
+    // 下载文件
+    await dio.download(
+      cleanDownloadUrl,
+      filePath,
+      cancelToken: _cancelToken,
+      options: Options(
+        receiveTimeout: Duration(seconds: 30),
+        followRedirects: true,
+        validateStatus: (status) => status! < 500,
+      ),
+      onReceiveProgress: (received, total) {
+        onProgress(received, total, filePath, cleanDownloadUrl);
+      },
+    ).timeout(Duration(minutes: 10));
     
-    // 清理原始URL中的空格和特殊字符
-    final cleanOriginalUrl = originalUrl.trim().replaceAll(' ', '');
-    
-    // 1. 原始链接（直连）
-    urls.add({
-      'name': 'GitHub 直连',
-      'url': cleanOriginalUrl,
-    });
-    
-    // 2-4. 代理链接
-    final proxies = [
-      'https://ghproxy.com',
-      'https://ghps.cc',
-      'https://mirror.ghproxy.com',
-    ];
-    
-    for (var proxy in proxies) {
-      urls.add({
-        'name': '代理服务',
-        'url': '$proxy/$cleanOriginalUrl',
-      });
+    // 处理 .apk.bak -> .apk 重命名（针对某些网盘会自动改后缀的情况）
+    if (requiresApkRename && filePath.toLowerCase().endsWith('.apk.bak')) {
+      final newFilePath = filePath.substring(0, filePath.length - 4); // 去掉 .bak
+      try {
+        final file = File(filePath);
+        await file.rename(newFilePath);
+        filePath = newFilePath;
+      } catch (e) {
+        throw Exception('重命名文件失败: $e\n\n请手动将下载的文件后缀从 .apk.bak 改为 .apk');
+      }
     }
     
-    return urls;
+    // 验证下载的文件
+    try {
+      if (Platform.isAndroid) {
+        await _validateApkFile(filePath);
+      } else if (Platform.isWindows) {
+        await _validateZipFile(filePath);
+      } else if (Platform.isMacOS) {
+        await _validateZipFile(filePath);
+      }
+    } catch (validationError) {
+      // 验证失败，删除无效文件
+      try {
+        final file = File(filePath);
+        if (await file.exists()) {
+          await file.delete();
+        }
+      } catch (deleteError) {
+      }
+      rethrow;
+    }
+    
+    // 根据平台安装
+    if (Platform.isAndroid) {
+      await _installAndroid(filePath);
+    } else if (Platform.isIOS) {
+      await _installIOS();
+    } else if (Platform.isWindows) {
+      await _installWindows(filePath);
+    } else if (Platform.isMacOS) {
+      await _installMacOS(filePath);
+    }
   }
   
   // 检查并请求安装未知应用权限（Android专用）
@@ -775,13 +704,41 @@ class UpdateInfo {
 // 下载源配置
 class DownloadSource {
   final String name;
-  final String apiUrl;
-  final String? proxyBase; // 代理服务地址（用于下载链接）
+  final String? apiUrl; // API URL，如果为 null 则是纯下载源
+  final String? downloadUrlBase; // 下载 URL 基础路径（用于纯下载源）
+  final bool requiresApkRename; // 是否需要处理 .apk.bak -> .apk 重命名
   
   const DownloadSource({
     required this.name,
-    required this.apiUrl,
-    this.proxyBase,
+    this.apiUrl,
+    this.downloadUrlBase,
+    this.requiresApkRename = false,
   });
+  
+  /// 是否是 API 源（需要通过 API 检查更新）
+  bool get isApiSource => apiUrl != null;
+  
+  /// 是否是纯下载源（只提供下载，不提供 API）
+  bool get isDownloadOnlySource => apiUrl == null && downloadUrlBase != null;
+  
+  /// 根据版本号和平台构建下载 URL
+  /// 注意：URL 始终使用原始文件名（如 .apk），即使某些网盘会在下载时自动改后缀
+  String? buildDownloadUrl(String version, String platform) {
+    if (downloadUrlBase == null) return null;
+    
+    String fileName;
+    if (platform == 'android') {
+      fileName = 'Agrisale-android-v$version.apk';
+    } else if (platform == 'ios') {
+      fileName = 'Agrisale-ios-v$version.ipa';
+    } else if (platform == 'macos') {
+      fileName = 'Agrisale-macos-v$version.dmg';
+    } else if (platform == 'windows') {
+      fileName = 'Agrisale-windows-v$version-installer.exe';
+    } else {
+      return null;
+    }
+    
+    return '$downloadUrlBase/v$version/$fileName';
+  }
 }
-

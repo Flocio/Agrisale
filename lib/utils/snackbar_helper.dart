@@ -60,5 +60,17 @@ extension SnackBarExtension on BuildContext {
       ),
     );
   }
+
+  /// 显示警告提示（橙色背景）
+  void showWarningSnackBar(String message, {Duration? duration}) {
+    ScaffoldMessenger.of(this).hideCurrentSnackBar();
+    ScaffoldMessenger.of(this).showSnackBar(
+      SnackBar(
+        content: Text(message),
+        backgroundColor: Colors.orange,
+        duration: duration ?? Duration(seconds: 3),
+      ),
+    );
+  }
 }
 
