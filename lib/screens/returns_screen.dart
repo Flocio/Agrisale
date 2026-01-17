@@ -435,11 +435,19 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
       if (username != null) {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId != null) {
+          // Rollback stock - 删除退货记录时减少库存（取消退货效果）
+          final quantity = returnItem['quantity'] as double;
+          final newStock = (product['stock'] as double) - quantity;
+          
+          // 检查删除后库存是否会变负
+          if (newStock < 0) {
+            _showErrorDialog('无法删除！删除此退货记录后库存将变为负数 (${_formatNumber(newStock)} ${product['unit']})。\n\n请先调整其他相关记录。');
+            return;
+          }
+          
           // 只删除当前用户的退货记录
           await db.delete('returns', where: 'id = ? AND userId = ?', whereArgs: [returnItem['id'], userId]);
 
-          // Rollback stock - 确保只更新当前用户的产品
-          final newStock = product['stock'] - returnItem['quantity'];
           await db.update(
             'products',
             {'stock': newStock},

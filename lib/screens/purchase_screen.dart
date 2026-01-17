@@ -454,13 +454,20 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
       if (username != null) {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId != null) {
-          // 只删除当前用户的采购记录
-          await db.delete('purchases', where: 'id = ? AND userId = ?', whereArgs: [purchase['id'], userId]);
-
           // Rollback stock - 删除采购记录时反向操作库存
           // 如果原记录是正数采购，删除时减少库存；如果是负数退货，删除时增加库存
           final quantity = purchase['quantity'] as double;
-          final newStock = product['stock'] - quantity;
+          final newStock = (product['stock'] as double) - quantity;
+          
+          // 检查删除后库存是否会变负
+          if (newStock < 0) {
+            _showErrorDialog('无法删除！删除此采购记录后库存将变为负数 (${_formatNumber(newStock)} ${product['unit']})。\n\n请先调整其他相关记录。');
+            return;
+          }
+          
+          // 只删除当前用户的采购记录
+          await db.delete('purchases', where: 'id = ? AND userId = ?', whereArgs: [purchase['id'], userId]);
+
           await db.update(
             'products',
             {'stock': newStock},
