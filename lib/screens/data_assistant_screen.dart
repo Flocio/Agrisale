@@ -280,7 +280,7 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
         {
           'name': 'products',
           'columns': ['id', 'userId', 'name', 'description', 'stock', 'unit', 'supplierId'],
-          'description': '产品表，存储农资产品信息。stock为REAL类型支持小数。单位可以是斤、公斤或袋。supplierId为外键关联到suppliers表，表示产品的供应商。每个用户有独立的产品数据'
+          'description': '产品表，存储农资产品信息。stock为REAL类型支持小数。单位可以是斤、公斤、袋、件或瓶。supplierId为外键关联到suppliers表，表示产品的供应商。每个用户有独立的产品数据'
         },
         {
           'name': 'suppliers',

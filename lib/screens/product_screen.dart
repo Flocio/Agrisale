@@ -971,7 +971,7 @@ class _ProductDialogState extends State<ProductDialog> {
                   _selectedUnit = newValue!;
                 });
               },
-              items: <String>['斤', '公斤', '袋']
+              items: <String>['斤', '公斤', '袋', '件', '瓶']
                   .map<DropdownMenuItem<String>>((String value) {
                 return DropdownMenuItem<String>(
                   value: value,

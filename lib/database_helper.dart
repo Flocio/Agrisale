@@ -44,7 +44,7 @@ class DatabaseHelper {
     
     final db = await openDatabase(
       path,
-      version: 12, // 更新版本号 - 添加自动备份功能字段
+      version: 13, // 更新版本号 - 添加新单位（件、瓶）
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -70,7 +70,7 @@ class DatabaseHelper {
       name TEXT NOT NULL,
       description TEXT,
       stock REAL,
-      unit TEXT NOT NULL CHECK(unit IN ('斤', '公斤', '袋')),
+      unit TEXT NOT NULL CHECK(unit IN ('斤', '公斤', '袋', '件', '瓶')),
       supplierId INTEGER,
       FOREIGN KEY (userId) REFERENCES users (id),
       FOREIGN KEY (supplierId) REFERENCES suppliers (id),
@@ -272,6 +272,42 @@ class DatabaseHelper {
       } else {
         print('✓ products表已包含supplierId列，跳过');
       }
+    }
+    
+    if (oldVersion < 13) {
+      // 从版本12或更早升级到13：更新products表的unit CHECK约束，添加'件'和'瓶'
+      print('升级到版本13: 更新products表的单位约束，添加"件"和"瓶"');
+      
+      // SQLite不支持直接修改CHECK约束，需要重建表
+      // 1. 创建新表（带新的CHECK约束）
+      await db.execute('''
+        CREATE TABLE products_new (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          name TEXT NOT NULL,
+          description TEXT,
+          stock REAL,
+          unit TEXT NOT NULL CHECK(unit IN ('斤', '公斤', '袋', '件', '瓶')),
+          supplierId INTEGER,
+          FOREIGN KEY (userId) REFERENCES users (id),
+          FOREIGN KEY (supplierId) REFERENCES suppliers (id),
+          UNIQUE(userId, name)
+        )
+      ''');
+      
+      // 2. 复制数据到新表
+      await db.execute('''
+        INSERT INTO products_new (id, userId, name, description, stock, unit, supplierId)
+        SELECT id, userId, name, description, stock, unit, supplierId FROM products
+      ''');
+      
+      // 3. 删除旧表
+      await db.execute('DROP TABLE products');
+      
+      // 4. 重命名新表
+      await db.execute('ALTER TABLE products_new RENAME TO products');
+      
+      print('✓ 已更新products表的单位约束，现支持：斤、公斤、袋、件、瓶');
     }
     
     // 无论版本如何，都检查并添加缺失的自动备份字段（修复可能的不完整升级）
