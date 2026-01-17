@@ -24,7 +24,7 @@ class HelpScreen extends StatelessWidget {
               children: [
                 _buildParagraph('Agrisale 是一款专业的农业销售管理系统，帮助您轻松管理产品库存、客户关系、采购销售等业务。系统支持多用户使用，每个用户的数据相互独立，确保数据安全。'),
                 _buildParagraph('系统支持 iOS、Android、macOS、Windows 全平台使用，数据本地存储，保护您的隐私安全。'),
-                _buildParagraph('当前版本：v3.2.0 - 库存统计筛选增强，重大鲁棒性修复，UI 改进。'),
+                _buildParagraph('当前版本：v3.3.0 - UI升级更新，产品单位扩展，库存负数防护，权限提示优化，自动更新功能。'),
               ],
             ),
             
@@ -36,10 +36,11 @@ class HelpScreen extends StatelessWidget {
               color: Colors.green,
               children: [
                 _buildSubSection('产品管理', [
-                  _buildParagraph('• 添加产品：设置产品名称、描述、单位、供应商等信息'),
+                  _buildParagraph('• 添加产品：设置产品名称、描述、单位（支持：斤、公斤、袋、件、瓶）、供应商等信息'),
                   _buildParagraph('• 库存管理：系统会自动根据采购、销售、退货记录更新库存'),
                   _buildParagraph('• 产品编辑：可以随时修改产品信息，包括库存数量'),
                   _buildParagraph('• 产品筛选：支持按供应商筛选产品，方便快速查找'),
+                  _buildParagraph('• 库存保护：系统会自动防止库存变为负数，确保数据准确性'),
                 ]),
                 _buildSubSection('客户管理', [
                   _buildParagraph('• 添加客户：记录客户姓名、联系方式等信息'),
@@ -70,14 +71,14 @@ class HelpScreen extends StatelessWidget {
                   _buildParagraph('• 采购退货：数量输入负数即可记录采购退货（退货给供应商）'),
                   _buildParagraph('• 供应商筛选：可以先选择供应商，再选择该供应商的产品，提高录入效率'),
                   _buildParagraph('• 自动计算：系统自动计算总进价（进价 × 数量）'),
-                  _buildParagraph('• 库存更新：采购后自动增加库存，采购退货自动减少库存'),
+                  _buildParagraph('• 库存更新：采购后自动增加库存，采购退货自动减少库存，系统会自动防止库存变为负数'),
                 ]),
                 _buildSubSection('销售管理', [
                   _buildParagraph('• 添加销售：选择产品、客户，输入数量、单价、销售日期'),
                   _buildParagraph('• 供应商筛选：可按供应商筛选产品，方便快速选择'),
-                  _buildParagraph('• 库存检查：销售时会检查库存是否充足，库存不足会提示'),
+                  _buildParagraph('• 库存检查：销售时会检查库存是否充足，库存不足会提示，防止库存为负数'),
                   _buildParagraph('• 自动计算：系统自动计算总售价（单价 × 数量）'),
-                  _buildParagraph('• 库存更新：销售后自动减少库存'),
+                  _buildParagraph('• 库存更新：销售后自动减少库存，系统会自动防止库存变为负数'),
                 ]),
                 _buildSubSection('退货管理', [
                   _buildParagraph('• 添加退货：选择产品、客户，输入数量、单价、退货日期'),
@@ -169,6 +170,12 @@ class HelpScreen extends StatelessWidget {
                   _buildParagraph('• 自动备份：设置自动备份计划，定期备份数据'),
                   _buildParagraph('• 数据恢复：从备份文件恢复数据，保护数据安全'),
                 ]),
+                _buildSubSection('系统更新', [
+                  _buildParagraph('• 检查更新：在关于界面可以检查是否有新版本可用'),
+                  _buildParagraph('• 自动更新：Android 平台支持自动下载和安装更新'),
+                  _buildParagraph('• 多下载源：支持从官网、123网盘、GitHub 等多个源下载更新'),
+                  _buildParagraph('• 更新说明：更新时会显示详细的更新内容和版本说明'),
+                ]),
               ],
             ),
             
@@ -196,10 +203,11 @@ class HelpScreen extends StatelessWidget {
               color: Colors.red,
               children: [
                 _buildParagraph('• 数据安全：系统数据存储在本地，请定期备份，避免数据丢失'),
-                _buildParagraph('• 库存管理：销售时会检查库存，库存不足无法完成销售'),
+                _buildParagraph('• 库存管理：系统会自动检查库存，防止库存变为负数，确保数据准确性'),
                 _buildParagraph('• 数据验证：所有输入都会进行验证，确保数据准确性和完整性'),
                 _buildParagraph('• 多用户：不同用户的数据相互独立，登录后只能看到自己的数据'),
                 _buildParagraph('• 产品关联：删除供应商前，请先修改或删除关联的产品'),
+                _buildParagraph('• 自动更新：系统支持自动检查更新，可在关于界面检查新版本'),
               ],
             ),
             
@@ -210,7 +218,15 @@ class HelpScreen extends StatelessWidget {
               icon: Icons.update,
               color: Colors.indigo,
               children: [
-                _buildSubSection('v3.2.0（最新版本）', [
+                _buildSubSection('v3.3.0（最新版本）', [
+                  _buildParagraph('🎨 UI 升级更新，优化整体界面设计和用户体验'),
+                  _buildParagraph('✨ 产品单位扩展：新增"瓶"和"件"作为产品单位选项'),
+                  _buildParagraph('🛡️ 库存负数防护：修复添加/更新/删除采购/销售/退货记录时库存可能为负数的问题'),
+                  _buildParagraph('🎨 权限提示优化：更新权限检查后未通过的UI提示（弹窗）'),
+                  _buildParagraph('🎨 导入数据确认窗口UI更新，优化数据导入流程'),
+                  _buildParagraph('🎨 关于界面更新，软件检查并自动更新功能更新'),
+                ]),
+                _buildSubSection('v3.2.0', [
                   _buildParagraph('✨ 库存统计界面新增日期范围筛选功能，支持按日期范围查看产品交易记录'),
                   _buildParagraph('✨ 库存统计界面新增"未分配供应商"筛选选项，方便查看未关联供应商的产品'),
                   _buildParagraph('🛡️ 修复产品名称修改时相关记录未同步更新的重大数据一致性问题'),
