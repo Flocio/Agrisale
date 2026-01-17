@@ -211,7 +211,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
           if (quantity < 0) {
             final currentStock = product['stock'] as double;
             if (currentStock < quantity.abs()) {
-              _showErrorDialog('库存不足！当前库存: ${_formatNumber(currentStock)} ${product['unit']}，无法退货 ${_formatNumber(quantity.abs())} ${product['unit']}');
+              _showErrorDialog('库存不足！产品"${product['name']}"当前库存为 ${_formatNumber(currentStock)} ${product['unit']}，无法退货 ${_formatNumber(quantity.abs())} ${product['unit']}。');
               return;
             }
           }
@@ -270,7 +270,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             if (oldQuantity > 0) {
               final oldProductStock = oldProduct['stock'] as double;
               if (oldProductStock < oldQuantity) {
-                _showErrorDialog('无法更改产品！原产品 ${oldProduct['name']} 当前库存: ${_formatNumber(oldProductStock)} ${oldProduct['unit']}，小于原采购数量 ${_formatNumber(oldQuantity)} ${oldProduct['unit']}');
+                _showErrorDialog('无法更改产品！产品"${oldProduct['name']}"当前库存为 ${_formatNumber(oldProductStock)} ${oldProduct['unit']}，小于原采购数量 ${_formatNumber(oldQuantity)} ${oldProduct['unit']}。');
                 return;
               }
             }
@@ -279,7 +279,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             if (newQuantity < 0) {
               final newProductStock = newProduct['stock'] as double;
               if (newProductStock < newQuantity.abs()) {
-                _showErrorDialog('库存不足！${newProduct['name']} 当前库存: ${_formatNumber(newProductStock)} ${newProduct['unit']}，无法退货 ${_formatNumber(newQuantity.abs())} ${newProduct['unit']}');
+                _showErrorDialog('库存不足！产品"${newProduct['name']}"当前库存为 ${_formatNumber(newProductStock)} ${newProduct['unit']}，无法退货 ${_formatNumber(newQuantity.abs())} ${newProduct['unit']}。');
                 return;
               }
             }
@@ -310,7 +310,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             if (quantityDiff < 0) {
               final currentStock = product['stock'] as double;
               if (currentStock < quantityDiff.abs()) {
-                _showErrorDialog('库存不足！当前库存: ${_formatNumber(currentStock)} ${product['unit']}，无法减少 ${_formatNumber(quantityDiff.abs())} ${product['unit']}');
+                _showErrorDialog('库存不足！产品"${product['name']}"当前库存为 ${_formatNumber(currentStock)} ${product['unit']}，无法减少 ${_formatNumber(quantityDiff.abs())} ${product['unit']}。');
                 return;
               }
             }
@@ -461,7 +461,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
           
           // 检查删除后库存是否会变负
           if (newStock < 0) {
-            _showErrorDialog('无法删除！删除此采购记录后库存将变为负数 (${_formatNumber(newStock)} ${product['unit']})。\n\n请先调整其他相关记录。');
+            _showErrorDialog('无法删除！产品"${product['name']}"当前库存为 ${_formatNumber(product['stock'] as double)} ${product['unit']}，删除此采购记录后库存将变为负数。\n\n请先调整其他相关记录。');
             return;
           }
           
@@ -485,7 +485,13 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('错误'),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('操作失败', style: TextStyle(color: Colors.red[700])),
+          ],
+        ),
         content: Text(message),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),

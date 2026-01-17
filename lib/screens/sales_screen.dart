@@ -203,7 +203,7 @@ class _SalesScreenState extends State<SalesScreen> {
       // Check if there's enough stock
       final product = _products.firstWhere((p) => p['name'] == result['productName']);
       if (product['stock'] < result['quantity']) {
-        _showErrorDialog('库存不足，当前库存: ${product['stock']} ${product['unit']}');
+        _showErrorDialog('库存不足！产品"${product['name']}"当前库存为 ${_formatNumber(product['stock'] as double)} ${product['unit']}，无法销售 ${_formatNumber(result['quantity'] as double)} ${product['unit']}。');
         return;
       }
 
@@ -268,7 +268,7 @@ class _SalesScreenState extends State<SalesScreen> {
             // 检查新产品库存是否足够
             final newProductStock = newProduct['stock'] as double;
             if (newProductStock < newQuantity) {
-              _showErrorDialog('库存不足！${newProduct['name']} 当前库存: ${_formatNumber(newProductStock)} ${newProduct['unit']}，无法销售 ${_formatNumber(newQuantity)} ${newProduct['unit']}');
+              _showErrorDialog('库存不足！产品"${newProduct['name']}"当前库存为 ${_formatNumber(newProductStock)} ${newProduct['unit']}，无法销售 ${_formatNumber(newQuantity)} ${newProduct['unit']}。');
               return;
             }
             
@@ -298,7 +298,7 @@ class _SalesScreenState extends State<SalesScreen> {
             if (quantityDiff > 0) {
               final currentStock = product['stock'] as double;
               if (currentStock < quantityDiff) {
-                _showErrorDialog('库存不足！当前库存: ${_formatNumber(currentStock)} ${product['unit']}，无法增加 ${_formatNumber(quantityDiff)} ${product['unit']}');
+                _showErrorDialog('库存不足！产品"${product['name']}"当前库存为 ${_formatNumber(currentStock)} ${product['unit']}，无法增加销售 ${_formatNumber(quantityDiff)} ${product['unit']}。');
                 return;
               }
             }
@@ -464,7 +464,13 @@ class _SalesScreenState extends State<SalesScreen> {
     showDialog(
       context: context,
       builder: (context) => AlertDialog(
-        title: Text('错误'),
+        title: Row(
+          children: [
+            Icon(Icons.error_outline, color: Colors.red),
+            SizedBox(width: 8),
+            Text('操作失败', style: TextStyle(color: Colors.red[700])),
+          ],
+        ),
         content: Text(message),
         shape: RoundedRectangleBorder(
           borderRadius: BorderRadius.circular(12),
