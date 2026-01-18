@@ -629,72 +629,86 @@ class _DownloadSourceSelectionDialogState extends State<_DownloadSourceSelection
     final packageInfo = await PackageInfo.fromPlatform();
     final sources = UpdateService.DOWNLOAD_SOURCES;
     
+    // 第一步：并行检测所有 API 源
+    // 创建检测任务列表（只针对 API 源）
+    final apiSourceIndices = <int>[];
+    final apiCheckFutures = <Future<_ApiCheckResult>>[];
+    
+    for (int i = 0; i < sources.length; i++) {
+      final source = sources[i];
+      if (source.isDownloadOnlySource) continue;
+      
+      apiSourceIndices.add(i);
+      apiCheckFutures.add(_checkApiSource(source, packageInfo.version, i));
+    }
+    
+    // 并行执行所有 API 源检测
+    final apiResults = await Future.wait(apiCheckFutures, eagerError: false);
+    
+    // 收集结果，找出最高版本
+    String? highestVersion;
+    String? highestVersionReleaseNotes;
+    String? highestVersionGithubUrl;
+    
+    for (var result in apiResults) {
+      // 更新 UI 状态
+      if (mounted) {
+        setState(() {
+          _sourceStatus[result.index] = result.checkResult;
+        });
+      }
+      
+      // 记录最高版本
+      if (result.checkResult.isAvailable && result.checkResult.updateInfo != null) {
+        final versionStr = result.checkResult.updateInfo!.version.replaceAll('v', '');
+        if (highestVersion == null || 
+            _compareVersions(versionStr, highestVersion!) > 0) {
+          highestVersion = versionStr;
+          highestVersionReleaseNotes = result.checkResult.updateInfo!.releaseNotes;
+          highestVersionGithubUrl = result.checkResult.updateInfo!.githubReleasesUrl;
+        }
+      }
+    }
+    
+    // 第二步：为纯下载源构建 URL（使用最高版本）
+    final versionForDownloadOnly = highestVersion ?? 
+        widget.updateInfo.version.replaceAll('v', '');
+    
     for (int i = 0; i < sources.length; i++) {
       final source = sources[i];
       
-      // 对于纯下载源（如 123网盘），不需要调用 API，直接构建下载 URL
-      if (source.isDownloadOnlySource) {
-        // 使用传入的 updateInfo 中的版本号构建下载 URL
-        final version = widget.updateInfo.version.replaceAll('v', '');
-        final downloadUrl = source.buildDownloadUrl(version, Platform.operatingSystem);
-        
-        if (downloadUrl != null) {
-          if (mounted) {
-            setState(() {
-              _sourceStatus[i] = SourceCheckResult(
-                isAvailable: true,
-                updateInfo: UpdateInfo(
-                  version: widget.updateInfo.version,
-                  currentVersion: packageInfo.version,
-                  releaseNotes: widget.updateInfo.releaseNotes,
-                  downloadUrl: downloadUrl,
-                  githubReleasesUrl: widget.updateInfo.githubReleasesUrl,
-                ),
-                error: null,
-                requiresApkRename: source.requiresApkRename,
-              );
-            });
-          }
-        } else {
-          if (mounted) {
-            setState(() {
-              _sourceStatus[i] = SourceCheckResult(
-                isAvailable: false,
-                updateInfo: null,
-                error: '不支持当前平台',
-              );
-            });
-          }
-        }
-        continue;
+      if (!source.isDownloadOnlySource) {
+        continue; // 已处理
       }
       
-      // 对于 API 源，调用 API 检查
-      try {
-        final updateInfo = await UpdateService.checkFromSource(
-          source,
-          packageInfo.version,
-        );
-        
-        if (mounted) {
-          setState(() {
+      final downloadUrl = source.buildDownloadUrl(
+        versionForDownloadOnly, 
+        Platform.operatingSystem,
+      );
+      
+      if (mounted) {
+        setState(() {
+          if (downloadUrl != null) {
             _sourceStatus[i] = SourceCheckResult(
               isAvailable: true,
-              updateInfo: updateInfo,
+              updateInfo: UpdateInfo(
+                version: 'v$versionForDownloadOnly',
+                currentVersion: packageInfo.version,
+                releaseNotes: highestVersionReleaseNotes ?? widget.updateInfo.releaseNotes,
+                downloadUrl: downloadUrl,
+                githubReleasesUrl: highestVersionGithubUrl ?? widget.updateInfo.githubReleasesUrl,
+              ),
               error: null,
+              requiresApkRename: source.requiresApkRename,
             );
-          });
-        }
-      } catch (e) {
-        if (mounted) {
-          setState(() {
+          } else {
             _sourceStatus[i] = SourceCheckResult(
               isAvailable: false,
               updateInfo: null,
-              error: e.toString(),
+              error: '不支持当前平台',
             );
-          });
-        }
+          }
+        });
       }
     }
     
@@ -710,6 +724,45 @@ class _DownloadSourceSelectionDialogState extends State<_DownloadSourceSelection
         }
       });
     }
+  }
+  
+  // 检测单个 API 源（用于并行执行）
+  Future<_ApiCheckResult> _checkApiSource(DownloadSource source, String currentVersion, int index) async {
+    try {
+      final updateInfo = await UpdateService.checkFromSource(source, currentVersion);
+      return _ApiCheckResult(
+        index: index,
+        checkResult: SourceCheckResult(
+          isAvailable: true,
+          updateInfo: updateInfo,
+          error: null,
+        ),
+      );
+    } catch (e) {
+      return _ApiCheckResult(
+        index: index,
+        checkResult: SourceCheckResult(
+          isAvailable: false,
+          updateInfo: null,
+          error: e.toString(),
+        ),
+      );
+    }
+  }
+  
+  // 版本号比较 (返回: 1=version1>version2, -1=version1<version2, 0=相等)
+  int _compareVersions(String version1, String version2) {
+    final v1Parts = version1.split('.').map((v) => int.tryParse(v) ?? 0).toList();
+    final v2Parts = version2.split('.').map((v) => int.tryParse(v) ?? 0).toList();
+    
+    while (v1Parts.length < 3) v1Parts.add(0);
+    while (v2Parts.length < 3) v2Parts.add(0);
+    
+    for (int i = 0; i < 3; i++) {
+      if (v1Parts[i] > v2Parts[i]) return 1;
+      if (v1Parts[i] < v2Parts[i]) return -1;
+    }
+    return 0;
   }
   
   @override
@@ -906,6 +959,17 @@ class _DownloadSourceSelectionDialogState extends State<_DownloadSourceSelection
       ],
     );
   }
+}
+
+// API 源检测结果（用于并行检测）
+class _ApiCheckResult {
+  final int index;
+  final SourceCheckResult checkResult;
+  
+  _ApiCheckResult({
+    required this.index,
+    required this.checkResult,
+  });
 }
 
 // 下载源检测结果

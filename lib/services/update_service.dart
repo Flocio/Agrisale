@@ -21,12 +21,17 @@ class UpdateService {
   // 下载取消令牌
   static CancelToken? _cancelToken;
   
-  // 下载源配置
+  // 下载源配置（UI显示顺序：官网 → GitHub → 123网盘）
   static List<DownloadSource> get DOWNLOAD_SOURCES => [
     // Agrisale官网（Cloudflare Pages）
     DownloadSource(
       name: 'Agrisale官网',
       apiUrl: 'https://agrisale.drflo.org/api/agrisale/latest.json',
+    ),
+    // GitHub 直连
+    DownloadSource(
+      name: 'GitHub',
+      apiUrl: 'https://api.github.com/repos/$GITHUB_REPO/releases/latest',
     ),
     // 123网盘（国内直连，速度快）
     DownloadSource(
@@ -34,31 +39,56 @@ class UpdateService {
       downloadUrlBase: 'https://1819203311.v.123pan.cn/1819203311/releases/agrisale',
       requiresApkRename: true, // .apk 会被改为 .apk.bak，下载后需要重命名
     ),
-    // GitHub 直连（备用）
-    DownloadSource(
-      name: 'GitHub',
-      apiUrl: 'https://api.github.com/repos/$GITHUB_REPO/releases/latest',
-    ),
   ];
   
-  // 检查更新（尝试多个源）
+  // 检查更新（并行检测所有 API 源，获取最高版本）
   static Future<UpdateInfo?> checkForUpdate() async {
     final packageInfo = await PackageInfo.fromPlatform();
     final currentVersion = packageInfo.version;
     
-    // 按优先级尝试每个下载源
-    for (var source in DOWNLOAD_SOURCES) {
-      try {
-        final updateInfo = await checkFromSource(source, currentVersion);
-        
-        if (updateInfo != null) {
-          return updateInfo;
-        } else {
-          return null; // 已是最新版本，不需要继续尝试其他源
+    // 筛选出所有 API 源（跳过纯下载源如 123网盘）
+    final apiSources = DOWNLOAD_SOURCES.where((s) => !s.isDownloadOnlySource).toList();
+    
+    // 并行检测所有 API 源
+    final results = await Future.wait(
+      apiSources.map((source) async {
+        try {
+          return await checkFromSource(source, currentVersion);
+        } catch (e) {
+          return null; // 检测失败返回 null
         }
-      } catch (e) {
-        continue; // 尝试下一个源
+      }),
+      eagerError: false, // 不要在第一个错误时就停止
+    );
+    
+    // 从所有结果中找出最高版本
+    UpdateInfo? highestUpdateInfo;
+    String? highestVersion;
+    bool hasSuccessfulCheck = false;
+    
+    for (var updateInfo in results) {
+      // updateInfo 为 null 可能是：1. 已是最新版本 2. 检测失败
+      // 但只要有一个源成功响应（即使没有更新），就算成功检查
+      hasSuccessfulCheck = true;
+      
+      if (updateInfo != null) {
+        final versionStr = updateInfo.version.replaceAll('v', '');
+        if (highestVersion == null || 
+            _compareVersions(versionStr, highestVersion) > 0) {
+          highestVersion = versionStr;
+          highestUpdateInfo = updateInfo;
+        }
       }
+    }
+    
+    // 返回最高版本的更新信息
+    if (highestUpdateInfo != null) {
+      return highestUpdateInfo;
+    }
+    
+    // 有成功的检查但没有更新（已是最新版本）
+    if (hasSuccessfulCheck) {
+      return null;
     }
     
     // 所有源都失败，返回 GitHub Releases 链接
