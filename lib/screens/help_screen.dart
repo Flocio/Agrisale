@@ -24,7 +24,7 @@ class HelpScreen extends StatelessWidget {
               children: [
                 _buildParagraph('Agrisale 是一款专业的农业销售管理系统，帮助您轻松管理产品库存、客户关系、采购销售等业务。系统支持多用户使用，每个用户的数据相互独立，确保数据安全。'),
                 _buildParagraph('系统支持 iOS、Android、macOS、Windows 全平台使用，数据本地存储，保护您的隐私安全。'),
-                _buildParagraph('当前版本：v3.3.0 - UI升级更新，产品单位扩展，库存负数防护，权限提示优化，自动更新功能。'),
+                _buildParagraph('当前版本：v3.3.1 - 并行更新检测优化，版本一致性优化，更新源版本显示修复。'),
               ],
             ),
             
@@ -218,7 +218,13 @@ class HelpScreen extends StatelessWidget {
               icon: Icons.update,
               color: Colors.indigo,
               children: [
-                _buildSubSection('v3.3.0（最新版本）', [
+                _buildSubSection('v3.3.1（最新版本）', [
+                  _buildParagraph('🚀 并行更新检测：优化更新检查机制，所有API源并行检测，大幅提升检测速度'),
+                  _buildParagraph('🚀 版本一致性优化：确保所有下载源显示最新版本，避免版本信息不一致问题'),
+                  _buildParagraph('🛡️ 更新源版本显示：修复下载源选择窗口可能显示旧版本的问题'),
+                  _buildParagraph('🛡️ 更新检测优化：修复多个更新源检测时的版本选择逻辑，确保始终显示最高版本'),
+                ]),
+                _buildSubSection('v3.3.0', [
                   _buildParagraph('🎨 UI 升级更新，优化整体界面设计和用户体验'),
                   _buildParagraph('✨ 产品单位扩展：新增"瓶"和"件"作为产品单位选项'),
                   _buildParagraph('🛡️ 库存负数防护：修复添加/更新/删除采购/销售/退货记录时库存可能为负数的问题'),
