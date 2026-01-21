@@ -306,7 +306,7 @@ class AutoBackupService {
     
     if (Platform.isAndroid) {
       // Android: 使用外部存储
-      baseDir = Directory('/storage/emulated/0/Android/data/com.yikang.agrisale/files');
+      baseDir = Directory('/storage/emulated/0/Android/data/org.drflo.agrisale/files');
       if (!await baseDir.exists()) {
         // 如果外部存储不可用，使用应用文档目录
         baseDir = await getApplicationDocumentsDirectory();

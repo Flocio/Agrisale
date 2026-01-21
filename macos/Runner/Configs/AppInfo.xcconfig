@@ -8,7 +8,7 @@
 PRODUCT_NAME = Agrisale
 
 // The application's bundle identifier
-PRODUCT_BUNDLE_IDENTIFIER = com.yikang.agrisale
+PRODUCT_BUNDLE_IDENTIFIER = org.drflo.agrisale
 
 // The copyright displayed in application information
-PRODUCT_COPYRIGHT = Copyright © 2026 com.yikang. All rights reserved.
+PRODUCT_COPYRIGHT = Copyright © 2026 drflo.org. All rights reserved.

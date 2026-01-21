@@ -1,4 +1,4 @@
-package com.yikang.agrisale
+package org.drflo.agrisale
 
 import io.flutter.embedding.android.FlutterActivity
 
