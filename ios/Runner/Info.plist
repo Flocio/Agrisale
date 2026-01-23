@@ -50,5 +50,8 @@
 	<true/>
 	<key>LSSupportsOpeningDocumentsInPlace</key>
 	<true/>
+	<!-- 相册权限 - 部分库可能需要 -->
+	<key>NSPhotoLibraryUsageDescription</key>
+	<string>用于选择和导出数据文件</string>
 </dict>
 </plist>
