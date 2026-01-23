@@ -3,16 +3,85 @@ name: Multi-Platform Build
 on:
   workflow_dispatch:
   push:
-    tags:
-      - 'v*'
+    branches:
+      - main
+    paths:
+      - 'pubspec.yaml'
+      - 'lib/utils/app_version.dart'
+      - '.github/workflows/dart.yml'
+
+permissions:
+  contents: write
 
 env:
   FLUTTER_VERSION: "3.24.0"
-  VERSION_TAG: "v3.3.1"
 
 jobs:
+  # 准备阶段：读取版本、校验一致性、自动打 tag
+  prepare:
+    name: Prepare Release
+    runs-on: ubuntu-latest
+    outputs:
+      version: ${{ steps.version.outputs.version }}
+      version_tag: ${{ steps.version.outputs.version_tag }}
+      should_release: ${{ steps.check.outputs.should_release }}
+    steps:
+      - name: Checkout Repository
+        uses: actions/checkout@v4
+        with:
+          fetch-depth: 0
+
+      - name: Extract and Validate Version
+        id: version
+        run: |
+          # 从 pubspec.yaml 提取版本号（格式：3.3.1+14）
+          PUBSPEC_VERSION=$(grep '^version:' pubspec.yaml | sed 's/version: //' | sed 's/+.*//' | xargs)
+          echo "pubspec_version=$PUBSPEC_VERSION" >> $GITHUB_OUTPUT
+          echo "version=$PUBSPEC_VERSION" >> $GITHUB_OUTPUT
+          echo "version_tag=v$PUBSPEC_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ pubspec.yaml version: $PUBSPEC_VERSION"
+          
+          # 从 lib/utils/app_version.dart 提取版本号
+          DART_VERSION=$(grep "static const String version = " lib/utils/app_version.dart | sed "s/.*= '//" | sed "s/';//" | xargs)
+          echo "dart_version=$DART_VERSION" >> $GITHUB_OUTPUT
+          echo "✅ app_version.dart version: $DART_VERSION"
+          
+          # 校验版本一致性
+          if [ "$PUBSPEC_VERSION" != "$DART_VERSION" ]; then
+            echo "❌ 版本不一致！pubspec.yaml ($PUBSPEC_VERSION) != app_version.dart ($DART_VERSION)"
+            exit 1
+          fi
+          
+          echo "✅ 所有版本号一致：$PUBSPEC_VERSION"
+
+      - name: Check if Tag Exists
+        id: check
+        run: |
+          VERSION_TAG="v${{ steps.version.outputs.version }}"
+          
+          # 检查 tag 是否存在
+          if git rev-parse "$VERSION_TAG" >/dev/null 2>&1; then
+            echo "⚠️  Tag $VERSION_TAG 已存在，跳过创建"
+            echo "should_release=false" >> $GITHUB_OUTPUT
+          else
+            echo "✅ Tag $VERSION_TAG 不存在，将创建新 tag"
+            echo "should_release=true" >> $GITHUB_OUTPUT
+          fi
+
+      - name: Create and Push Tag
+        if: steps.check.outputs.should_release == 'true'
+        run: |
+          VERSION_TAG="v${{ steps.version.outputs.version }}"
+          git config user.name "github-actions[bot]"
+          git config user.email "github-actions[bot]@users.noreply.github.com"
+          git tag -a "$VERSION_TAG" -m "Release $VERSION_TAG"
+          git push origin "$VERSION_TAG"
+          echo "✅ Tag $VERSION_TAG 已创建并推送"
+
   # iOS 构建
   build-ios:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     name: iOS Build
     runs-on: macos-latest
     steps:
@@ -40,17 +109,19 @@ jobs:
         run: |
           mkdir Payload
           mv Runner.app/ Payload
-          zip -qq -r -9 Agrisale-ios-${{ env.VERSION_TAG }}.ipa Payload
+          zip -qq -r -9 Agrisale-ios-${{ needs.prepare.outputs.version_tag }}.ipa Payload
         working-directory: build/ios/iphoneos
 
       - name: Upload iOS Artifact
         uses: actions/upload-artifact@v4
         with:
           name: iOS-Build
-          path: build/ios/iphoneos/Agrisale-ios-${{ env.VERSION_TAG }}.ipa
+          path: build/ios/iphoneos/Agrisale-ios-${{ needs.prepare.outputs.version_tag }}.ipa
 
   # Android 构建
   build-android:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     name: Android Build
     runs-on: ubuntu-latest
     steps:
@@ -140,9 +211,8 @@ jobs:
               else:
                   print('✓ build.gradle 已包含 namespace')
               
-              # 修复 compileSdkVersion - 确保至少为 30（Java 9+ 要求），最好设置为 35
+              # 修复 compileSdkVersion
               if 'compileSdkVersion' in content:
-                  # 检查当前的 compileSdkVersion 值
                   match = re.search(r'compileSdkVersion\s+(\d+)', content)
                   if match:
                       current_sdk = int(match.group(1))
@@ -153,59 +223,19 @@ jobs:
                       else:
                           print(f'✓ compileSdkVersion 已设置为 {current_sdk}')
                   else:
-                      # 如果格式不同，尝试替换
                       content = re.sub(r'compileSdkVersion\s*[^\n]+', 'compileSdkVersion 35', content)
                       has_changes = True
                       print('✓ 已设置 compileSdkVersion 为 35')
-              else:
-                  # 如果没有 compileSdkVersion，添加它（在 namespace 之后）
-                  if 'namespace' in content:
-                      pattern = r'(namespace\s+"[^"]+"\s*\n)'
-                      replacement = r'\1    compileSdkVersion 35\n'
-                      content = re.sub(pattern, replacement, content, count=1)
-                      has_changes = True
-                      print('✓ 已添加 compileSdkVersion 35')
-                  elif 'android {' in content:
-                      pattern = r'(android\s*\{)'
-                      replacement = r'\1\n    compileSdkVersion 35'
-                      content = re.sub(pattern, replacement, content, count=1)
-                      has_changes = True
-                      print('✓ 已添加 compileSdkVersion 35')
               
-              # 统一 JVM 目标版本为 11（与项目配置一致）
-              # 修复 compileOptions - 将 Java 1.8 改为 11
+              # 统一 JVM 目标版本为 11
               if 'VERSION_1_8' in content:
                   content = re.sub(r'VERSION_1_8', 'VERSION_11', content)
                   has_changes = True
                   print('✓ 已更新 Java 版本从 1.8 到 11')
               
-              # 修复 kotlinOptions - 将 jvmTarget 1.8 改为 11
               if 'jvmTarget' in content:
-                  # 匹配 jvmTarget = "1.8" 或 jvmTarget = '1.8'
                   content = re.sub(r'jvmTarget\s*=\s*["\']1\.8["\']', 'jvmTarget = "11"', content)
-                  if 'jvmTarget = "11"' in content or "jvmTarget = '11'" in content:
-                      print('✓ kotlinOptions jvmTarget 已设置为 11')
-                  else:
-                      has_changes = True
-                      print('✓ 已更新 kotlinOptions jvmTarget 到 11')
-              
-              # 如果没有 compileOptions，添加它
-              if 'compileOptions' not in content and 'android {' in content:
-                  # 在 android { 后添加 compileOptions
-                  pattern = r'(android\s*\{)'
-                  replacement = r'\1\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_11\n        targetCompatibility JavaVersion.VERSION_11\n    }'
-                  content = re.sub(pattern, replacement, content, count=1)
-                  has_changes = True
-                  print('✓ 已添加 compileOptions 配置')
-              
-              # 如果没有 kotlinOptions，添加它
-              if 'kotlinOptions' not in content and 'compileOptions' in content:
-                  # 在 compileOptions 后添加 kotlinOptions
-                  pattern = r'(compileOptions\s*\{[^\}]*?\})'
-                  replacement = r'\1\n    kotlinOptions {\n        jvmTarget = "11"\n    }'
-                  content = re.sub(pattern, replacement, content, count=1)
-                  has_changes = True
-                  print('✓ 已添加 kotlinOptions 配置')
+                  print('✓ kotlinOptions jvmTarget 已设置为 11')
               
               if has_changes:
                   with open(build_gradle_path, 'w', encoding='utf-8') as f:
@@ -221,12 +251,9 @@ jobs:
               with open(manifest_path, 'r', encoding='utf-8') as f:
                   content = f.read()
               
-              # 移除 package 属性
               if 'package=' in content:
-                  # 匹配 package="..." 或 package='...'
                   pattern = r'\s*package\s*=\s*["\'][^"\']*["\']'
                   new_content = re.sub(pattern, '', content)
-                  
                   with open(manifest_path, 'w', encoding='utf-8') as f:
                       f.write(new_content)
                   print('✓ 已移除 AndroidManifest.xml 中的 package 属性')
@@ -234,13 +261,14 @@ jobs:
                   print('✓ AndroidManifest.xml 中已无 package 属性')
           else:
               print(f'警告: 未找到 AndroidManifest.xml: {manifest_path}')
-          
+          PYEOF
 
       - name: Restore Android keystore
         run: |
           if [ -n "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" ]; then
             echo "${{ secrets.ANDROID_KEYSTORE_BASE64 }}" | base64 --decode > android/app/agrisale-release.jks
-            echo "✓ Keystore restored to android/app/agrisale-release.jks"
+            chmod 600 android/app/agrisale-release.jks
+            echo "✅ Keystore restored"
           else
             echo "⚠️ Warning: ANDROID_KEYSTORE_BASE64 secret not set, will use debug signing"
           fi
@@ -254,7 +282,7 @@ jobs:
           keyAlias=${{ secrets.ANDROID_KEY_ALIAS }}
           storeFile=agrisale-release.jks
           EOF
-            echo "✓ key.properties created in android/ directory"
+            echo "✅ key.properties created"
           else
             echo "⚠️ Warning: key.properties not created, will use debug signing"
           fi
@@ -264,16 +292,18 @@ jobs:
 
       - name: Rename APK File
         run: |
-          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/Agrisale-android-${{ env.VERSION_TAG }}.apk
+          mv build/app/outputs/flutter-apk/app-release.apk build/app/outputs/flutter-apk/Agrisale-android-${{ needs.prepare.outputs.version_tag }}.apk
 
       - name: Upload Android APK
         uses: actions/upload-artifact@v4
         with:
           name: Android-APK
-          path: build/app/outputs/flutter-apk/Agrisale-android-${{ env.VERSION_TAG }}.apk
+          path: build/app/outputs/flutter-apk/Agrisale-android-${{ needs.prepare.outputs.version_tag }}.apk
 
   # macOS 构建
   build-macos:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     name: macOS Build
     runs-on: macos-latest
     steps:
@@ -300,11 +330,6 @@ jobs:
       - name: Build macOS Release
         run: flutter build macos --release
 
-      - name: Create macOS ZIP Archive
-        run: |
-          cd build/macos/Build/Products/Release
-          zip -qq -r -9 ../../../../../Agrisale-macos-${{ env.VERSION_TAG }}.zip agrisale.app
-
       - name: Create macOS DMG
         run: |
           # 创建临时目录用于 DMG 内容
@@ -318,25 +343,21 @@ jobs:
           hdiutil create -volname "Agrisale" \
             -srcfolder dmg_temp \
             -ov -format UDZO \
-            Agrisale-macos-${{ env.VERSION_TAG }}.dmg
+            Agrisale-macos-${{ needs.prepare.outputs.version_tag }}.dmg
           
           # 清理临时目录
           rm -rf dmg_temp
-
-      - name: Upload macOS ZIP Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: macOS-ZIP
-          path: Agrisale-macos-${{ env.VERSION_TAG }}.zip
 
       - name: Upload macOS DMG Artifact
         uses: actions/upload-artifact@v4
         with:
           name: macOS-DMG
-          path: Agrisale-macos-${{ env.VERSION_TAG }}.dmg
+          path: Agrisale-macos-${{ needs.prepare.outputs.version_tag }}.dmg
 
   # Windows 构建
   build-windows:
+    needs: prepare
+    if: needs.prepare.outputs.should_release == 'true'
     name: Windows Build
     runs-on: windows-latest
     steps:
@@ -358,27 +379,30 @@ jobs:
       - name: Build Windows Release
         run: flutter build windows --release
 
-      - name: Create Windows ZIP Archive
-        run: |
-          Compress-Archive -Path "build\windows\x64\runner\Release\*" -DestinationPath "Agrisale-windows-${{ env.VERSION_TAG }}.zip"
-
       - name: Install Inno Setup
         run: |
           choco install innosetup -y
 
+      - name: Download Chinese Language File for Inno Setup
+        run: |
+          $langUrl = "https://raw.githubusercontent.com/jrsoftware/issrc/main/Files/Languages/Unofficial/ChineseSimplified.isl"
+          $langPath = "C:\Program Files (x86)\Inno Setup 6\Languages\ChineseSimplified.isl"
+          Invoke-WebRequest -Uri $langUrl -OutFile $langPath
+          Write-Host "✅ Downloaded ChineseSimplified.isl"
+
       - name: Create Inno Setup Script
         run: |
-          $version = "${{ env.VERSION_TAG }}".TrimStart('v')
-          @"
+          $version = "${{ needs.prepare.outputs.version_tag }}".TrimStart('v')
+          $issContent = @"
           [Setup]
           AppName=Agrisale
           AppVersion=$version
-          AppPublisher=Agrisale Team
-          AppPublisherURL=https://github.com/yourusername/agrisale
+          AppPublisher=drflo.org
+          AppPublisherURL=https://agrisale.drflo.org
           DefaultDirName={autopf}\Agrisale
           DefaultGroupName=Agrisale
           OutputDir=.
-          OutputBaseFilename=Agrisale-windows-${{ env.VERSION_TAG }}-installer
+          OutputBaseFilename=Agrisale-windows-${{ needs.prepare.outputs.version_tag }}-installer
           Compression=lzma2
           SolidCompression=yes
           ArchitecturesAllowed=x64
@@ -388,6 +412,7 @@ jobs:
           UninstallDisplayIcon={app}\agrisale.exe
           
           [Languages]
+          Name: "chinesesimplified"; MessagesFile: "compiler:Languages\ChineseSimplified.isl"
           Name: "english"; MessagesFile: "compiler:Default.isl"
           
           [Tasks]
@@ -403,30 +428,25 @@ jobs:
           
           [Run]
           Filename: "{app}\agrisale.exe"; Description: "{cm:LaunchProgram,Agrisale}"; Flags: nowait postinstall skipifsilent
-          "@ | Out-File -FilePath "setup.iss" -Encoding UTF8
+          "@
+          [System.IO.File]::WriteAllText("setup.iss", $issContent, [System.Text.Encoding]::UTF8)
 
       - name: Build Windows Installer
         run: |
           & "C:\Program Files (x86)\Inno Setup 6\ISCC.exe" setup.iss
 
-      - name: Upload Windows ZIP Artifact
-        uses: actions/upload-artifact@v4
-        with:
-          name: Windows-ZIP
-          path: Agrisale-windows-${{ env.VERSION_TAG }}.zip
-
       - name: Upload Windows Installer Artifact
         uses: actions/upload-artifact@v4
         with:
           name: Windows-Installer
-          path: Agrisale-windows-${{ env.VERSION_TAG }}-installer.exe
+          path: Agrisale-windows-${{ needs.prepare.outputs.version_tag }}-installer.exe
 
   # 创建 GitHub Release
   create-release:
     name: Create Release
-    needs: [build-ios, build-android, build-macos, build-windows]
+    needs: [prepare, build-ios, build-android, build-macos, build-windows]
     runs-on: ubuntu-latest
-    if: github.event_name == 'workflow_dispatch' || startsWith(github.ref, 'refs/tags/')
+    if: needs.prepare.outputs.should_release == 'true'
     steps:
       - name: Download all artifacts
         uses: actions/download-artifact@v4
@@ -439,10 +459,10 @@ jobs:
       - name: Create Release
         uses: softprops/action-gh-release@v1
         with:
-          tag_name: ${{ env.VERSION_TAG }}
-          name: "Agrisale ${{ env.VERSION_TAG }}"
+          tag_name: ${{ needs.prepare.outputs.version_tag }}
+          name: "Agrisale ${{ needs.prepare.outputs.version_tag }}"
           body: |
-            ## Agrisale ${{ env.VERSION_TAG }}
+            ## Agrisale ${{ needs.prepare.outputs.version_tag }}
             
             ### 支持平台
             - iOS: iPhone 和 iPad
@@ -459,73 +479,35 @@ jobs:
             - 数据备份恢复
             - 多用户系统
             
-            ### v3.3.1 更新内容 🚀
-            
-            #### 🚀 性能优化
-            - **并行更新检测**：优化更新检查机制，所有API源并行检测，大幅提升检测速度
-            - **版本一致性优化**：确保所有下载源显示最新版本，避免版本信息不一致问题
-            
-            #### 🛡️ 问题修复
-            - **更新源版本显示**：修复下载源选择窗口可能显示旧版本的问题
-            - **更新检测优化**：修复多个更新源检测时的版本选择逻辑，确保始终显示最高版本
-            
             ### 📥 下载说明
             
             #### iOS 用户
-            - 下载 `Agrisale-ios-${{ env.VERSION_TAG }}.ipa` 文件
+            - 下载 `Agrisale-ios-${{ needs.prepare.outputs.version_tag }}.ipa` 文件
+            - 需要使用第三方工具如 AltStore 或企业证书安装
             
             #### Android 用户
-            - 下载 `Agrisale-android-${{ env.VERSION_TAG }}.apk` 文件
+            - 下载 `Agrisale-android-${{ needs.prepare.outputs.version_tag }}.apk` 文件
+            - 开启"未知来源应用"后直接安装
             
-            #### macOS 用户（推荐 DMG）
-            - **推荐**: `Agrisale-macos-${{ env.VERSION_TAG }}.dmg` - 标准安装包，带安装向导
-            - **备选**: `Agrisale-macos-${{ env.VERSION_TAG }}.zip` - 绿色版本，解压即用
+            #### macOS 用户
+            - 下载 `Agrisale-macos-${{ needs.prepare.outputs.version_tag }}.dmg` 文件
+            - 双击 DMG 文件，将 agrisale.app 拖拽到 Applications 文件夹
+            - 首次打开可能需要在"系统设置 → 隐私与安全性"中允许
             
-            #### Windows 用户（推荐 EXE）
-            - **推荐**: `Agrisale-windows-${{ env.VERSION_TAG }}-installer.exe` - 安装向导，自动配置
-            - **备选**: `Agrisale-windows-${{ env.VERSION_TAG }}.zip` - 绿色版本，解压即用
-            
-            ### 📲 安装说明
-            
-            #### iOS
-            - 需要使用第三方工具如 AltStore 或企业证书安装 IPA 文件
-            
-            #### Android
-            - 开启"未知来源应用"后直接安装 APK 文件
-            
-            #### macOS
-            - **DMG 文件**（推荐）：
-              1. 双击 DMG 文件挂载磁盘镜像
-              2. 将 agrisale.app 拖拽到 Applications 文件夹
-              3. 首次打开可能需要在"系统偏好设置 → 安全性与隐私"中允许
-            - **ZIP 文件**：
-              1. 解压 ZIP 文件
-              2. 将 agrisale.app 拖拽到应用程序文件夹
-              3. 首次打开可能需要在系统设置中允许
-            
-            #### Windows
-            - **EXE 安装程序**（推荐）：
-              1. 双击运行安装程序
-              2. 按照安装向导提示完成安装
-              3. 自动创建开始菜单和桌面快捷方式（可选）
-              4. 可通过"添加/删除程序"卸载
-            - **ZIP 文件**：
-              1. 解压到任意文件夹
-              2. 运行 agrisale.exe
-              3. 可手动创建快捷方式
+            #### Windows 用户
+            - 下载 `Agrisale-windows-${{ needs.prepare.outputs.version_tag }}-installer.exe` 文件
+            - 双击运行安装程序，按照安装向导完成安装
+            - 支持简体中文安装界面
             
             ---
             
             完整跨平台支持 | 原生用户体验 | 开源免费
           files: |
-            artifacts/iOS-Build/Agrisale-ios-${{ env.VERSION_TAG }}.ipa
-            artifacts/Android-APK/Agrisale-android-${{ env.VERSION_TAG }}.apk
-            artifacts/macOS-ZIP/Agrisale-macos-${{ env.VERSION_TAG }}.zip
-            artifacts/macOS-DMG/Agrisale-macos-${{ env.VERSION_TAG }}.dmg
-            artifacts/Windows-ZIP/Agrisale-windows-${{ env.VERSION_TAG }}.zip
-            artifacts/Windows-Installer/Agrisale-windows-${{ env.VERSION_TAG }}-installer.exe
+            artifacts/iOS-Build/Agrisale-ios-${{ needs.prepare.outputs.version_tag }}.ipa
+            artifacts/Android-APK/Agrisale-android-${{ needs.prepare.outputs.version_tag }}.apk
+            artifacts/macOS-DMG/Agrisale-macos-${{ needs.prepare.outputs.version_tag }}.dmg
+            artifacts/Windows-Installer/Agrisale-windows-${{ needs.prepare.outputs.version_tag }}-installer.exe
           draft: false
           prerelease: false
         env:
           GITHUB_TOKEN: ${{ secrets.GITHUB_TOKEN }}
-
