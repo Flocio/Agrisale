@@ -266,16 +266,8 @@ jobs:
               if 'compileOptions' not in content:
                   # 在 android { 后添加 compileOptions
                   pattern = r'(android\s*\{[^\}]*namespace[^\n]*\n)'
-                  replacement = r'''\1
-    compileOptions {
-        sourceCompatibility JavaVersion.VERSION_17
-        targetCompatibility JavaVersion.VERSION_17
-    }
-    kotlinOptions {
-        jvmTarget = "17"
-    }
-'''
-                  content = re.sub(pattern, replacement, content, count=1)
+                  compile_opts = '\\1\n    compileOptions {\n        sourceCompatibility JavaVersion.VERSION_17\n        targetCompatibility JavaVersion.VERSION_17\n    }\n    kotlinOptions {\n        jvmTarget = "17"\n    }\n'
+                  content = re.sub(pattern, compile_opts, content, count=1)
                   has_changes = True
                   print('✓ 已添加 compileOptions 和 kotlinOptions 配置')
               
