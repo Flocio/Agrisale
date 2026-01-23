@@ -24,7 +24,7 @@ class HelpScreen extends StatelessWidget {
               children: [
                 _buildParagraph('Agrisale 是一款专业的农业销售管理系统，帮助您轻松管理产品库存、客户关系、采购销售等业务。系统支持多用户使用，每个用户的数据相互独立，确保数据安全。'),
                 _buildParagraph('系统支持 iOS、Android、macOS、Windows 全平台使用，数据本地存储，保护您的隐私安全。'),
-                _buildParagraph('当前版本：v3.3.1 - 并行更新检测优化，版本一致性优化，更新源版本显示修复。'),
+                _buildParagraph('当前版本：v3.3.2 - 应用图标统一更新，工作流自动化优化，Windows 安装程序中文化。'),
               ],
             ),
             
@@ -218,7 +218,13 @@ class HelpScreen extends StatelessWidget {
               icon: Icons.update,
               color: Colors.indigo,
               children: [
-                _buildSubSection('v3.3.1（最新版本）', [
+                _buildSubSection('v3.3.2（最新版本）', [
+                  _buildParagraph('🎨 应用图标统一更新：重新设计并统一所有平台的应用程序图标'),
+                  _buildParagraph('🔧 工作流自动化优化：实现版本号自动检测和 GitHub Release 自动创建'),
+                  _buildParagraph('🌐 Windows 安装程序中文化：Windows 安装程序支持简体中文界面'),
+                  _buildParagraph('📦 构建优化：移除 macOS 和 Windows 的 ZIP 文件构建，仅保留 DMG 和 EXE 安装包'),
+                ]),
+                _buildSubSection('v3.3.1', [
                   _buildParagraph('🚀 并行更新检测：优化更新检查机制，所有API源并行检测，大幅提升检测速度'),
                   _buildParagraph('🚀 版本一致性优化：确保所有下载源显示最新版本，避免版本信息不一致问题'),
                   _buildParagraph('🛡️ 更新源版本显示：修复下载源选择窗口可能显示旧版本的问题'),
