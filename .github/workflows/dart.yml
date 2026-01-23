@@ -94,12 +94,23 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           architecture: x64
+          cache: true
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            ios/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-pods-${{ hashFiles('ios/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-pods-
 
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Update CocoaPods
-        run: pod repo update
+      - name: Install CocoaPods
+        run: pod install --repo-update
         working-directory: ios
 
       - name: Build iOS Release
@@ -117,6 +128,7 @@ jobs:
         with:
           name: iOS-Build
           path: build/ios/iphoneos/Agrisale-ios-${{ needs.prepare.outputs.version_tag }}.ipa
+          retention-days: 1
 
   # Android 构建
   build-android:
@@ -139,14 +151,19 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+          cache: true
+
+      - name: Cache Gradle
+        uses: actions/cache@v4
+        with:
+          path: |
+            ~/.gradle/caches
+            ~/.gradle/wrapper
+          key: ${{ runner.os }}-gradle-${{ hashFiles('android/**/*.gradle*', 'android/**/gradle-wrapper.properties') }}
+          restore-keys: |
+            ${{ runner.os }}-gradle-
 
       - name: Install Dependencies
-        run: flutter pub get
-
-      - name: Clean Build
-        run: flutter clean
-
-      - name: Get Dependencies Again
         run: flutter pub get
 
       - name: Fix share_plus build.gradle
@@ -299,6 +316,7 @@ jobs:
         with:
           name: Android-APK
           path: build/app/outputs/flutter-apk/Agrisale-android-${{ needs.prepare.outputs.version_tag }}.apk
+          retention-days: 1
 
   # macOS 构建
   build-macos:
@@ -316,6 +334,17 @@ jobs:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
           architecture: x64
+          cache: true
+
+      - name: Cache CocoaPods
+        uses: actions/cache@v4
+        with:
+          path: |
+            macos/Pods
+            ~/Library/Caches/CocoaPods
+          key: ${{ runner.os }}-macos-pods-${{ hashFiles('macos/Podfile.lock') }}
+          restore-keys: |
+            ${{ runner.os }}-macos-pods-
 
       - name: Enable macOS Desktop
         run: flutter config --enable-macos-desktop
@@ -323,8 +352,8 @@ jobs:
       - name: Install Dependencies
         run: flutter pub get
 
-      - name: Update CocoaPods
-        run: pod repo update
+      - name: Install CocoaPods
+        run: pod install --repo-update
         working-directory: macos
 
       - name: Build macOS Release
@@ -353,6 +382,7 @@ jobs:
         with:
           name: macOS-DMG
           path: Agrisale-macos-${{ needs.prepare.outputs.version_tag }}.dmg
+          retention-days: 1
 
   # Windows 构建
   build-windows:
@@ -369,6 +399,7 @@ jobs:
         with:
           flutter-version: ${{ env.FLUTTER_VERSION }}
           channel: 'stable'
+          cache: true
 
       - name: Enable Windows Desktop
         run: flutter config --enable-windows-desktop
@@ -440,6 +471,7 @@ jobs:
         with:
           name: Windows-Installer
           path: Agrisale-windows-${{ needs.prepare.outputs.version_tag }}-installer.exe
+          retention-days: 1
 
   # 创建 GitHub Release
   create-release:
