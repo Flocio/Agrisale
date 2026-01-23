@@ -141,7 +141,7 @@ class _MainScreenState extends State<MainScreen> {
           mainAxisSize: MainAxisSize.min,
           children: [
             Image.asset(
-              'assets/images/background.png',
+              'assets/images/background-white.png',
               width: 36,
               height: 36,
             ),

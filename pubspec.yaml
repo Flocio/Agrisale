@@ -80,6 +80,31 @@ dev_dependencies:
   # package. See that file for information about deactivating specific lint
   # rules and activating additional ones.
   flutter_lints: ^5.0.0
+  flutter_launcher_icons: ^0.14.3
+
+# 应用图标配置
+flutter_launcher_icons:
+  android: true
+  ios: true
+  image_path: "assets/images/icon.png"
+  # Android 自适应图标 - 使用透明前景 + 纯色背景
+  adaptive_icon_background: "#FAF8F5"
+  adaptive_icon_foreground: "assets/images/icon.png"
+  # macOS 配置
+  macos:
+    generate: true
+    image_path: "assets/images/Agrisale-macos-BG-remove.png"
+  # Windows 配置
+  windows:
+    generate: true
+    image_path: "assets/images/icon.png"
+    icon_size: 256
+  # Web 配置
+  web:
+    generate: true
+    image_path: "assets/images/icon.png"
+    background_color: "#FAF8F5"
+    theme_color: "#4CAF50"
 
 # For information on the generic Dart part of this file, see the
 # following page: https://dart.dev/tools/pub/pubspec
@@ -93,6 +118,7 @@ flutter:
   uses-material-design: true
   assets:
     - assets/images/background.png
+    - assets/images/background-white.png
     - assets/fonts/
 
   # To add assets to your application, add an assets section, like this:
