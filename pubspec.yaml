@@ -90,14 +90,14 @@ flutter_launcher_icons:
   # Android 自适应图标 - 使用透明前景 + 纯色背景
   adaptive_icon_background: "#FAF8F5"
   adaptive_icon_foreground: "assets/images/icon.png"
-  # macOS 配置
+  # macOS 配置 - 使用带内边距的图标
   macos:
     generate: true
-    image_path: "assets/images/Agrisale-macos-BG-remove.png"
-  # Windows 配置
+    image_path: "assets/images/icon-padding.png"
+  # Windows 配置 - 使用带内边距的图标
   windows:
     generate: true
-    image_path: "assets/images/icon.png"
+    image_path: "assets/images/icon-padding.png"
     icon_size: 256
   # Web 配置
   web:
