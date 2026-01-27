@@ -85,6 +85,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
   Widget build(BuildContext context) {
     return MaterialApp(
       title: 'Agrisale',
+      debugShowCheckedModeBanner: false, // 隐藏右上角的 DEBUG 标识
       // 配置中文本地化
       localizationsDelegates: [
         GlobalMaterialLocalizations.delegate,
