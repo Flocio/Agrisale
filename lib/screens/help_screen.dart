@@ -1,19 +1,8 @@
 // lib/screens/help_screen.dart
 
-import 'dart:io';
 import 'package:flutter/material.dart';
 
 class HelpScreen extends StatelessWidget {
-  // 获取当前平台名称
-  String get _platformName {
-    if (Platform.isIOS) return 'iOS';
-    if (Platform.isMacOS) return 'macOS';
-    if (Platform.isAndroid) return 'Android';
-    if (Platform.isWindows) return 'Windows';
-    if (Platform.isLinux) return 'Linux';
-    return '当前平台';
-  }
-
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -35,7 +24,6 @@ class HelpScreen extends StatelessWidget {
               children: [
                 _buildParagraph('Agrisale 是一款专业的农业销售管理系统，帮助您轻松管理产品库存、客户关系、采购销售等业务。系统支持多用户使用，每个用户的数据相互独立，确保数据安全。'),
                 _buildParagraph('数据本地存储，保护您的隐私安全。'),
-                _buildParagraph('当前版本：v3.3.2 - 应用图标统一更新，优化系统稳定性。'),
               ],
             ),
             
@@ -103,16 +91,16 @@ class HelpScreen extends StatelessWidget {
                   _buildParagraph('• 付款方式：支持现金、微信转账、银行卡三种付款方式'),
                   _buildParagraph('• 经手人：可选择员工作为经手人'),
                   _buildParagraph('• 日期默认：默认使用当天日期，可手动修改'),
-                  _buildParagraph('• 退款记录（v3.0新增）：支持负数金额，用于记录客户退款，金额显示为绿色带正号'),
-                  _buildParagraph('• 类型筛选（v3.0新增）：支持按"收款"或"退款"类型筛选进账记录'),
+                  _buildParagraph('• 退款记录：支持负数金额，用于记录客户退款，金额显示为绿色带正号'),
+                  _buildParagraph('• 类型筛选：支持按"收款"或"退款"类型筛选进账记录'),
                 ]),
                 _buildSubSection('汇款管理', [
                   _buildParagraph('• 添加汇款：记录向供应商付款信息'),
                   _buildParagraph('• 付款方式：支持现金、微信转账、银行卡三种付款方式'),
                   _buildParagraph('• 经手人：可选择员工作为经手人'),
                   _buildParagraph('• 日期默认：默认使用当天日期，可手动修改'),
-                  _buildParagraph('• 退款记录（v3.0新增）：支持负数金额，用于记录供应商退款，金额显示为绿色带正号'),
-                  _buildParagraph('• 类型筛选（v3.0新增）：支持按"汇款"或"退款"类型筛选汇款记录'),
+                  _buildParagraph('• 退款记录：支持负数金额，用于记录供应商退款，金额显示为绿色带正号'),
+                  _buildParagraph('• 类型筛选：支持按"汇款"或"退款"类型筛选汇款记录'),
                 ]),
               ],
             ),
@@ -147,11 +135,11 @@ class HelpScreen extends StatelessWidget {
             SizedBox(height: 24),
             
             _buildSection(
-              title: '数据导出（v3.0增强）',
+              title: '数据导出',
               icon: Icons.file_download,
               color: Colors.teal,
               children: [
-                _buildParagraph('• 导出格式：支持 CSV 和 PDF 两种格式（PDF 为 v3.0 新增功能）'),
+                _buildParagraph('• 导出格式：支持 CSV 和 PDF 两种格式'),
                 _buildParagraph('• CSV 格式：适合在 Excel 等表格软件中打开和编辑'),
                 _buildParagraph('• PDF 格式（新）：适合打印和分享，支持中文字体显示，自动生成美观的表格布局'),
                 _buildParagraph('• 导出内容：包含报表数据、表头、汇总信息等完整内容'),
@@ -180,15 +168,6 @@ class HelpScreen extends StatelessWidget {
                   _buildParagraph('• 手动备份：可以随时手动导出数据备份文件'),
                   _buildParagraph('• 自动备份：设置自动备份计划，定期备份数据'),
                   _buildParagraph('• 数据恢复：从备份文件恢复数据，保护数据安全'),
-                ]),
-                _buildSubSection('系统更新', [
-                  _buildParagraph('• 检查更新：在关于界面可以检查是否有新版本可用'),
-                  if (Platform.isAndroid)
-                    _buildParagraph('• 自动更新：支持自动下载和安装更新'),
-                  if (Platform.isIOS || Platform.isMacOS || Platform.isWindows || Platform.isLinux)
-                    _buildParagraph('• 更新提示：检测到新版本时会提示您前往下载'),
-                  _buildParagraph('• 多下载源：支持从多个源下载更新'),
-                  _buildParagraph('• 更新说明：更新时会显示详细的更新内容和版本说明'),
                 ]),
               ],
             ),
@@ -221,67 +200,6 @@ class HelpScreen extends StatelessWidget {
                 _buildParagraph('• 数据验证：所有输入都会进行验证，确保数据准确性和完整性'),
                 _buildParagraph('• 多用户：不同用户的数据相互独立，登录后只能看到自己的数据'),
                 _buildParagraph('• 产品关联：删除供应商前，请先修改或删除关联的产品'),
-                _buildParagraph('• 自动更新：系统支持自动检查更新，可在关于界面检查新版本'),
-              ],
-            ),
-            
-            SizedBox(height: 24),
-            
-            _buildSection(
-              title: '版本更新历史',
-              icon: Icons.update,
-              color: Colors.indigo,
-              children: [
-                _buildSubSection('v3.3.2（最新版本）', [
-                  _buildParagraph('🎨 应用图标统一更新：重新设计应用程序图标'),
-                  _buildParagraph('🔧 系统稳定性优化：提升整体运行性能'),
-                  _buildParagraph('📦 安装包优化：优化应用安装体验'),
-                ]),
-                _buildSubSection('v3.3.1', [
-                  _buildParagraph('🚀 并行更新检测：优化更新检查机制，所有API源并行检测，大幅提升检测速度'),
-                  _buildParagraph('🚀 版本一致性优化：确保所有下载源显示最新版本，避免版本信息不一致问题'),
-                  _buildParagraph('🛡️ 更新源版本显示：修复下载源选择窗口可能显示旧版本的问题'),
-                  _buildParagraph('🛡️ 更新检测优化：修复多个更新源检测时的版本选择逻辑，确保始终显示最高版本'),
-                ]),
-                _buildSubSection('v3.3.0', [
-                  _buildParagraph('🎨 UI 升级更新，优化整体界面设计和用户体验'),
-                  _buildParagraph('✨ 产品单位扩展：新增"瓶"和"件"作为产品单位选项'),
-                  _buildParagraph('🛡️ 库存负数防护：修复添加/更新/删除采购/销售/退货记录时库存可能为负数的问题'),
-                  _buildParagraph('🎨 权限提示优化：更新权限检查后未通过的UI提示（弹窗）'),
-                  _buildParagraph('🎨 导入数据确认窗口UI更新，优化数据导入流程'),
-                  _buildParagraph('🎨 关于界面更新，软件检查并自动更新功能更新'),
-                ]),
-                _buildSubSection('v3.2.0', [
-                  _buildParagraph('✨ 库存统计界面新增日期范围筛选功能，支持按日期范围查看产品交易记录'),
-                  _buildParagraph('✨ 库存统计界面新增"未分配供应商"筛选选项，方便查看未关联供应商的产品'),
-                  _buildParagraph('🛡️ 修复产品名称修改时相关记录未同步更新的重大数据一致性问题'),
-                  _buildParagraph('🛡️ 产品删除时自动删除所有关联记录，并显示详细警告信息'),
-                  _buildParagraph('🛡️ 产品供应商修改时，可选择是否同步更新历史采购记录的供应商信息'),
-                  _buildParagraph('🛡️ 修复客户/供应商/员工删除后，相关记录的 ID 未正确设置的问题'),
-                  _buildParagraph('🛡️ 修复编辑记录时，关联实体已删除导致的崩溃问题'),
-                  _buildParagraph('🛡️ 搜索功能增强，现在可以正确搜索"未知客户"、"未知供应商"、"未指定"等条目'),
-                  _buildParagraph('🎨 删除基础数据时显示详细的关联记录警告信息'),
-                  _buildParagraph('🎨 编辑记录时，关联实体已删除时显示友好的警告提示'),
-                  _buildParagraph('🎨 产品编辑时，根据实际修改情况显示更精确的操作结果提示'),
-                ]),
-                _buildSubSection('v3.1.0', [
-                  _buildParagraph('✨ 新增客户详细对账单界面，支持查看客户完整的交易记录和应收余额'),
-                  _buildParagraph('✨ 新增供应商详细对账单界面，支持查看供应商完整的交易记录和应付余额'),
-                  _buildParagraph('🎨 UI 界面优化，提升用户体验和视觉效果'),
-                  _buildParagraph('🎨 为缺少版权脚注的界面统一添加 FooterWidget 脚注'),
-                  _buildParagraph('🔧 更新检查功能优化'),
-                  _buildParagraph('🐛 修复客户记录和供应商记录导出 PDF 时总计行显示位置错误的问题'),
-                  _buildParagraph('🐛 修复导出功能中 CSV 和 PDF 格式的各种显示问题'),
-                ]),
-                _buildSubSection('v2.9.0', [
-                  _buildParagraph('📚 新增完整的使用帮助文档'),
-                  _buildParagraph('🐛 修复产品编辑时库存计算问题'),
-                  _buildParagraph('🎨 优化产品管理界面布局'),
-                ]),
-                _buildSubSection('v2.8.0', [
-                  _buildParagraph('✨ 新增 PDF 导出功能基础支持'),
-                  _buildParagraph('🎨 优化数据导出流程'),
-                ]),
               ],
             ),
             

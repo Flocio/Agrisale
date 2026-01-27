@@ -373,25 +373,28 @@ class _VersionInfoScreenState extends State<VersionInfoScreen> {
                 _showVersionDetails();
               },
             ),
-            Divider(),
-            ListTile(
-              leading: _isChecking
-                  ? SizedBox(
-                      width: 24,
-                      height: 24,
-                      child: CircularProgressIndicator(
-                        strokeWidth: 2,
-                        valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
-                      ),
-                    )
-                  : Icon(Icons.system_update, color: Colors.green),
-              title: Text(_isChecking ? '正在检查更新...' : '检查更新'),
-              subtitle: _checkError != null 
-                  ? Text(_checkError!, style: TextStyle(color: Colors.red))
-                  : Text('检查是否有新版本可用'),
-              trailing: _isChecking ? null : Icon(Icons.arrow_forward_ios, size: 16),
-              onTap: _isChecking ? null : _checkForUpdate,
-            ),
+            // iOS 系统通过 App Store 更新，不显示检查更新功能
+            if (!Platform.isIOS) ...[
+              Divider(),
+              ListTile(
+                leading: _isChecking
+                    ? SizedBox(
+                        width: 24,
+                        height: 24,
+                        child: CircularProgressIndicator(
+                          strokeWidth: 2,
+                          valueColor: AlwaysStoppedAnimation<Color>(Colors.green),
+                        ),
+                      )
+                    : Icon(Icons.system_update, color: Colors.green),
+                title: Text(_isChecking ? '正在检查更新...' : '检查更新'),
+                subtitle: _checkError != null 
+                    ? Text(_checkError!, style: TextStyle(color: Colors.red))
+                    : Text('检查是否有新版本可用'),
+                trailing: _isChecking ? null : Icon(Icons.arrow_forward_ios, size: 16),
+                onTap: _isChecking ? null : _checkForUpdate,
+              ),
+            ],
           ],
         ),
       ),
