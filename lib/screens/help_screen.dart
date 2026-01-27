@@ -1,8 +1,19 @@
 // lib/screens/help_screen.dart
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 class HelpScreen extends StatelessWidget {
+  // 获取当前平台名称
+  String get _platformName {
+    if (Platform.isIOS) return 'iOS';
+    if (Platform.isMacOS) return 'macOS';
+    if (Platform.isAndroid) return 'Android';
+    if (Platform.isWindows) return 'Windows';
+    if (Platform.isLinux) return 'Linux';
+    return '当前平台';
+  }
+
   @override
   Widget build(BuildContext context) {
     return Scaffold(
@@ -23,8 +34,8 @@ class HelpScreen extends StatelessWidget {
               color: Colors.blue,
               children: [
                 _buildParagraph('Agrisale 是一款专业的农业销售管理系统，帮助您轻松管理产品库存、客户关系、采购销售等业务。系统支持多用户使用，每个用户的数据相互独立，确保数据安全。'),
-                _buildParagraph('系统支持 iOS、Android、macOS、Windows 全平台使用，数据本地存储，保护您的隐私安全。'),
-                _buildParagraph('当前版本：v3.3.2 - 应用图标统一更新，工作流自动化优化，Windows 安装程序中文化。'),
+                _buildParagraph('数据本地存储，保护您的隐私安全。'),
+                _buildParagraph('当前版本：v3.3.2 - 应用图标统一更新，优化系统稳定性。'),
               ],
             ),
             
@@ -172,8 +183,11 @@ class HelpScreen extends StatelessWidget {
                 ]),
                 _buildSubSection('系统更新', [
                   _buildParagraph('• 检查更新：在关于界面可以检查是否有新版本可用'),
-                  _buildParagraph('• 自动更新：Android 平台支持自动下载和安装更新'),
-                  _buildParagraph('• 多下载源：支持从官网、123网盘、GitHub 等多个源下载更新'),
+                  if (Platform.isAndroid)
+                    _buildParagraph('• 自动更新：支持自动下载和安装更新'),
+                  if (Platform.isIOS || Platform.isMacOS || Platform.isWindows || Platform.isLinux)
+                    _buildParagraph('• 更新提示：检测到新版本时会提示您前往下载'),
+                  _buildParagraph('• 多下载源：支持从多个源下载更新'),
                   _buildParagraph('• 更新说明：更新时会显示详细的更新内容和版本说明'),
                 ]),
               ],
@@ -219,10 +233,9 @@ class HelpScreen extends StatelessWidget {
               color: Colors.indigo,
               children: [
                 _buildSubSection('v3.3.2（最新版本）', [
-                  _buildParagraph('🎨 应用图标统一更新：重新设计并统一所有平台的应用程序图标'),
-                  _buildParagraph('🔧 工作流自动化优化：实现版本号自动检测和 GitHub Release 自动创建'),
-                  _buildParagraph('🌐 Windows 安装程序中文化：Windows 安装程序支持简体中文界面'),
-                  _buildParagraph('📦 构建优化：移除 macOS 和 Windows 的 ZIP 文件构建，仅保留 DMG 和 EXE 安装包'),
+                  _buildParagraph('🎨 应用图标统一更新：重新设计应用程序图标'),
+                  _buildParagraph('🔧 系统稳定性优化：提升整体运行性能'),
+                  _buildParagraph('📦 安装包优化：优化应用安装体验'),
                 ]),
                 _buildSubSection('v3.3.1', [
                   _buildParagraph('🚀 并行更新检测：优化更新检查机制，所有API源并行检测，大幅提升检测速度'),
@@ -256,8 +269,7 @@ class HelpScreen extends StatelessWidget {
                   _buildParagraph('✨ 新增供应商详细对账单界面，支持查看供应商完整的交易记录和应付余额'),
                   _buildParagraph('🎨 UI 界面优化，提升用户体验和视觉效果'),
                   _buildParagraph('🎨 为缺少版权脚注的界面统一添加 FooterWidget 脚注'),
-                  _buildParagraph('🔧 GitHub Actions 构建系统优化，统一软件包命名规范'),
-                  _buildParagraph('🔧 更新检查功能适配新的软件包命名规范'),
+                  _buildParagraph('🔧 更新检查功能优化'),
                   _buildParagraph('🐛 修复客户记录和供应商记录导出 PDF 时总计行显示位置错误的问题'),
                   _buildParagraph('🐛 修复导出功能中 CSV 和 PDF 格式的各种显示问题'),
                 ]),
