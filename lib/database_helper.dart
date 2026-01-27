@@ -448,4 +448,112 @@ class DatabaseHelper {
       'userId': userId,
     });
   }
+
+  /// 删除用户账号及其所有关联数据
+  /// 
+  /// 在事务中删除用户的所有数据，包括：
+  /// - 用户设置 (user_settings)
+  /// - 产品 (products)
+  /// - 供应商 (suppliers)
+  /// - 客户 (customers)
+  /// - 员工 (employees)
+  /// - 采购记录 (purchases)
+  /// - 销售记录 (sales)
+  /// - 退货记录 (returns)
+  /// - 进账记录 (income)
+  /// - 汇款记录 (remittance)
+  /// - 用户账号 (users)
+  /// 
+  /// 返回删除的数据统计
+  Future<Map<String, int>> deleteUserAccount(int userId) async {
+    final db = await database;
+    final Map<String, int> deletedCounts = {};
+    
+    await db.transaction((txn) async {
+      // 按照正确的顺序删除（先删除有外键依赖的表）
+      
+      // 1. 删除用户设置
+      deletedCounts['user_settings'] = await txn.delete(
+        'user_settings',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      // 2. 删除交易记录（这些表引用了 products, suppliers, customers, employees）
+      deletedCounts['purchases'] = await txn.delete(
+        'purchases',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      deletedCounts['sales'] = await txn.delete(
+        'sales',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      deletedCounts['returns'] = await txn.delete(
+        'returns',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      deletedCounts['income'] = await txn.delete(
+        'income',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      deletedCounts['remittance'] = await txn.delete(
+        'remittance',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      // 3. 删除基础数据（products 引用了 suppliers）
+      deletedCounts['products'] = await txn.delete(
+        'products',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      deletedCounts['suppliers'] = await txn.delete(
+        'suppliers',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      deletedCounts['customers'] = await txn.delete(
+        'customers',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      deletedCounts['employees'] = await txn.delete(
+        'employees',
+        where: 'userId = ?',
+        whereArgs: [userId],
+      );
+      
+      // 4. 最后删除用户账号本身
+      deletedCounts['users'] = await txn.delete(
+        'users',
+        where: 'id = ?',
+        whereArgs: [userId],
+      );
+    });
+    
+    return deletedCounts;
+  }
+
+  /// 验证用户密码
+  Future<bool> verifyUserPassword(String username, String password) async {
+    final db = await database;
+    final result = await db.query(
+      'users',
+      where: 'username = ? AND password = ?',
+      whereArgs: [username, password],
+    );
+    return result.isNotEmpty;
+  }
 }

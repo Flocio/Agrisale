@@ -20,9 +20,11 @@ class _SettingsScreenState extends State<SettingsScreen> {
   final _currentPasswordController = TextEditingController();
   final _newPasswordController = TextEditingController();
   final _confirmPasswordController = TextEditingController();
+  final _deletePasswordController = TextEditingController();
   bool _obscureCurrentPassword = true;
   bool _obscureNewPassword = true;
   bool _obscureConfirmPassword = true;
+  bool _obscureDeletePassword = true;
   String? _username;
 
   @override
@@ -847,7 +849,293 @@ class _SettingsScreenState extends State<SettingsScreen> {
       Navigator.of(context).pushReplacementNamed('/');
     }
   }
-  
+
+  // 注销账号
+  Future<void> _deleteAccount() async {
+    if (_username == null || _username == '未登录') {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('请先登录')),
+      );
+      return;
+    }
+
+    // 清空密码输入框
+    _deletePasswordController.clear();
+    
+    // 第一步：显示警告确认对话框
+    final firstConfirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => AlertDialog(
+        title: Row(
+          children: [
+            Icon(Icons.warning_amber_rounded, color: Colors.red[700], size: 28),
+            SizedBox(width: 8),
+            Text('注销账号', style: TextStyle(color: Colors.red[700], fontWeight: FontWeight.bold)),
+          ],
+        ),
+        content: SingleChildScrollView(
+          child: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Container(
+                padding: EdgeInsets.all(12),
+                decoration: BoxDecoration(
+                  color: Colors.red[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.red[300]!, width: 1.5),
+                ),
+                child: Column(
+                  crossAxisAlignment: CrossAxisAlignment.start,
+                  children: [
+                    Text(
+                      '⚠️ 警告：此操作不可撤销！',
+                      style: TextStyle(
+                        fontWeight: FontWeight.bold,
+                        fontSize: 15,
+                        color: Colors.red[900],
+                      ),
+                    ),
+                    SizedBox(height: 12),
+                    Text('注销账号将永久删除以下所有数据：', style: TextStyle(fontSize: 14)),
+                    SizedBox(height: 8),
+                    _buildDeleteWarningItem('账号信息和登录凭证'),
+                    _buildDeleteWarningItem('所有产品、供应商、客户、员工数据'),
+                    _buildDeleteWarningItem('所有采购、销售、退货记录'),
+                    _buildDeleteWarningItem('所有进账、汇款记录'),
+                    _buildDeleteWarningItem('个人设置（包括 API Key）'),
+                    _buildDeleteWarningItem('该账号的所有自动备份文件'),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
+              Text(
+                '当前账号: $_username',
+                style: TextStyle(fontWeight: FontWeight.w500),
+              ),
+              SizedBox(height: 8),
+              Text(
+                '确定要继续注销此账号吗？',
+                style: TextStyle(fontSize: 14),
+              ),
+            ],
+          ),
+        ),
+        actions: [
+          TextButton(
+            onPressed: () => Navigator.of(context).pop(false),
+            child: Text('取消', style: TextStyle(fontSize: 16)),
+          ),
+          ElevatedButton(
+            onPressed: () => Navigator.of(context).pop(true),
+            style: ElevatedButton.styleFrom(
+              backgroundColor: Colors.red,
+              foregroundColor: Colors.white,
+              padding: EdgeInsets.symmetric(horizontal: 20, vertical: 10),
+            ),
+            child: Text('继续', style: TextStyle(fontSize: 16)),
+          ),
+        ],
+      ),
+    );
+
+    if (firstConfirm != true) return;
+
+    // 第二步：要求输入密码确认
+    final passwordConfirm = await showDialog<bool>(
+      context: context,
+      builder: (context) => StatefulBuilder(
+        builder: (context, setDialogState) => AlertDialog(
+          title: Text('验证密码', style: TextStyle(fontWeight: FontWeight.bold)),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('请输入账号密码以确认注销：'),
+              SizedBox(height: 16),
+              TextField(
+                controller: _deletePasswordController,
+                obscureText: _obscureDeletePassword,
+                decoration: InputDecoration(
+                  labelText: '密码',
+                  border: OutlineInputBorder(),
+                  suffixIcon: IconButton(
+                    icon: Icon(
+                      _obscureDeletePassword ? Icons.visibility_off : Icons.visibility,
+                    ),
+                    onPressed: () {
+                      setDialogState(() {
+                        _obscureDeletePassword = !_obscureDeletePassword;
+                      });
+                    },
+                  ),
+                ),
+              ),
+            ],
+          ),
+          actions: [
+            TextButton(
+              onPressed: () => Navigator.of(context).pop(false),
+              child: Text('取消', style: TextStyle(fontSize: 16)),
+            ),
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(true),
+              style: ElevatedButton.styleFrom(
+                backgroundColor: Colors.red,
+                foregroundColor: Colors.white,
+              ),
+              child: Text('确认注销', style: TextStyle(fontSize: 16)),
+            ),
+          ],
+        ),
+      ),
+    );
+
+    if (passwordConfirm != true) return;
+
+    // 验证密码
+    final password = _deletePasswordController.text;
+    if (password.isEmpty) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(content: Text('请输入密码')),
+      );
+      return;
+    }
+
+    final isPasswordValid = await DatabaseHelper().verifyUserPassword(_username!, password);
+    if (!isPasswordValid) {
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('密码错误，账号注销已取消'),
+          backgroundColor: Colors.red,
+        ),
+      );
+      return;
+    }
+
+    // 显示加载对话框
+    showDialog(
+      context: context,
+      barrierDismissible: false,
+      builder: (context) => AlertDialog(
+        content: Row(
+          children: [
+            CircularProgressIndicator(),
+            SizedBox(width: 20),
+            Text('正在注销账号...'),
+          ],
+        ),
+      ),
+    );
+
+    try {
+      // 停止自动备份服务
+      await AutoBackupService().stopAutoBackup();
+
+      // 获取用户ID
+      final userId = await DatabaseHelper().getCurrentUserId(_username!);
+      if (userId == null) {
+        Navigator.of(context).pop(); // 关闭加载对话框
+        ScaffoldMessenger.of(context).hideCurrentSnackBar();
+        ScaffoldMessenger.of(context).showSnackBar(
+          SnackBar(content: Text('用户信息错误')),
+        );
+        return;
+      }
+
+      // 删除用户账号及所有数据
+      final deletedCounts = await DatabaseHelper().deleteUserAccount(userId);
+
+      // 删除该用户的所有自动备份文件
+      final deletedBackupCount = await AutoBackupService().deleteBackupsForUser(_username!);
+
+      // 清除 SharedPreferences 中的用户信息
+      final prefs = await SharedPreferences.getInstance();
+      await prefs.remove('current_username');
+      // 如果 last_username 是被删除的用户，也清除它
+      final lastUsername = prefs.getString('last_username');
+      if (lastUsername == _username) {
+        await prefs.remove('last_username');
+      }
+
+      Navigator.of(context).pop(); // 关闭加载对话框
+
+      // 显示成功消息
+      await showDialog(
+        context: context,
+        builder: (context) => AlertDialog(
+          title: Row(
+            children: [
+              Icon(Icons.check_circle, color: Colors.green, size: 28),
+              SizedBox(width: 8),
+              Text('账号已注销'),
+            ],
+          ),
+          content: Column(
+            mainAxisSize: MainAxisSize.min,
+            crossAxisAlignment: CrossAxisAlignment.start,
+            children: [
+              Text('账号 "$_username" 及其所有数据已被永久删除。'),
+              SizedBox(height: 12),
+              Text(
+                '删除统计：',
+                style: TextStyle(fontWeight: FontWeight.bold),
+              ),
+              SizedBox(height: 4),
+              Text('• 产品: ${deletedCounts['products'] ?? 0} 条'),
+              Text('• 供应商: ${deletedCounts['suppliers'] ?? 0} 条'),
+              Text('• 客户: ${deletedCounts['customers'] ?? 0} 条'),
+              Text('• 员工: ${deletedCounts['employees'] ?? 0} 条'),
+              Text('• 采购记录: ${deletedCounts['purchases'] ?? 0} 条'),
+              Text('• 销售记录: ${deletedCounts['sales'] ?? 0} 条'),
+              Text('• 退货记录: ${deletedCounts['returns'] ?? 0} 条'),
+              Text('• 进账记录: ${deletedCounts['income'] ?? 0} 条'),
+              Text('• 汇款记录: ${deletedCounts['remittance'] ?? 0} 条'),
+              Text('• 自动备份文件: $deletedBackupCount 个'),
+            ],
+          ),
+          actions: [
+            ElevatedButton(
+              onPressed: () => Navigator.of(context).pop(),
+              child: Text('确定'),
+            ),
+          ],
+        ),
+      );
+
+      // 跳转到登录界面
+      Navigator.of(context).pushReplacementNamed('/');
+
+    } catch (e) {
+      Navigator.of(context).pop(); // 关闭加载对话框
+      ScaffoldMessenger.of(context).hideCurrentSnackBar();
+      ScaffoldMessenger.of(context).showSnackBar(
+        SnackBar(
+          content: Text('注销失败: $e'),
+          backgroundColor: Colors.red,
+        ),
+      );
+    }
+  }
+
+  // 辅助方法：构建删除警告项
+  Widget _buildDeleteWarningItem(String text) {
+    return Padding(
+      padding: EdgeInsets.only(left: 8, top: 2),
+      child: Row(
+        crossAxisAlignment: CrossAxisAlignment.start,
+        children: [
+          Text('• ', style: TextStyle(fontSize: 14, color: Colors.red[800])),
+          Expanded(
+            child: Text(text, style: TextStyle(fontSize: 14, color: Colors.red[800])),
+          ),
+        ],
+      ),
+    );
+  }
 
   @override
   Widget build(BuildContext context) {
@@ -859,6 +1147,13 @@ class _SettingsScreenState extends State<SettingsScreen> {
             color: Colors.white,
           )
         ),
+        actions: [
+          IconButton(
+            onPressed: _deleteAccount,
+            icon: Icon(Icons.delete_forever, color: Colors.black87),
+            tooltip: '注销账号',
+          ),
+        ],
       ),
       body: Column(
         children: [
@@ -1054,6 +1349,7 @@ class _SettingsScreenState extends State<SettingsScreen> {
     _currentPasswordController.dispose();
     _newPasswordController.dispose();
     _confirmPasswordController.dispose();
+    _deletePasswordController.dispose();
     super.dispose();
   }
 }

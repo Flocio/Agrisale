@@ -330,9 +330,17 @@ class AutoBackupService {
     return autoBackupDir;
   }
 
-  // 获取所有备份文件列表
+  // 获取当前用户的备份文件列表（只返回属于当前登录用户的备份）
   Future<List<Map<String, dynamic>>> getBackupList() async {
     try {
+      // 获取当前登录用户名
+      final prefs = await SharedPreferences.getInstance();
+      final currentUsername = prefs.getString('current_username');
+      if (currentUsername == null) {
+        print('未登录，无法获取备份列表');
+        return [];
+      }
+
       final backupDir = await getAutoBackupDirectory();
       final files = backupDir.listSync()
         .where((f) => f is File && f.path.endsWith('.json'))
@@ -344,16 +352,29 @@ class AutoBackupService {
         b.lastModifiedSync().compareTo(a.lastModifiedSync())
       );
       
-      // 构建备份信息列表
+      // 构建备份信息列表，只包含当前用户的备份
       List<Map<String, dynamic>> backupList = [];
       for (var file in files) {
-        final stat = await file.stat();
-        backupList.add({
-          'path': file.path,
-          'fileName': file.path.split('/').last,
-          'modifiedTime': stat.modified,
-          'size': stat.size,
-        });
+        try {
+          final jsonString = await file.readAsString();
+          final Map<String, dynamic> backupData = jsonDecode(jsonString);
+          final backupUsername = backupData['backupInfo']?['username'] as String?;
+          
+          // 只添加属于当前用户的备份
+          if (backupUsername == currentUsername) {
+            final stat = await file.stat();
+            backupList.add({
+              'path': file.path,
+              'fileName': file.path.split('/').last,
+              'modifiedTime': stat.modified,
+              'size': stat.size,
+              'username': backupUsername,
+            });
+          }
+        } catch (e) {
+          // 单个文件读取失败，跳过
+          print('读取备份文件失败 ${file.path}: $e');
+        }
       }
       
       return backupList;
@@ -379,7 +400,7 @@ class AutoBackupService {
     }
   }
 
-  // 删除所有备份
+  // 删除当前用户的所有备份（getBackupList 已经只返回当前用户的备份）
   Future<int> deleteAllBackups() async {
     try {
       final backupList = await getBackupList();
@@ -394,6 +415,42 @@ class AutoBackupService {
       return deletedCount;
     } catch (e) {
       print('删除所有备份失败: $e');
+      return 0;
+    }
+  }
+
+  // 删除指定用户的所有备份文件
+  Future<int> deleteBackupsForUser(String username) async {
+    try {
+      final backupList = await getBackupList();
+      int deletedCount = 0;
+      
+      for (var backup in backupList) {
+        final filePath = backup['path'] as String;
+        try {
+          final file = File(filePath);
+          if (await file.exists()) {
+            final jsonString = await file.readAsString();
+            final Map<String, dynamic> backupData = jsonDecode(jsonString);
+            
+            // 检查备份文件中的用户名是否匹配
+            final backupUsername = backupData['backupInfo']?['username'] as String?;
+            if (backupUsername == username) {
+              if (await deleteBackup(filePath)) {
+                deletedCount++;
+              }
+            }
+          }
+        } catch (e) {
+          // 单个文件读取失败不影响继续处理其他文件
+          print('检查备份文件失败 $filePath: $e');
+        }
+      }
+      
+      print('删除用户 $username 的备份文件: $deletedCount 个');
+      return deletedCount;
+    } catch (e) {
+      print('删除用户备份文件失败: $e');
       return 0;
     }
   }
