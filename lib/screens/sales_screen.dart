@@ -718,6 +718,32 @@ class _SalesScreenState extends State<SalesScreen> {
       ),
       body: Column(
         children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Icon(Icons.point_of_sale, color: Colors.green[700], size: 20),
+                SizedBox(width: 8),
+                Text(
+                  '销售记录',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.green[800],
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '共 ${_filteredSales.length} 条记录',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           Expanded(
               child: _filteredSales.isEmpty
                   ? SingleChildScrollView(

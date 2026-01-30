@@ -719,6 +719,32 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
       ),
       body: Column(
         children: <Widget>[
+          Padding(
+            padding: const EdgeInsets.fromLTRB(16, 16, 16, 8),
+            child: Row(
+              children: [
+                Icon(Icons.assignment_return, color: Colors.orange[700], size: 20),
+                SizedBox(width: 8),
+                Text(
+                  '退货记录',
+                  style: TextStyle(
+                    fontSize: 16,
+                    fontWeight: FontWeight.bold,
+                    color: Colors.orange[800],
+                  ),
+                ),
+                Spacer(),
+                Text(
+                  '共 ${_filteredReturns.length} 条记录',
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
+                  ),
+                ),
+              ],
+            ),
+          ),
+          Divider(height: 1, thickness: 1, indent: 16, endIndent: 16),
           Expanded(
             child: _filteredReturns.isEmpty
                 ? SingleChildScrollView(
