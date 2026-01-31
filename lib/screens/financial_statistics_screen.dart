@@ -253,7 +253,7 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
     rows.add(['产品筛选: ${_selectedProduct ?? '所有产品'}']);
     rows.add([]); // 空行
     // 修改表头为中文
-    rows.add(['日期/月份', '总销售额', '总采购额', '利润']);
+    rows.add(['日期/月份', '总销售额', '总采购额', '利润/亏损']);
 
     List<Map<String, dynamic>> statistics = _currentIndex == 0 ? _dailyStatistics : _monthlyStatistics;
     String dateKey = _currentIndex == 0 ? 'date' : 'month';
@@ -267,7 +267,10 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
       row.add(stat[dateKey]);
       row.add(_formatAmount(totalSales));
       row.add(_formatAmount(totalPurchases));
-      row.add(_formatAmount(profit));
+      // 利润/亏损：正数显示"利润: xxx"，负数显示"亏损: xxx"
+      row.add(profit >= 0 
+          ? '利润: ${_formatAmount(profit)}' 
+          : '亏损: ${_formatAmount(profit.abs())}');
       rows.add(row);
     }
 
@@ -805,7 +808,9 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
                         ),
                       ),
                       child: Text(
-                        '利润: ¥ ${profit.toStringAsFixed(2)}',
+                        profit >= 0 
+                            ? '利润: ¥ ${profit.toStringAsFixed(2)}'
+                            : '亏损: ¥ ${profit.abs().toStringAsFixed(2)}',
                         style: TextStyle(
                           fontSize: 14,
                           fontWeight: FontWeight.bold,
@@ -856,7 +861,9 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
                             Padding(
                               padding: const EdgeInsets.only(left: 8, top: 6),
                               child: Text(
-                                '¥ ${totalSales.toStringAsFixed(2)}',
+                                totalSales >= 0 
+                                    ? '¥ ${totalSales.toStringAsFixed(2)}'
+                                    : '-¥ ${totalSales.abs().toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
@@ -904,7 +911,9 @@ class _FinancialStatisticsScreenState extends State<FinancialStatisticsScreen> {
                             Padding(
                               padding: const EdgeInsets.only(left: 8, top: 6),
                               child: Text(
-                                '¥ ${totalPurchases.toStringAsFixed(2)}',
+                                totalPurchases >= 0 
+                                    ? '¥ ${totalPurchases.toStringAsFixed(2)}'
+                                    : '-¥ ${totalPurchases.abs().toStringAsFixed(2)}',
                                 style: TextStyle(
                                   fontWeight: FontWeight.bold,
                                   fontSize: 16,
