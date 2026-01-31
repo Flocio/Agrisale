@@ -5,6 +5,8 @@ import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class RemittanceScreen extends StatefulWidget {
   @override
@@ -259,7 +261,26 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId != null) {
           result['userId'] = userId;
-          await db.insert('remittance', result);
+          final insertedId = await db.insert('remittance', result);
+          
+          // 记录日志
+          final supplier = _suppliers.firstWhere(
+            (s) => s['id'] == result['supplierId'],
+            orElse: () => {'name': '未知供应商'},
+          );
+          final employee = _employees.firstWhere(
+            (e) => e['id'] == result['employeeId'],
+            orElse: () => {'name': '未知员工'},
+          );
+          await AuditLogService().logCreate(
+            entityType: EntityType.remittance,
+            userId: userId,
+            username: username,
+            entityId: insertedId,
+            entityName: '¥${result['amount']} (${supplier['name']})',
+            newData: {...result, 'id': insertedId, 'supplierName': supplier['name'], 'employeeName': employee['name']},
+          );
+          
           _fetchRemittances();
         }
       }
@@ -290,6 +311,51 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
             where: 'id = ? AND userId = ?',
             whereArgs: [remittance['id'], userId],
           );
+          
+          // 记录日志
+          final oldSupplier = _suppliers.firstWhere(
+            (s) => s['id'] == remittance['supplierId'],
+            orElse: () => {'name': '未知供应商'},
+          );
+          final newSupplier = _suppliers.firstWhere(
+            (s) => s['id'] == result['supplierId'],
+            orElse: () => {'name': '未知供应商'},
+          );
+          final oldEmployee = _employees.firstWhere(
+            (e) => e['id'] == remittance['employeeId'],
+            orElse: () => {'name': '未知员工'},
+          );
+          final newEmployee = _employees.firstWhere(
+            (e) => e['id'] == result['employeeId'],
+            orElse: () => {'name': '未知员工'},
+          );
+          final oldData = Map<String, dynamic>.from(remittance);
+          oldData['supplierName'] = oldSupplier['name'];
+          oldData['employeeName'] = oldEmployee['name'];
+          // 构建 newData 时保持与 oldData 相同的字段顺序
+          final newData = {
+            'id': remittance['id'],
+            'userId': userId,
+            'supplierId': result['supplierId'],
+            'supplierName': newSupplier['name'],
+            'employeeId': result['employeeId'],
+            'employeeName': newEmployee['name'],
+            'remittanceDate': result['remittanceDate'],
+            'amount': result['amount'],
+            'note': result['note'],
+            'created_at': remittance['created_at'],
+            'updated_at': remittance['updated_at'],
+          };
+          await AuditLogService().logUpdate(
+            entityType: EntityType.remittance,
+            userId: userId,
+            username: username,
+            entityId: remittance['id'] as int,
+            entityName: '¥${result['amount']} (${newSupplier['name']})',
+            oldData: oldData,
+            newData: newData,
+          );
+          
           _fetchRemittances();
         }
       }
@@ -331,7 +397,39 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
       if (username != null) {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId != null) {
+          // 获取要删除的记录数据
+          final remittanceData = await db.query(
+            'remittance',
+            where: 'id = ? AND userId = ?',
+            whereArgs: [id, userId],
+          );
+          
           await db.delete('remittance', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
+          
+          // 记录日志
+          if (remittanceData.isNotEmpty) {
+            final remittance = remittanceData.first;
+            final supplier = _suppliers.firstWhere(
+              (s) => s['id'] == remittance['supplierId'],
+              orElse: () => {'name': '未知供应商'},
+            );
+            final employee = _employees.firstWhere(
+              (e) => e['id'] == remittance['employeeId'],
+              orElse: () => {'name': '未知员工'},
+            );
+            final oldData = Map<String, dynamic>.from(remittance);
+            oldData['supplierName'] = supplier['name'];
+            oldData['employeeName'] = employee['name'];
+            await AuditLogService().logDelete(
+              entityType: EntityType.remittance,
+              userId: userId,
+              username: username,
+              entityId: id,
+              entityName: '¥${remittance['amount']} (${supplier['name']})',
+              oldData: oldData,
+            );
+          }
+          
           _fetchRemittances();
         }
       }

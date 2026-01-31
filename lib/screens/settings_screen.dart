@@ -9,6 +9,8 @@ import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import '../services/auto_backup_service.dart';
 import '../services/export_service.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class SettingsScreen extends StatefulWidget {
   @override
@@ -518,6 +520,26 @@ class _SettingsScreenState extends State<SettingsScreen> {
           return;
         }
 
+        // 在删除前统计现有数据数量（用于日志记录）
+        final beforeSupplierCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM suppliers WHERE userId = ?', [userId])) ?? 0;
+        final beforeCustomerCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM customers WHERE userId = ?', [userId])) ?? 0;
+        final beforeEmployeeCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM employees WHERE userId = ?', [userId])) ?? 0;
+        final beforeProductCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM products WHERE userId = ?', [userId])) ?? 0;
+        final beforePurchaseCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM purchases WHERE userId = ?', [userId])) ?? 0;
+        final beforeSaleCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM sales WHERE userId = ?', [userId])) ?? 0;
+        final beforeReturnCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM returns WHERE userId = ?', [userId])) ?? 0;
+        final beforeIncomeCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM income WHERE userId = ?', [userId])) ?? 0;
+        final beforeRemittanceCount = Sqflite.firstIntValue(await db.rawQuery(
+          'SELECT COUNT(*) FROM remittance WHERE userId = ?', [userId])) ?? 0;
+
         // 在事务中执行数据恢复
         await db.transaction((txn) async {
           // 删除当前用户的业务数据（不包括 user_settings）
@@ -726,6 +748,48 @@ class _SettingsScreenState extends State<SettingsScreen> {
           // 理由：用户设置包含个人隐私数据（API Key）和个人偏好
           //       与业务数据无关，应该保留当前设置
         });
+        
+        // 记录数据覆盖日志
+        await AuditLogService().logCover(
+          userId: userId,
+          username: username,
+          entityName: '数据导入',
+          oldData: {
+            'operation': '数据覆盖导入',
+            'source_user': backupUsername,
+            'source_time': backupTime,
+            'source_version': backupVersion,
+            'is_from_different_user': isFromDifferentUser,
+            'before_counts': {
+              'suppliers': beforeSupplierCount,
+              'customers': beforeCustomerCount,
+              'employees': beforeEmployeeCount,
+              'products': beforeProductCount,
+              'purchases': beforePurchaseCount,
+              'sales': beforeSaleCount,
+              'returns': beforeReturnCount,
+              'income': beforeIncomeCount,
+              'remittance': beforeRemittanceCount,
+            },
+          },
+          newData: {
+            'import_counts': {
+              'suppliers': backupSupplierCount,
+              'customers': backupCustomerCount,
+              'employees': backupEmployeeCount,
+              'products': backupProductCount,
+              'purchases': backupPurchaseCount,
+              'sales': backupSaleCount,
+              'returns': backupReturnCount,
+              'income': backupIncomeCount,
+              'remittance': backupRemittanceCount,
+            },
+            'total_count': backupSupplierCount + backupCustomerCount + backupEmployeeCount + 
+                          backupProductCount + backupPurchaseCount + backupSaleCount + 
+                          backupReturnCount + backupIncomeCount + backupRemittanceCount,
+          },
+          note: '从 $backupUsername 的备份文件($backupTimeDisplay)覆盖数据',
+        );
 
         Navigator.of(context).pop(); // 关闭加载对话框
 

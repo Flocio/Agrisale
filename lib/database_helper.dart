@@ -44,7 +44,7 @@ class DatabaseHelper {
     
     final db = await openDatabase(
       path,
-      version: 13, // 更新版本号 - 添加新单位（件、瓶）
+      version: 14, // 更新版本号 - 添加操作日志表
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -204,6 +204,30 @@ class DatabaseHelper {
     )
   ''');
 
+    // 创建操作日志表
+    await db.execute('''
+    CREATE TABLE operation_logs (
+      id INTEGER PRIMARY KEY AUTOINCREMENT,
+      userId INTEGER NOT NULL,
+      username TEXT NOT NULL,
+      operation_type TEXT NOT NULL CHECK(operation_type IN ('CREATE', 'UPDATE', 'DELETE', 'COVER')),
+      entity_type TEXT NOT NULL,
+      entity_id INTEGER,
+      entity_name TEXT,
+      old_data TEXT,
+      new_data TEXT,
+      changes TEXT,
+      operation_time TEXT DEFAULT (datetime('now')),
+      note TEXT,
+      FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+    )
+  ''');
+    
+    // 创建索引以提高查询性能
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_operation_logs_userId ON operation_logs(userId)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_operation_logs_operation_time ON operation_logs(operation_time)');
+    await db.execute('CREATE INDEX IF NOT EXISTS idx_operation_logs_entity_type ON operation_logs(entity_type)');
+
     // 不再插入初始用户数据，让用户自己注册
   }
 
@@ -308,6 +332,37 @@ class DatabaseHelper {
       await db.execute('ALTER TABLE products_new RENAME TO products');
       
       print('✓ 已更新products表的单位约束，现支持：斤、公斤、袋、件、瓶');
+    }
+    
+    if (oldVersion < 14) {
+      // 从版本13升级到14：添加操作日志表
+      print('升级到版本14: 添加操作日志表');
+      
+      // 创建操作日志表
+      await db.execute('''
+        CREATE TABLE IF NOT EXISTS operation_logs (
+          id INTEGER PRIMARY KEY AUTOINCREMENT,
+          userId INTEGER NOT NULL,
+          username TEXT NOT NULL,
+          operation_type TEXT NOT NULL CHECK(operation_type IN ('CREATE', 'UPDATE', 'DELETE', 'COVER')),
+          entity_type TEXT NOT NULL,
+          entity_id INTEGER,
+          entity_name TEXT,
+          old_data TEXT,
+          new_data TEXT,
+          changes TEXT,
+          operation_time TEXT DEFAULT (datetime('now')),
+          note TEXT,
+          FOREIGN KEY (userId) REFERENCES users (id) ON DELETE CASCADE
+        )
+      ''');
+      
+      // 创建索引以提高查询性能
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_operation_logs_userId ON operation_logs(userId)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_operation_logs_operation_time ON operation_logs(operation_time)');
+      await db.execute('CREATE INDEX IF NOT EXISTS idx_operation_logs_entity_type ON operation_logs(entity_type)');
+      
+      print('✓ 升级到版本14完成：已添加 operation_logs 表');
     }
     
     // 无论版本如何，都检查并添加缺失的自动备份字段（修复可能的不完整升级）

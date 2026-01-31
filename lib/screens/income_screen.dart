@@ -5,6 +5,8 @@ import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class IncomeScreen extends StatefulWidget {
   @override
@@ -261,7 +263,26 @@ class _IncomeScreenState extends State<IncomeScreen> {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId != null) {
           result['userId'] = userId;
-          await db.insert('income', result);
+          final insertedId = await db.insert('income', result);
+          
+          // 记录日志
+          final customer = _customers.firstWhere(
+            (c) => c['id'] == result['customerId'],
+            orElse: () => {'name': '未知客户'},
+          );
+          final employee = _employees.firstWhere(
+            (e) => e['id'] == result['employeeId'],
+            orElse: () => {'name': '未知员工'},
+          );
+          await AuditLogService().logCreate(
+            entityType: EntityType.income,
+            userId: userId,
+            username: username,
+            entityId: insertedId,
+            entityName: '¥${result['amount']} (${customer['name']})',
+            newData: {...result, 'id': insertedId, 'customerName': customer['name'], 'employeeName': employee['name']},
+          );
+          
           _fetchIncomes();
         }
       }
@@ -292,6 +313,53 @@ class _IncomeScreenState extends State<IncomeScreen> {
             where: 'id = ? AND userId = ?',
             whereArgs: [income['id'], userId],
           );
+          
+          // 记录日志
+          final oldCustomer = _customers.firstWhere(
+            (c) => c['id'] == income['customerId'],
+            orElse: () => {'name': '未知客户'},
+          );
+          final newCustomer = _customers.firstWhere(
+            (c) => c['id'] == result['customerId'],
+            orElse: () => {'name': '未知客户'},
+          );
+          final oldEmployee = _employees.firstWhere(
+            (e) => e['id'] == income['employeeId'],
+            orElse: () => {'name': '未知员工'},
+          );
+          final newEmployee = _employees.firstWhere(
+            (e) => e['id'] == result['employeeId'],
+            orElse: () => {'name': '未知员工'},
+          );
+          final oldData = Map<String, dynamic>.from(income);
+          oldData['customerName'] = oldCustomer['name'];
+          oldData['employeeName'] = oldEmployee['name'];
+          // 构建 newData 时保持与 oldData 相同的字段顺序
+          final newData = {
+            'id': income['id'],
+            'userId': userId,
+            'customerId': result['customerId'],
+            'customerName': newCustomer['name'],
+            'employeeId': result['employeeId'],
+            'employeeName': newEmployee['name'],
+            'incomeDate': result['incomeDate'],
+            'amount': result['amount'],
+            'discount': result['discount'],
+            'paymentMethod': result['paymentMethod'],
+            'note': result['note'],
+            'created_at': income['created_at'],
+            'updated_at': income['updated_at'],
+          };
+          await AuditLogService().logUpdate(
+            entityType: EntityType.income,
+            userId: userId,
+            username: username,
+            entityId: income['id'] as int,
+            entityName: '¥${result['amount']} (${newCustomer['name']})',
+            oldData: oldData,
+            newData: newData,
+          );
+          
           _fetchIncomes();
         }
       }
@@ -333,7 +401,39 @@ class _IncomeScreenState extends State<IncomeScreen> {
       if (username != null) {
         final userId = await DatabaseHelper().getCurrentUserId(username);
         if (userId != null) {
+          // 获取要删除的记录数据
+          final incomeData = await db.query(
+            'income',
+            where: 'id = ? AND userId = ?',
+            whereArgs: [id, userId],
+          );
+          
           await db.delete('income', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
+          
+          // 记录日志
+          if (incomeData.isNotEmpty) {
+            final income = incomeData.first;
+            final customer = _customers.firstWhere(
+              (c) => c['id'] == income['customerId'],
+              orElse: () => {'name': '未知客户'},
+            );
+            final employee = _employees.firstWhere(
+              (e) => e['id'] == income['employeeId'],
+              orElse: () => {'name': '未知员工'},
+            );
+            final oldData = Map<String, dynamic>.from(income);
+            oldData['customerName'] = customer['name'];
+            oldData['employeeName'] = employee['name'];
+            await AuditLogService().logDelete(
+              entityType: EntityType.income,
+              userId: userId,
+              username: username,
+              entityId: id,
+              entityName: '¥${income['amount']} (${customer['name']})',
+              oldData: oldData,
+            );
+          }
+          
           _fetchIncomes();
         }
       }

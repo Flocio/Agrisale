@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class SalesScreen extends StatefulWidget {
   @override
@@ -216,7 +218,7 @@ class _SalesScreenState extends State<SalesScreen> {
         if (userId != null) {
           // 添加userId到销售记录
           result['userId'] = userId;
-          await db.insert('sales', result);
+          final insertedId = await db.insert('sales', result);
 
           // Update product stock - 确保只更新当前用户的产品
           final newStock = product['stock'] - result['quantity'];
@@ -225,6 +227,20 @@ class _SalesScreenState extends State<SalesScreen> {
             {'stock': newStock},
             where: 'id = ? AND userId = ?',
             whereArgs: [product['id'], userId],
+          );
+          
+          // 记录日志
+          final customer = _customers.firstWhere(
+            (c) => c['id'] == result['customerId'],
+            orElse: () => {'name': '未知客户'},
+          );
+          await AuditLogService().logCreate(
+            entityType: EntityType.sale,
+            userId: userId,
+            username: username,
+            entityId: insertedId,
+            entityName: '${result['productName']} (销售 ${_formatNumber(result['quantity'] as double)} ${product['unit']})',
+            newData: {...result, 'id': insertedId, 'customerName': customer['name']},
           );
 
           _fetchData();
@@ -327,69 +343,46 @@ class _SalesScreenState extends State<SalesScreen> {
             where: 'id = ? AND userId = ?',
             whereArgs: [sale['id'], userId],
           );
+          
+          // 记录日志
+          final oldCustomer = _customers.firstWhere(
+            (c) => c['id'] == sale['customerId'],
+            orElse: () => {'name': '未知客户'},
+          );
+          final newCustomer = _customers.firstWhere(
+            (c) => c['id'] == result['customerId'],
+            orElse: () => {'name': '未知客户'},
+          );
+          final oldData = Map<String, dynamic>.from(sale);
+          oldData['customerName'] = oldCustomer['name'];
+          // 构建 newData 时保持与 oldData 相同的字段顺序
+          final newData = {
+            'id': sale['id'],
+            'userId': userId,
+            'productName': result['productName'],
+            'quantity': result['quantity'],
+            'saleDate': result['saleDate'],
+            'customerId': result['customerId'],
+            'customerName': newCustomer['name'],
+            'totalSalePrice': result['totalSalePrice'],
+            'note': result['note'],
+            'created_at': sale['created_at'],
+            'updated_at': sale['updated_at'],
+          };
+          await AuditLogService().logUpdate(
+            entityType: EntityType.sale,
+            userId: userId,
+            username: username,
+            entityId: sale['id'] as int,
+            entityName: '${result['productName']} (${result['saleDate']})',
+            oldData: oldData,
+            newData: newData,
+          );
 
           _fetchData();
         }
       }
     }
-  }
-
-  void _showNoteDialog(Map<String, dynamic> sale) {
-    final _noteController = TextEditingController(text: sale['note']);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('备注'),
-        content: TextField(
-          controller: _noteController,
-          decoration: InputDecoration(
-            labelText: '编辑备注',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            filled: true,
-            fillColor: Colors.grey[50],
-          ),
-          maxLines: null,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton(
-                onPressed: () async {
-                  final db = await DatabaseHelper().database;
-                  final prefs = await SharedPreferences.getInstance();
-                  final username = prefs.getString('current_username');
-                  
-                  if (username != null) {
-                    final userId = await DatabaseHelper().getCurrentUserId(username);
-                    if (userId != null) {
-                      await db.update(
-                        'sales',
-                        {'note': _noteController.text},
-                        where: 'id = ? AND userId = ?',
-                        whereArgs: [sale['id'], userId],
-                      );
-                      Navigator.of(context).pop();
-                      _fetchData(); // Refresh data
-                    }
-                  }
-                },
-                child: Text('保存'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('取消'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _deleteSale(Map<String, dynamic> sale) async {
@@ -452,6 +445,18 @@ class _SalesScreenState extends State<SalesScreen> {
             {'stock': newStock},
             where: 'id = ? AND userId = ?',
             whereArgs: [product['id'], userId],
+          );
+          
+          // 记录日志
+          final oldData = Map<String, dynamic>.from(sale);
+          oldData['customerName'] = customer['name'];
+          await AuditLogService().logDelete(
+            entityType: EntityType.sale,
+            userId: userId,
+            username: username,
+            entityId: sale['id'] as int,
+            entityName: '${sale['productName']} (${sale['saleDate']})',
+            oldData: oldData,
           );
 
           _fetchData();

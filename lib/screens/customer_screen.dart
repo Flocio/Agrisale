@@ -7,6 +7,8 @@ import 'customer_records_screen.dart';
 import 'customer_transactions_screen.dart';
 import 'customer_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class CustomerScreen extends StatefulWidget {
   @override
@@ -108,7 +110,22 @@ class _CustomerScreenState extends State<CustomerScreen> {
           } else {
             // 添加userId到客户数据
             result['userId'] = userId;
-            await db.insert('customers', result);
+            final insertedId = await db.insert('customers', result);
+            
+            // 记录日志（不影响主业务逻辑）
+            try {
+              await AuditLogService().logCreate(
+                entityType: EntityType.customer,
+                userId: userId,
+                username: username,
+                entityId: insertedId,
+                entityName: result['name'],
+                newData: {...result, 'id': insertedId},
+              );
+            } catch (e) {
+              print('记录创建日志失败: $e');
+            }
+            
             _fetchCustomers();
           }
         }
@@ -151,12 +168,42 @@ class _CustomerScreenState extends State<CustomerScreen> {
           } else {
             // 确保userId不变
             result['userId'] = userId;
+            
+            // 先保存旧数据用于日志记录
+            final oldData = Map<String, dynamic>.from(customer);
+            
+            // 先更新数据库
             await db.update(
               'customers', 
               result, 
               where: 'id = ? AND userId = ?', 
               whereArgs: [customer['id'], userId]
             );
+            
+            // 记录日志（不影响主业务逻辑）
+            try {
+              // 构建 newData 时保持与 oldData 相同的字段顺序
+              final newData = {
+                'id': customer['id'],
+                'userId': userId,
+                'name': result['name'],
+                'note': result['note'],
+                'created_at': customer['created_at'],
+                'updated_at': customer['updated_at'],
+              };
+              await AuditLogService().logUpdate(
+                entityType: EntityType.customer,
+                userId: userId,
+                username: username,
+                entityId: customer['id'] as int,
+                entityName: result['name'],
+                oldData: oldData,
+                newData: newData,
+              );
+            } catch (e) {
+              print('记录更新日志失败: $e');
+            }
+            
             _fetchCustomers();
           }
         }
@@ -246,6 +293,13 @@ class _CustomerScreenState extends State<CustomerScreen> {
     );
 
     if (confirm == true) {
+      // 获取客户数据用于日志记录
+      final customerData = await db.query(
+        'customers',
+        where: 'id = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
+      
       // 只删除当前用户的客户
       await db.delete('customers', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
       // 更新当前用户的销售记录，将删除的客户ID设为0
@@ -269,6 +323,36 @@ class _CustomerScreenState extends State<CustomerScreen> {
         where: 'customerId = ? AND userId = ?',
         whereArgs: [id, userId],
       );
+      
+      // 记录日志（不影响主业务逻辑）
+      try {
+        Map<String, dynamic>? oldData;
+        if (customerData.isNotEmpty) {
+          oldData = Map<String, dynamic>.from(customerData.first);
+          // 添加级联操作信息
+          if (totalRelatedRecords > 0) {
+            oldData['cascade_info'] = {
+              'operation': 'customer_delete_update_relations',
+              'affected_sales': salesCount,
+              'affected_returns': returnsCount,
+              'affected_income': incomeCount,
+              'total_affected': totalRelatedRecords,
+              'note': '关联记录的客户已设为"未知客户"',
+            };
+          }
+        }
+        await AuditLogService().logDelete(
+          entityType: EntityType.customer,
+          userId: userId,
+          username: username,
+          entityId: id,
+          entityName: name,
+          oldData: oldData,
+        );
+      } catch (e) {
+        print('记录删除日志失败: $e');
+      }
+      
       _fetchCustomers();
       
       // 显示删除成功提示

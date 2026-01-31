@@ -3,8 +3,11 @@ import 'dart:convert';
 import 'dart:io';
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import 'package:sqflite/sqflite.dart';
 import '../database_helper.dart';
 import '../utils/app_version.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class AutoBackupService {
   static final AutoBackupService _instance = AutoBackupService._internal();
@@ -492,7 +495,7 @@ class AutoBackupService {
   }
 
   // 恢复备份
-  Future<bool> restoreBackup(String filePath, int userId) async {
+  Future<bool> restoreBackup(String filePath, int userId, {String? username}) async {
     try {
       final file = File(filePath);
       if (!await file.exists()) {
@@ -510,7 +513,42 @@ class AutoBackupService {
       }
 
       final data = importData['data'] as Map<String, dynamic>;
+      final backupInfo = importData['backupInfo'] as Map<String, dynamic>;
+      final backupUsername = backupInfo['username'] ?? '未知';
+      final backupTime = backupInfo['backupTime'] ?? '未知';
+      final backupVersion = backupInfo['version'] ?? '未知';
+      
+      // 获取数据量统计（将要导入的数据）
+      final supplierCount = (data['suppliers'] as List?)?.length ?? 0;
+      final customerCount = (data['customers'] as List?)?.length ?? 0;
+      final productCount = (data['products'] as List?)?.length ?? 0;
+      final employeeCount = (data['employees'] as List?)?.length ?? 0;
+      final purchaseCount = (data['purchases'] as List?)?.length ?? 0;
+      final saleCount = (data['sales'] as List?)?.length ?? 0;
+      final returnCount = (data['returns'] as List?)?.length ?? 0;
+      final incomeCount = (data['income'] as List?)?.length ?? 0;
+      final remittanceCount = (data['remittance'] as List?)?.length ?? 0;
       final db = await DatabaseHelper().database;
+
+      // 在删除前统计现有数据数量（用于日志记录）
+      final beforeSupplierCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM suppliers WHERE userId = ?', [userId])) ?? 0;
+      final beforeCustomerCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM customers WHERE userId = ?', [userId])) ?? 0;
+      final beforeEmployeeCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM employees WHERE userId = ?', [userId])) ?? 0;
+      final beforeProductCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM products WHERE userId = ?', [userId])) ?? 0;
+      final beforePurchaseCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM purchases WHERE userId = ?', [userId])) ?? 0;
+      final beforeSaleCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM sales WHERE userId = ?', [userId])) ?? 0;
+      final beforeReturnCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM returns WHERE userId = ?', [userId])) ?? 0;
+      final beforeIncomeCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM income WHERE userId = ?', [userId])) ?? 0;
+      final beforeRemittanceCount = Sqflite.firstIntValue(await db.rawQuery(
+        'SELECT COUNT(*) FROM remittance WHERE userId = ?', [userId])) ?? 0;
 
       // 在事务中执行恢复
       await db.transaction((txn) async {
@@ -708,6 +746,59 @@ class AutoBackupService {
           }
         }
       });
+      
+      // 记录操作日志
+      try {
+        // 如果没有传入 username，尝试从 SharedPreferences 获取
+        String? finalUsername = username;
+        if (finalUsername == null) {
+          final prefs = await SharedPreferences.getInstance();
+          finalUsername = prefs.getString('current_username') ?? '未知用户';
+        }
+        
+        await AuditLogService().logCover(
+          userId: userId,
+          username: finalUsername,
+          entityName: '备份恢复',
+          oldData: {
+            'operation': '自动备份恢复',
+            'source_user': backupUsername,
+            'source_time': backupTime,
+            'source_version': backupVersion,
+            'before_counts': {
+              'suppliers': beforeSupplierCount,
+              'customers': beforeCustomerCount,
+              'employees': beforeEmployeeCount,
+              'products': beforeProductCount,
+              'purchases': beforePurchaseCount,
+              'sales': beforeSaleCount,
+              'returns': beforeReturnCount,
+              'income': beforeIncomeCount,
+              'remittance': beforeRemittanceCount,
+            },
+          },
+          newData: {
+            'import_counts': {
+              'suppliers': supplierCount,
+              'customers': customerCount,
+              'employees': employeeCount,
+              'products': productCount,
+              'purchases': purchaseCount,
+              'sales': saleCount,
+              'returns': returnCount,
+              'income': incomeCount,
+              'remittance': remittanceCount,
+            },
+            'total_count': supplierCount + customerCount + employeeCount + 
+                          productCount + purchaseCount + saleCount + 
+                          returnCount + incomeCount + remittanceCount,
+          },
+          note: '恢复自动备份（覆盖）：供应商 $supplierCount，客户 $customerCount，员工 $employeeCount，产品 $productCount，采购 $purchaseCount，销售 $saleCount，退货 $returnCount，进账 $incomeCount，汇款 $remittanceCount',
+        );
+      } catch (e) {
+        print('记录备份恢复日志失败: $e');
+        // 日志记录失败不影响业务
+      }
 
       print('恢复备份成功');
       return true;

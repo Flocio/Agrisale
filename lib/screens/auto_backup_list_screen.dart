@@ -233,7 +233,7 @@ class _AutoBackupListScreenState extends State<AutoBackupListScreen> {
           return;
         }
 
-        final success = await _backupService.restoreBackup(backup['path'], userId);
+        final success = await _backupService.restoreBackup(backup['path'], userId, username: username);
         Navigator.of(context).pop(); // 关闭加载对话框
 
         if (success) {

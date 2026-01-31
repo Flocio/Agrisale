@@ -5,6 +5,8 @@ import 'package:intl/intl.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class PurchaseScreen extends StatefulWidget {
   @override
@@ -218,7 +220,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
           
           // 添加userId到采购记录
           result['userId'] = userId;
-          await db.insert('purchases', result);
+          final insertedId = await db.insert('purchases', result);
 
           // Update product stock - 采购为正数增加库存，退货为负数减少库存
           final newStock = product['stock'] + quantity;
@@ -227,6 +229,21 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             {'stock': newStock},
             where: 'id = ? AND userId = ?',
             whereArgs: [product['id'], userId],
+          );
+          
+          // 记录日志
+          final supplier = _suppliers.firstWhere(
+            (s) => s['id'] == result['supplierId'],
+            orElse: () => {'name': '未知供应商'},
+          );
+          final entityName = '${result['productName']} (${quantity > 0 ? "采购" : "退货"} ${_formatNumber(quantity.abs())} ${product['unit']})';
+          await AuditLogService().logCreate(
+            entityType: EntityType.purchase,
+            userId: userId,
+            username: username,
+            entityId: insertedId,
+            entityName: entityName,
+            newData: {...result, 'id': insertedId, 'supplierName': supplier['name']},
           );
 
           _fetchData();
@@ -339,69 +356,46 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             where: 'id = ? AND userId = ?',
             whereArgs: [purchase['id'], userId],
           );
+          
+          // 记录日志
+          final oldSupplier = _suppliers.firstWhere(
+            (s) => s['id'] == purchase['supplierId'],
+            orElse: () => {'name': '未知供应商'},
+          );
+          final newSupplier = _suppliers.firstWhere(
+            (s) => s['id'] == result['supplierId'],
+            orElse: () => {'name': '未知供应商'},
+          );
+          final oldData = Map<String, dynamic>.from(purchase);
+          oldData['supplierName'] = oldSupplier['name'];
+          // 构建 newData 时保持与 oldData 相同的字段顺序
+          final newData = {
+            'id': purchase['id'],
+            'userId': userId,
+            'productName': result['productName'],
+            'quantity': result['quantity'],
+            'purchaseDate': result['purchaseDate'],
+            'supplierId': result['supplierId'],
+            'supplierName': newSupplier['name'],
+            'totalPurchasePrice': result['totalPurchasePrice'],
+            'note': result['note'],
+            'created_at': purchase['created_at'],
+            'updated_at': purchase['updated_at'],
+          };
+          await AuditLogService().logUpdate(
+            entityType: EntityType.purchase,
+            userId: userId,
+            username: username,
+            entityId: purchase['id'] as int,
+            entityName: '${result['productName']} (${result['purchaseDate']})',
+            oldData: oldData,
+            newData: newData,
+          );
 
           _fetchData();
         }
       }
     }
-  }
-
-  void _showNoteDialog(Map<String, dynamic> purchase) {
-    final _noteController = TextEditingController(text: purchase['note']);
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        title: Text('备注'),
-        content: TextField(
-          controller: _noteController,
-          decoration: InputDecoration(
-            labelText: '编辑备注',
-            border: OutlineInputBorder(
-              borderRadius: BorderRadius.circular(8),
-            ),
-            filled: true,
-            fillColor: Colors.grey[50],
-          ),
-          maxLines: null,
-        ),
-        shape: RoundedRectangleBorder(
-          borderRadius: BorderRadius.circular(12),
-        ),
-        actions: [
-          Row(
-            mainAxisAlignment: MainAxisAlignment.spaceBetween,
-            children: [
-              TextButton(
-                onPressed: () async {
-                  final db = await DatabaseHelper().database;
-                  final prefs = await SharedPreferences.getInstance();
-                  final username = prefs.getString('current_username');
-                  
-                  if (username != null) {
-                    final userId = await DatabaseHelper().getCurrentUserId(username);
-                    if (userId != null) {
-                      await db.update(
-                        'purchases',
-                        {'note': _noteController.text},
-                        where: 'id = ? AND userId = ?',
-                        whereArgs: [purchase['id'], userId],
-                      );
-                      Navigator.of(context).pop();
-                      _fetchData(); // Refresh data
-                    }
-                  }
-                },
-                child: Text('保存'),
-              ),
-              TextButton(
-                onPressed: () => Navigator.of(context).pop(),
-                child: Text('取消'),
-              ),
-            ],
-          ),
-        ],
-      ),
-    );
   }
 
   Future<void> _deletePurchase(Map<String, dynamic> purchase) async {
@@ -473,6 +467,18 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
             {'stock': newStock},
             where: 'id = ? AND userId = ?',
             whereArgs: [product['id'], userId],
+          );
+          
+          // 记录日志
+          final oldData = Map<String, dynamic>.from(purchase);
+          oldData['supplierName'] = supplier['name'];
+          await AuditLogService().logDelete(
+            entityType: EntityType.purchase,
+            userId: userId,
+            username: username,
+            entityId: purchase['id'] as int,
+            entityName: '${purchase['productName']} (${purchase['purchaseDate']})',
+            oldData: oldData,
           );
 
           _fetchData();

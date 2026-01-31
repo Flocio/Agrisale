@@ -7,6 +7,8 @@ import 'supplier_records_screen.dart';
 import 'supplier_transactions_screen.dart';
 import 'supplier_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class SupplierScreen extends StatefulWidget {
   @override
@@ -108,7 +110,22 @@ class _SupplierScreenState extends State<SupplierScreen> {
           } else {
             // 添加userId到供应商数据
             result['userId'] = userId;
-            await db.insert('suppliers', result);
+            final insertedId = await db.insert('suppliers', result);
+            
+            // 记录日志（不影响主业务逻辑）
+            try {
+              await AuditLogService().logCreate(
+                entityType: EntityType.supplier,
+                userId: userId,
+                username: username,
+                entityId: insertedId,
+                entityName: result['name'],
+                newData: {...result, 'id': insertedId},
+              );
+            } catch (e) {
+              print('记录创建日志失败: $e');
+            }
+            
             _fetchSuppliers();
           }
         }
@@ -151,7 +168,35 @@ class _SupplierScreenState extends State<SupplierScreen> {
           } else {
             // 确保userId不变
             result['userId'] = userId;
+            
+            // 先更新数据库
             await db.update('suppliers', result, where: 'id = ? AND userId = ?', whereArgs: [supplier['id'], userId]);
+            
+            // 记录日志（不影响主业务逻辑）
+            try {
+              final oldData = Map<String, dynamic>.from(supplier);
+              // 构建 newData 时保持与 oldData 相同的字段顺序
+              final newData = {
+                'id': supplier['id'],
+                'userId': userId,
+                'name': result['name'],
+                'note': result['note'],
+                'created_at': supplier['created_at'],
+                'updated_at': supplier['updated_at'],
+              };
+              await AuditLogService().logUpdate(
+                entityType: EntityType.supplier,
+                userId: userId,
+                username: username,
+                entityId: supplier['id'] as int,
+                entityName: result['name'],
+                oldData: oldData,
+                newData: newData,
+              );
+            } catch (e) {
+              print('记录更新日志失败: $e');
+            }
+            
             _fetchSuppliers();
           }
         }
@@ -241,6 +286,13 @@ class _SupplierScreenState extends State<SupplierScreen> {
     );
 
     if (confirm == true) {
+      // 获取供应商数据用于日志记录
+      final supplierData = await db.query(
+        'suppliers',
+        where: 'id = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
+      
       // 只删除当前用户的供应商
       await db.delete('suppliers', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
       // 更新当前用户的采购记录，将删除的供应商ID设为0
@@ -264,6 +316,36 @@ class _SupplierScreenState extends State<SupplierScreen> {
         where: 'supplierId = ? AND userId = ?',
         whereArgs: [id, userId],
       );
+      
+      // 记录日志（不影响主业务逻辑）
+      try {
+        Map<String, dynamic>? oldData;
+        if (supplierData.isNotEmpty) {
+          oldData = Map<String, dynamic>.from(supplierData.first);
+          // 添加级联操作信息
+          if (totalRelatedRecords > 0) {
+            oldData['cascade_info'] = {
+              'operation': 'supplier_delete_update_relations',
+              'affected_purchases': purchasesCount,
+              'affected_products': productsCount,
+              'affected_remittance': remittanceCount,
+              'total_affected': totalRelatedRecords,
+              'note': '关联记录的供应商已设为"未分配"或"未知供应商"',
+            };
+          }
+        }
+        await AuditLogService().logDelete(
+          entityType: EntityType.supplier,
+          userId: userId,
+          username: username,
+          entityId: id,
+          entityName: name,
+          oldData: oldData,
+        );
+      } catch (e) {
+        print('记录删除日志失败: $e');
+      }
+      
       _fetchSuppliers();
       
       // 显示删除成功提示

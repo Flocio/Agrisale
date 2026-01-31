@@ -4,6 +4,8 @@ import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart'; // 确保路径正确
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class ProductScreen extends StatefulWidget {
   @override
@@ -133,7 +135,18 @@ class _ProductScreenState extends State<ProductScreen> {
           } else {
             // 添加userId到产品数据
             result['userId'] = userId;
-            await db.insert('products', result);
+            final insertedId = await db.insert('products', result);
+            
+            // 记录日志
+            await AuditLogService().logCreate(
+              entityType: EntityType.product,
+              userId: userId,
+              username: username,
+              entityId: insertedId,
+              entityName: result['name'],
+              newData: {...result, 'id': insertedId},
+            );
+            
             _fetchProducts();
           }
         }
@@ -250,23 +263,45 @@ class _ProductScreenState extends State<ProductScreen> {
             
             // 确保userId不变
             result['userId'] = userId;
+            
+            // 准备日志数据
+            final oldData = Map<String, dynamic>.from(product);
+            // 构建 newData 时保持与 oldData 相同的字段顺序
+            final newData = {
+              'id': product['id'],
+              'userId': userId,
+              'name': result['name'],
+              'description': result['description'],
+              'stock': result['stock'],
+              'unit': result['unit'],
+              'supplierId': result['supplierId'],
+              'created_at': product['created_at'],
+              'updated_at': product['updated_at'],
+            };
+            
+            // 统计级联更新数量
+            int affectedPurchases = 0;
+            int affectedSales = 0;
+            int affectedReturns = 0;
+            int supplierSyncedPurchases = 0;
+            
             await db.update('products', result, where: 'id = ? AND userId = ?', whereArgs: [product['id'], userId]);
             
             // 如果产品名称发生变化，同步更新 purchases/sales/returns 表中的 productName
             if (oldProductName != newProductName) {
-              await db.update(
+              affectedPurchases = await db.update(
                 'purchases',
                 {'productName': newProductName},
                 where: 'productName = ? AND userId = ?',
                 whereArgs: [oldProductName, userId],
               );
-              await db.update(
+              affectedSales = await db.update(
                 'sales',
                 {'productName': newProductName},
                 where: 'productName = ? AND userId = ?',
                 whereArgs: [oldProductName, userId],
               );
-              await db.update(
+              affectedReturns = await db.update(
                 'returns',
                 {'productName': newProductName},
                 where: 'productName = ? AND userId = ?',
@@ -278,13 +313,85 @@ class _ProductScreenState extends State<ProductScreen> {
             if (shouldSyncSupplier) {
               // 使用新的产品名称（可能已经改变）
               final productNameToUse = newProductName;
-              await db.update(
+              supplierSyncedPurchases = await db.update(
                 'purchases',
                 {'supplierId': newSupplierId},
                 where: 'productName = ? AND userId = ? AND supplierId = ?',
                 whereArgs: [productNameToUse, userId, oldSupplierId],
               );
             }
+            
+            // 构建级联操作信息
+            if (oldProductName != newProductName || supplierChanged) {
+              final cascadeInfo = <String, dynamic>{};
+              
+              if (oldProductName != newProductName) {
+                cascadeInfo['operation'] = 'product_name_sync';
+                cascadeInfo['old_product_name'] = oldProductName;
+                cascadeInfo['new_product_name'] = newProductName;
+                cascadeInfo['affected_purchases'] = affectedPurchases;
+                cascadeInfo['affected_sales'] = affectedSales;
+                cascadeInfo['affected_returns'] = affectedReturns;
+                cascadeInfo['total_affected'] = affectedPurchases + affectedSales + affectedReturns;
+                
+                // 如果同时有供应商同步
+                if (shouldSyncSupplier) {
+                  cascadeInfo['supplier_sync'] = {
+                    'old_supplier': _getSupplierName(oldSupplierId is int ? oldSupplierId : int.tryParse(oldSupplierId.toString())),
+                    'new_supplier': newSupplierId != null && newSupplierId != 0
+                        ? _getSupplierName(newSupplierId is int ? newSupplierId : int.tryParse(newSupplierId.toString()))
+                        : '未分配',
+                    'updated_purchases': supplierSyncedPurchases,
+                  };
+                } else if (supplierChanged) {
+                  // 供应商变更但用户选择不同步
+                  cascadeInfo['supplier_no_sync'] = {
+                    'old_supplier': _getSupplierName(oldSupplierId is int ? oldSupplierId : int.tryParse(oldSupplierId.toString())),
+                    'new_supplier': newSupplierId != null && newSupplierId != 0
+                        ? _getSupplierName(newSupplierId is int ? newSupplierId : int.tryParse(newSupplierId.toString()))
+                        : '未分配',
+                    'skipped_purchases': (await db.rawQuery(
+                      'SELECT COUNT(*) as count FROM purchases WHERE productName = ? AND userId = ? AND supplierId = ?',
+                      [newProductName, userId, oldSupplierId],
+                    )).first['count'] as int,
+                    'note': '用户选择不同步采购记录的供应商',
+                  };
+                }
+              } else if (shouldSyncSupplier) {
+                // 只有供应商同步
+                cascadeInfo['operation'] = 'product_supplier_sync';
+                cascadeInfo['old_supplier'] = _getSupplierName(oldSupplierId is int ? oldSupplierId : int.tryParse(oldSupplierId.toString()));
+                cascadeInfo['new_supplier'] = newSupplierId != null && newSupplierId != 0
+                    ? _getSupplierName(newSupplierId is int ? newSupplierId : int.tryParse(newSupplierId.toString()))
+                    : '未分配';
+                cascadeInfo['updated_purchases'] = supplierSyncedPurchases;
+              } else if (supplierChanged) {
+                // 供应商变更但用户选择不同步
+                cascadeInfo['operation'] = 'product_supplier_no_sync';
+                cascadeInfo['old_supplier'] = _getSupplierName(oldSupplierId is int ? oldSupplierId : int.tryParse(oldSupplierId.toString()));
+                cascadeInfo['new_supplier'] = newSupplierId != null && newSupplierId != 0
+                    ? _getSupplierName(newSupplierId is int ? newSupplierId : int.tryParse(newSupplierId.toString()))
+                    : '未分配';
+                cascadeInfo['skipped_purchases'] = (await db.rawQuery(
+                  'SELECT COUNT(*) as count FROM purchases WHERE productName = ? AND userId = ? AND supplierId = ?',
+                  [newProductName, userId, oldSupplierId],
+                )).first['count'] as int;
+                cascadeInfo['note'] = '用户选择不同步采购记录的供应商';
+              }
+              
+              oldData['cascade_info'] = cascadeInfo;
+            }
+            
+            // 记录日志
+            await AuditLogService().logUpdate(
+              entityType: EntityType.product,
+              userId: userId,
+              username: username,
+              entityId: product['id'] as int,
+              entityName: newProductName,
+              oldData: oldData,
+              newData: newData,
+            );
             
             // 显示操作结果提示
             ScaffoldMessenger.of(context).hideCurrentSnackBar();
@@ -398,12 +505,35 @@ class _ProductScreenState extends State<ProductScreen> {
     );
 
     if (confirm == true) {
+      // 获取产品数据用于日志记录
+      final productData = Map<String, dynamic>.from(product);
+      
       // 级联删除所有相关记录
-      await db.delete('purchases', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
-      await db.delete('sales', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
-      await db.delete('returns', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
+      final deletedPurchases = await db.delete('purchases', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
+      final deletedSales = await db.delete('sales', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
+      final deletedReturns = await db.delete('returns', where: 'productName = ? AND userId = ?', whereArgs: [productName, userId]);
       // 删除产品本身
       await db.delete('products', where: 'id = ? AND userId = ?', whereArgs: [product['id'], userId]);
+      
+      // 记录日志
+      if (totalRelatedRecords > 0) {
+        productData['cascade_info'] = {
+          'operation': 'product_cascade_delete',
+          'deleted_purchases': deletedPurchases,
+          'deleted_sales': deletedSales,
+          'deleted_returns': deletedReturns,
+          'total_deleted': deletedPurchases + deletedSales + deletedReturns,
+        };
+      }
+      await AuditLogService().logDelete(
+        entityType: EntityType.product,
+        userId: userId,
+        username: username,
+        entityId: product['id'] as int,
+        entityName: productName,
+        oldData: productData,
+      );
+      
       _fetchProducts();
       
       // 显示删除成功提示

@@ -31,6 +31,7 @@ import 'screens/auto_backup_screen.dart';
 import 'screens/auto_backup_list_screen.dart';
 import 'screens/version_info_screen.dart';
 import 'screens/model_settings_screen.dart';
+import 'screens/audit_log_screen.dart';
 import 'services/auto_backup_service.dart';
 
 void main() {
@@ -169,6 +170,7 @@ class _MyAppState extends State<MyApp> with WidgetsBindingObserver {
         '/auto_backup_list': (context) => AutoBackupListScreen(),
         '/version_info': (context) => VersionInfoScreen(),
         '/model_settings': (context) => ModelSettingsScreen(),
+        '/audit_log': (context) => AuditLogScreen(),
       },
     );
   }

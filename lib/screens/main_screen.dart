@@ -69,6 +69,7 @@ class _MainScreenState extends State<MainScreen> {
         {'name': '账户设置', 'icon': Icons.settings, 'route': '/settings'},
         {'name': '模型设置', 'icon': Icons.tune, 'route': '/model_settings'},
         {'name': '数据备份', 'icon': Icons.backup, 'route': '/auto_backup'},
+        {'name': '操作日志', 'icon': Icons.history, 'route': '/audit_log'},
         {'name': '关于系统', 'icon': Icons.info_outline, 'route': '/version_info'},
       ]
     },

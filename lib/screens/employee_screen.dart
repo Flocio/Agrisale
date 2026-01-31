@@ -5,6 +5,8 @@ import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import 'employee_records_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
+import '../services/audit_log_service.dart';
+import '../models/audit_log.dart';
 
 class EmployeeScreen extends StatefulWidget {
   @override
@@ -106,7 +108,18 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
           } else {
             // 添加userId到员工数据
             result['userId'] = userId;
-            await db.insert('employees', result);
+            final insertedId = await db.insert('employees', result);
+            
+            // 记录日志
+            await AuditLogService().logCreate(
+              entityType: EntityType.employee,
+              userId: userId,
+              username: username,
+              entityId: insertedId,
+              entityName: result['name'],
+              newData: {...result, 'id': insertedId},
+            );
+            
             _fetchEmployees();
           }
         }
@@ -149,12 +162,38 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
           } else {
             // 确保userId不变
             result['userId'] = userId;
+            
+            // 保存旧数据用于日志
+            final oldData = Map<String, dynamic>.from(employee);
+            
+            // 先更新数据库
             await db.update(
               'employees', 
               result, 
               where: 'id = ? AND userId = ?', 
               whereArgs: [employee['id'], userId]
             );
+            
+            // 记录日志（数据库更新成功后）
+            // 构建 newData 时保持与 oldData 相同的字段顺序
+            final newData = {
+              'id': employee['id'],
+              'userId': userId,
+              'name': result['name'],
+              'note': result['note'],
+              'created_at': employee['created_at'],
+              'updated_at': employee['updated_at'],
+            };
+            await AuditLogService().logUpdate(
+              entityType: EntityType.employee,
+              userId: userId,
+              username: username,
+              entityId: employee['id'] as int,
+              entityName: result['name'],
+              oldData: oldData,
+              newData: newData,
+            );
+            
             _fetchEmployees();
           }
         }
@@ -236,6 +275,13 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
     );
 
     if (confirm == true) {
+      // 获取员工数据用于日志记录
+      final employeeData = await db.query(
+        'employees',
+        where: 'id = ? AND userId = ?',
+        whereArgs: [id, userId],
+      );
+      
       // 只删除当前用户的员工
       await db.delete('employees', where: 'id = ? AND userId = ?', whereArgs: [id, userId]);
       // 更新当前用户的进账记录，将删除的员工ID设为0
@@ -252,6 +298,31 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
         where: 'employeeId = ? AND userId = ?',
         whereArgs: [id, userId],
       );
+      
+      // 记录日志
+      Map<String, dynamic>? oldData;
+      if (employeeData.isNotEmpty) {
+        oldData = Map<String, dynamic>.from(employeeData.first);
+        // 添加级联操作信息
+        if (totalRelatedRecords > 0) {
+          oldData['cascade_info'] = {
+            'operation': 'employee_delete_update_relations',
+            'affected_income': incomeCount,
+            'affected_remittance': remittanceCount,
+            'total_affected': totalRelatedRecords,
+            'note': '关联记录的经办人已设为"未知员工"',
+          };
+        }
+      }
+      await AuditLogService().logDelete(
+        entityType: EntityType.employee,
+        userId: userId,
+        username: username,
+        entityId: id,
+        entityName: name,
+        oldData: oldData,
+      );
+      
       _fetchEmployees();
       
       // 显示删除成功提示
