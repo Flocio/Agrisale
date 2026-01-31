@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart'; // 确保路径正确
+import '../widgets/entity_detail_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
@@ -417,6 +418,47 @@ class _ProductScreenState extends State<ProductScreen> {
     }
   }
 
+  /// 显示产品详情对话框
+  void _showProductDetailDialog(Map<String, dynamic> product) async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    if (username == null) return;
+    
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+
+    // 获取供应商名称
+    String? supplierName;
+    final supplierId = product['supplierId'];
+    if (supplierId != null && supplierId != 0) {
+      final supplier = _suppliers.firstWhere(
+        (s) => s['id'] == supplierId,
+        orElse: () => {'name': '未知供应商'},
+      );
+      supplierName = supplier['name'] as String?;
+    }
+    
+    // 构建带有供应商名称的数据
+    final recordData = Map<String, dynamic>.from(product);
+    if (supplierName != null) {
+      recordData['supplierName'] = supplierName;
+    }
+
+    showDialog(
+      context: context,
+      builder: (context) => EntityDetailDialog(
+        entityType: EntityType.product,
+        entityTypeDisplayName: '产品',
+        entityId: product['id'] as int,
+        userId: userId,
+        entityName: product['name'] as String,
+        recordData: recordData,
+        themeColor: Colors.green,
+        actionButtons: [], // 产品没有操作按钮
+      ),
+    );
+  }
+
   Future<void> _deleteProduct(Map<String, dynamic> product) async {
     final db = await DatabaseHelper().database;
     final prefs = await SharedPreferences.getInstance();
@@ -701,6 +743,7 @@ class _ProductScreenState extends State<ProductScreen> {
                           ),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
+                            onTap: () => _showProductDetailDialog(product),
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                               child: Row(

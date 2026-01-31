@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../widgets/entity_detail_dialog.dart';
 import 'supplier_records_screen.dart';
 import 'supplier_transactions_screen.dart';
 import 'supplier_detail_screen.dart';
@@ -388,6 +389,52 @@ class _SupplierScreenState extends State<SupplierScreen> {
     );
   }
 
+  /// 显示供应商详情对话框
+  void _showSupplierDetailDialog(Map<String, dynamic> supplier) async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    if (username == null) return;
+    
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+
+    final supplierId = supplier['id'] as int;
+    final supplierName = supplier['name'] as String;
+
+    showDialog(
+      context: context,
+      builder: (context) => EntityDetailDialog(
+        entityType: EntityType.supplier,
+        entityTypeDisplayName: '供应商',
+        entityId: supplierId,
+        userId: userId,
+        entityName: supplierName,
+        recordData: supplier,
+        themeColor: Colors.blue,
+        actionButtons: [
+          EntityActionButton(
+            icon: Icons.receipt_long,
+            label: '对账单',
+            color: Colors.green,
+            onPressed: () => _viewSupplierDetail(supplierId, supplierName),
+          ),
+          EntityActionButton(
+            icon: Icons.account_balance_wallet,
+            label: '往来记录',
+            color: Colors.purple,
+            onPressed: () => _viewSupplierTransactions(supplierId, supplierName),
+          ),
+          EntityActionButton(
+            icon: Icons.list_alt,
+            label: '采购记录',
+            color: Colors.blue,
+            onPressed: () => _viewSupplierRecords(supplierId, supplierName),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -489,7 +536,7 @@ class _SupplierScreenState extends State<SupplierScreen> {
                           ),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
-                            onTap: () => _viewSupplierDetail(supplier['id'] as int, supplier['name'] as String),
+                            onTap: () => _showSupplierDetailDialog(supplier),
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                               child: Row(
@@ -545,28 +592,6 @@ class _SupplierScreenState extends State<SupplierScreen> {
                                   Row(
                     mainAxisSize: MainAxisSize.min,
                     children: [
-                      IconButton(
-                                        icon: Icon(Icons.account_balance_wallet, color: Colors.purple),
-                                        tooltip: '往来记录',
-                                        onPressed: () => _viewSupplierTransactions(
-                                          supplier['id'] as int, 
-                                          supplier['name'] as String
-                                        ),
-                                        constraints: BoxConstraints(),
-                                        padding: EdgeInsets.all(8),
-                      ),
-                                      SizedBox(width: 4),
-                      IconButton(
-                                        icon: Icon(Icons.list_alt, color: Colors.blue),
-                                        tooltip: '采购记录',
-                                        onPressed: () => _viewSupplierRecords(
-                                          supplier['id'] as int, 
-                                          supplier['name'] as String
-                                        ),
-                                        constraints: BoxConstraints(),
-                                        padding: EdgeInsets.all(8),
-                      ),
-                                      SizedBox(width: 4),
                       IconButton(
                                         icon: Icon(Icons.edit, color: Colors.blue),
                                         tooltip: '编辑',

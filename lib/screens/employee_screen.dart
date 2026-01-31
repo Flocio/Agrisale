@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../widgets/entity_detail_dialog.dart';
 import 'employee_records_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
@@ -347,6 +348,40 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
     );
   }
 
+  /// 显示员工详情对话框
+  void _showEmployeeDetailDialog(Map<String, dynamic> employee) async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    if (username == null) return;
+    
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+
+    final employeeId = employee['id'] as int;
+    final employeeName = employee['name'] as String;
+
+    showDialog(
+      context: context,
+      builder: (context) => EntityDetailDialog(
+        entityType: EntityType.employee,
+        entityTypeDisplayName: '员工',
+        entityId: employeeId,
+        userId: userId,
+        entityName: employeeName,
+        recordData: employee,
+        themeColor: Colors.purple,
+        actionButtons: [
+          EntityActionButton(
+            icon: Icons.list_alt,
+            label: '经办记录',
+            color: Colors.blue,
+            onPressed: () => _viewEmployeeRecords(employeeId, employeeName),
+          ),
+        ],
+      ),
+    );
+  }
+
   @override
   Widget build(BuildContext context) {
     return GestureDetector(
@@ -448,6 +483,7 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                           ),
                           child: InkWell(
                             borderRadius: BorderRadius.circular(10),
+                            onTap: () => _showEmployeeDetailDialog(employee),
                             child: Padding(
                               padding: EdgeInsets.symmetric(vertical: 8, horizontal: 16),
                               child: Row(
@@ -495,17 +531,6 @@ class _EmployeeScreenState extends State<EmployeeScreen> {
                                   Row(
                                     mainAxisSize: MainAxisSize.min,
                                     children: [
-                                      IconButton(
-                                        icon: Icon(Icons.list_alt, color: Colors.blue),
-                                        tooltip: '查看记录',
-                                        onPressed: () => _viewEmployeeRecords(
-                                          employee['id'] as int, 
-                                          employee['name'] as String
-                                        ),
-                                        constraints: BoxConstraints(),
-                                        padding: EdgeInsets.all(8),
-                                      ),
-                                      SizedBox(width: 4),
                                       IconButton(
                                         icon: Icon(Icons.edit, color: Colors.purple),
                                         tooltip: '编辑',

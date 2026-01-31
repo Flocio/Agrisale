@@ -1,20 +1,34 @@
-/// 记录详情对话框
-/// 显示记录的完整数据库信息和操作历史
+/// 基础信息详情对话框
+/// 显示产品/客户/供应商/员工的完整数据库信息和操作历史
 
 import 'package:flutter/material.dart';
 import '../models/audit_log.dart';
 import '../services/audit_log_service.dart';
-import '../database_helper.dart';
 import '../utils/field_translator.dart';
 
-/// 记录详情对话框
+/// 操作按钮定义
+class EntityActionButton {
+  final IconData icon;
+  final String label;
+  final Color color;
+  final VoidCallback onPressed;
+
+  const EntityActionButton({
+    required this.icon,
+    required this.label,
+    required this.color,
+    required this.onPressed,
+  });
+}
+
+/// 基础信息详情对话框
 /// 
-/// 用于显示采购/销售/退货/进账/汇款等记录的完整信息和操作历史
-class RecordDetailDialog extends StatefulWidget {
+/// 用于显示产品/客户/供应商/员工的完整信息和操作历史
+class EntityDetailDialog extends StatefulWidget {
   /// 实体类型
   final EntityType entityType;
   
-  /// 实体类型显示名称（如 '采购', '销售'）
+  /// 实体类型显示名称（如 '产品', '客户'）
   final String entityTypeDisplayName;
   
   /// 实体ID
@@ -24,32 +38,35 @@ class RecordDetailDialog extends StatefulWidget {
   final int userId;
   
   /// 实体名称（用于标题显示）
-  final String? entityName;
+  final String entityName;
   
   /// 记录的完整数据（所有数据库字段）
   final Map<String, dynamic> recordData;
   
   /// 主题色（用于图标和强调色）
   final Color themeColor;
+  
+  /// 操作按钮列表（显示在顶部）
+  final List<EntityActionButton> actionButtons;
 
-  const RecordDetailDialog({
+  const EntityDetailDialog({
     Key? key,
     required this.entityType,
     required this.entityTypeDisplayName,
     required this.entityId,
     required this.userId,
-    this.entityName,
+    required this.entityName,
     required this.recordData,
     this.themeColor = Colors.blue,
+    this.actionButtons = const [],
   }) : super(key: key);
 
   @override
-  State<RecordDetailDialog> createState() => _RecordDetailDialogState();
+  State<EntityDetailDialog> createState() => _EntityDetailDialogState();
 }
 
-class _RecordDetailDialogState extends State<RecordDetailDialog> {
+class _EntityDetailDialogState extends State<EntityDetailDialog> {
   final AuditLogService _auditLogService = AuditLogService();
-  final DatabaseHelper _dbHelper = DatabaseHelper();
   
   List<AuditLog> _logs = [];
   bool _isLoadingLogs = true;
@@ -106,6 +123,12 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
                 child: Column(
                   crossAxisAlignment: CrossAxisAlignment.start,
                   children: [
+                    // 操作按钮区域（顶部）
+                    if (widget.actionButtons.isNotEmpty) ...[
+                      _buildActionButtons(),
+                      SizedBox(height: 16),
+                    ],
+                    
                     // 记录详情
                     _buildRecordInfo(),
                     
@@ -117,7 +140,6 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
                 ),
               ),
             ),
-            
           ],
         ),
       ),
@@ -143,23 +165,22 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
               crossAxisAlignment: CrossAxisAlignment.start,
               children: [
                 Text(
-                  '${widget.entityTypeDisplayName}记录详情',
+                  '${widget.entityTypeDisplayName}详情',
                   style: TextStyle(
                     fontSize: 18,
                     fontWeight: FontWeight.bold,
                     color: widget.themeColor,
                   ),
                 ),
-                if (widget.entityName != null)
-                  Text(
-                    widget.entityName!,
-                    style: TextStyle(
-                      fontSize: 14,
-                      color: Colors.grey[600],
-                    ),
-                    maxLines: 1,
-                    overflow: TextOverflow.ellipsis,
+                Text(
+                  widget.entityName,
+                  style: TextStyle(
+                    fontSize: 14,
+                    color: Colors.grey[600],
                   ),
+                  maxLines: 1,
+                  overflow: TextOverflow.ellipsis,
+                ),
               ],
             ),
           ),
@@ -173,6 +194,95 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
       ),
     );
   }
+
+  Widget _buildActionButtons() {
+    return LayoutBuilder(
+      builder: (context, constraints) {
+        final availableWidth = constraints.maxWidth;
+        final buttonCount = widget.actionButtons.length;
+        final spacing = 8.0 * (buttonCount - 1); // 按钮之间的间距
+        
+        // 计算最长标签的字符数
+        int maxLabelLength = 0;
+        for (final button in widget.actionButtons) {
+          if (button.label.length > maxLabelLength) {
+            maxLabelLength = button.label.length;
+          }
+        }
+        
+        // 估算每个按钮需要的最小宽度
+        // 中文字符约14-16px，取15px
+        // 带图标的按钮：图标(18) + 间距(8) + 文字 + padding(24)
+        final textWidth = maxLabelLength * 15.0;
+        final minWidthWithIcon = 18 + 8 + textWidth + 24;
+        
+        // 计算是否需要隐藏图标
+        final totalWidthWithIcons = buttonCount * minWidthWithIcon + spacing;
+        final showIcons = availableWidth >= totalWidthWithIcons;
+        
+        // 构建按钮列表
+        final buttons = widget.actionButtons.map((button) {
+          if (showIcons) {
+            return OutlinedButton.icon(
+              onPressed: () {
+                Navigator.pop(context);
+                button.onPressed();
+              },
+              icon: Icon(button.icon, size: 18, color: button.color),
+              label: Text(
+                button.label,
+                style: TextStyle(color: button.color),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: button.color.withOpacity(0.5)),
+                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
+              ),
+            );
+          } else {
+            // 空间不足时只显示文字
+            return OutlinedButton(
+              onPressed: () {
+                Navigator.pop(context);
+                button.onPressed();
+              },
+              child: Text(
+                button.label,
+                style: TextStyle(color: button.color),
+                maxLines: 1,
+                overflow: TextOverflow.ellipsis,
+              ),
+              style: OutlinedButton.styleFrom(
+                side: BorderSide(color: button.color.withOpacity(0.5)),
+                padding: EdgeInsets.symmetric(horizontal: 8, vertical: 8),
+              ),
+            );
+          }
+        }).toList();
+        
+        // 使用 Row + Flexible 让按钮在空间不足时等比例缩小
+        return Row(
+          children: buttons.asMap().entries.map((entry) {
+            final index = entry.key;
+            final button = entry.value;
+            return Flexible(
+              child: Padding(
+                padding: EdgeInsets.only(right: index < buttons.length - 1 ? 8 : 0),
+                child: SizedBox(
+                  width: double.infinity,
+                  child: button,
+                ),
+              ),
+            );
+          }).toList(),
+        );
+      },
+    );
+  }
+
+  // 系统字段列表（默认隐藏）
+  static const _systemFields = ['id', 'userId', 'version', 'created_at', 'updated_at'];
 
   Widget _buildRecordInfo() {
     return Column(
@@ -224,31 +334,16 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
     );
   }
 
-  // 可查询名称的ID字段
-  static const _lookupFields = {
-    'customerId': '客户',
-    'supplierId': '供应商',
-    'employeeId': '经办人',
-  };
-
   List<Widget> _buildFieldRows() {
     final fields = widget.recordData.entries.toList();
     final widgets = <Widget>[];
     
-    // 系统字段列表（默认隐藏）
-    final systemFields = ['id', 'userId', 'version', 'created_at', 'updated_at'];
-    
     for (int i = 0; i < fields.length; i++) {
       final entry = fields[i];
-      final isSystemField = systemFields.contains(entry.key);
+      final isSystemField = _systemFields.contains(entry.key);
       
       // 如果不显示所有字段，跳过系统字段
       if (!_showAllFields && isSystemField) continue;
-      
-      // 检查是否是可查询的ID字段
-      final isLookupField = _lookupFields.containsKey(entry.key) && 
-                            entry.value != null && 
-                            entry.value != 0;
       
       widgets.add(
         Container(
@@ -282,18 +377,6 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
                   ),
                 ),
               ),
-              // 查询按钮
-              if (isLookupField)
-                SizedBox(
-                  width: 28,
-                  height: 28,
-                  child: IconButton(
-                    icon: Icon(Icons.search, size: 18),
-                    padding: EdgeInsets.zero,
-                    tooltip: '查询${_lookupFields[entry.key]}名称',
-                    onPressed: () => _lookupName(entry.key, entry.value as int),
-                  ),
-                ),
             ],
           ),
         ),
@@ -315,110 +398,6 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
     return widgets;
   }
 
-  /// 查询ID对应的名称
-  Future<void> _lookupName(String fieldKey, int id) async {
-    String? name;
-    String typeName = _lookupFields[fieldKey] ?? '未知';
-    
-    try {
-      final db = await _dbHelper.database;
-      
-      switch (fieldKey) {
-        case 'customerId':
-          final result = await db.query(
-            'customers',
-            columns: ['name'],
-            where: 'id = ?',
-            whereArgs: [id],
-          );
-          if (result.isNotEmpty) {
-            name = result.first['name'] as String?;
-          }
-          break;
-        case 'supplierId':
-          final result = await db.query(
-            'suppliers',
-            columns: ['name'],
-            where: 'id = ?',
-            whereArgs: [id],
-          );
-          if (result.isNotEmpty) {
-            name = result.first['name'] as String?;
-          }
-          break;
-        case 'employeeId':
-          final result = await db.query(
-            'employees',
-            columns: ['name'],
-            where: 'id = ?',
-            whereArgs: [id],
-          );
-          if (result.isNotEmpty) {
-            name = result.first['name'] as String?;
-          }
-          break;
-      }
-    } catch (e) {
-      // 记录不存在或已删除
-      name = null;
-    }
-    
-    if (!mounted) return;
-    
-    showDialog(
-      context: context,
-      builder: (context) => AlertDialog(
-        shape: RoundedRectangleBorder(borderRadius: BorderRadius.circular(12)),
-        title: Row(
-          children: [
-            Icon(Icons.info_outline, color: widget.themeColor),
-            SizedBox(width: 8),
-            Text('$typeName信息', style: TextStyle(fontSize: 16)),
-          ],
-        ),
-        content: Column(
-          mainAxisSize: MainAxisSize.min,
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildLookupRow('ID', id.toString()),
-            SizedBox(height: 8),
-            _buildLookupRow('名称', name ?? '(未找到或已删除)'),
-          ],
-        ),
-        actions: [
-          TextButton(
-            onPressed: () => Navigator.pop(context),
-            child: Text('关闭'),
-          ),
-        ],
-      ),
-    );
-  }
-
-  Widget _buildLookupRow(String label, String value) {
-    return Row(
-      children: [
-        SizedBox(
-          width: 50,
-          child: Text(
-            label,
-            style: TextStyle(color: Colors.grey[600], fontSize: 14),
-          ),
-        ),
-        Expanded(
-          child: Text(
-            value,
-            style: TextStyle(
-              fontSize: 14,
-              fontWeight: FontWeight.w500,
-              color: value.startsWith('(') ? Colors.grey[500] : Colors.black87,
-            ),
-          ),
-        ),
-      ],
-    );
-  }
-
   String _formatValue(dynamic value) {
     if (value == null) return '-';
     if (value is double) {
@@ -432,7 +411,6 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
   }
 
   /// 获取字段的显示标签
-  /// 对于某些字段提供更明确的说明
   String _getFieldLabel(String fieldKey) {
     // 特殊字段使用更明确的标签
     switch (fieldKey) {
@@ -510,7 +488,7 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
             ),
           ),
         
-        // 级联操作提示
+        // 提示信息
         SizedBox(height: 12),
         Container(
           padding: EdgeInsets.all(10),
@@ -526,7 +504,7 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  '数据导入/备份恢复会重新分配记录ID，因此仅显示最近一次数据导入/备份恢复后的操作历史；\n由产品/客户/供应商/员工变更引发的级联修改不在此处显示，请查看对应基础信息的操作日志。',
+                  '数据导入/备份恢复会重新分配基础信息ID，因此仅显示最近一次数据导入/备份恢复后的操作历史。',
                   style: TextStyle(
                     fontSize: 12,
                     color: Colors.amber[900],
@@ -621,11 +599,30 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
                         overflow: TextOverflow.ellipsis,
                       ),
                     ),
+                  // 显示级联操作摘要
+                  if (log.oldData != null && log.oldData!['cascade_info'] != null)
+                    Padding(
+                      padding: EdgeInsets.only(top: 4),
+                      child: Container(
+                        padding: EdgeInsets.symmetric(horizontal: 6, vertical: 2),
+                        decoration: BoxDecoration(
+                          color: Colors.orange[50],
+                          borderRadius: BorderRadius.circular(4),
+                          border: Border.all(color: Colors.orange[200]!),
+                        ),
+                        child: Text(
+                          _getCascadeSummary(log.oldData!['cascade_info'] as Map<String, dynamic>),
+                          style: TextStyle(
+                            fontSize: 11,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ),
+                    ),
                 ],
               ),
             ),
             
-            // 查看详情箭头
             Icon(Icons.chevron_right, color: Colors.grey[400], size: 20),
           ],
         ),
@@ -634,14 +631,41 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
   }
 
   String _getChangeSummary(Map<String, dynamic> changes) {
-    final changedFields = changes.keys.take(3).map((key) {
-      return FieldTranslator.getChineseName(key);
-    }).toList();
-    
+    final changedFields = changes.keys
+        .map((key) => FieldTranslator.getChineseName(key))
+        .take(3)
+        .join('、');
     if (changes.length > 3) {
-      return '修改了: ${changedFields.join(", ")} 等${changes.length}项';
+      return '修改了: $changedFields 等${changes.length}个字段';
     }
-    return '修改了: ${changedFields.join(", ")}';
+    return '修改了: $changedFields';
+  }
+
+  String _getCascadeSummary(Map<String, dynamic> cascadeInfo) {
+    final operation = cascadeInfo['operation'] as String?;
+    switch (operation) {
+      case 'product_name_sync':
+        return '级联: 产品名称同步';
+      case 'product_supplier_sync':
+        return '级联: 供应商同步';
+      case 'product_cascade_delete':
+        return '级联: 删除关联记录';
+      case 'customer_delete_update_relations':
+        return '级联: 客户删除关联更新';
+      case 'supplier_delete_update_relations':
+        return '级联: 供应商删除关联更新';
+      case 'employee_delete_update_relations':
+        return '级联: 员工删除关联更新';
+      default:
+        return '级联操作';
+    }
+  }
+
+  void _showLogDetail(AuditLog log) {
+    showDialog(
+      context: context,
+      builder: (context) => _LogDetailSubDialog(log: log, themeColor: widget.themeColor),
+    );
   }
 
   Color _getOperationColor(OperationType type) {
@@ -669,21 +693,14 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
         return Icons.restore;
     }
   }
-
-  void _showLogDetail(AuditLog log) {
-    showDialog(
-      context: context,
-      builder: (context) => _LogDetailSubDialog(log: log),
-    );
-  }
-
 }
 
 /// 日志详情子对话框
 class _LogDetailSubDialog extends StatelessWidget {
   final AuditLog log;
+  final Color themeColor;
 
-  const _LogDetailSubDialog({required this.log});
+  const _LogDetailSubDialog({required this.log, this.themeColor = Colors.blue});
 
   @override
   Widget build(BuildContext context) {
@@ -747,7 +764,7 @@ class _LogDetailSubDialog extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '创建了新的记录',
+                    '创建了新的${log.entityType.displayName}记录',
                     style: TextStyle(color: Colors.green[700], fontSize: 13),
                   ),
                 ),
@@ -767,7 +784,7 @@ class _LogDetailSubDialog extends StatelessWidget {
                     borderRadius: BorderRadius.circular(8),
                   ),
                   child: Text(
-                    '删除了该记录',
+                    '删除了该${log.entityType.displayName}记录',
                     style: TextStyle(color: Colors.red[700], fontSize: 13),
                   ),
                 ),
