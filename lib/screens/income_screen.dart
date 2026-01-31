@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../widgets/record_detail_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../services/audit_log_service.dart';
@@ -364,6 +365,34 @@ class _IncomeScreenState extends State<IncomeScreen> {
         }
       }
     }
+  }
+
+  /// 显示进账记录详情对话框
+  void _showRecordDetail(Map<String, dynamic> income) async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    if (username == null) return;
+    
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+
+    final customer = _customers.firstWhere(
+      (c) => c['id'] == income['customerId'],
+      orElse: () => {'name': '未知客户'},
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => RecordDetailDialog(
+        entityType: EntityType.income,
+        entityTypeDisplayName: '进账',
+        entityId: income['id'] as int,
+        userId: userId,
+        entityName: '¥${income['amount']} (${customer['name']})',
+        recordData: income,
+        themeColor: Colors.teal,
+      ),
+    );
   }
 
   Future<void> _deleteIncome(int id) async {
@@ -824,7 +853,10 @@ class _IncomeScreenState extends State<IncomeScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Padding(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => _showRecordDetail(income),
+                          child: Padding(
                           padding: EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -988,6 +1020,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
                                 ),
                             ],
                           ),
+                        ),
                         ),
                       );
                     },

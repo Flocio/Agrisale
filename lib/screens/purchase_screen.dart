@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../widgets/record_detail_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
@@ -396,6 +397,29 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
         }
       }
     }
+  }
+
+  /// 显示采购记录详情对话框
+  void _showRecordDetail(Map<String, dynamic> purchase, Map<String, dynamic> supplier) async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    if (username == null) return;
+    
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => RecordDetailDialog(
+        entityType: EntityType.purchase,
+        entityTypeDisplayName: '采购',
+        entityId: purchase['id'] as int,
+        userId: userId,
+        entityName: purchase['productName'],
+        recordData: purchase,
+        themeColor: Colors.green,
+      ),
+    );
   }
 
   Future<void> _deletePurchase(Map<String, dynamic> purchase) async {
@@ -826,7 +850,10 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Padding(
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () => _showRecordDetail(purchase, supplier),
+                            child: Padding(
                             padding: EdgeInsets.all(8),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -978,6 +1005,7 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
                                 SizedBox(height: 4),
                               ],
                             ),
+                          ),
                           ),
                         );
                       },

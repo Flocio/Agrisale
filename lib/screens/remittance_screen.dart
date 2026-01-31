@@ -3,6 +3,7 @@
 import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../widgets/record_detail_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../services/audit_log_service.dart';
@@ -361,6 +362,34 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
         }
       }
     }
+  }
+
+  /// 显示汇款记录详情对话框
+  void _showRecordDetail(Map<String, dynamic> remittance) async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    if (username == null) return;
+    
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+
+    final supplier = _suppliers.firstWhere(
+      (s) => s['id'] == remittance['supplierId'],
+      orElse: () => {'name': '未知供应商'},
+    );
+
+    showDialog(
+      context: context,
+      builder: (context) => RecordDetailDialog(
+        entityType: EntityType.remittance,
+        entityTypeDisplayName: '汇款',
+        entityId: remittance['id'] as int,
+        userId: userId,
+        entityName: '¥${remittance['amount']} (${supplier['name']})',
+        recordData: remittance,
+        themeColor: Colors.orange,
+      ),
+    );
   }
 
   Future<void> _deleteRemittance(int id) async {
@@ -821,7 +850,10 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Padding(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => _showRecordDetail(remittance),
+                          child: Padding(
                           padding: EdgeInsets.all(16),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -964,6 +996,7 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
                                 ),
                             ],
                           ),
+                        ),
                         ),
                       );
                     },

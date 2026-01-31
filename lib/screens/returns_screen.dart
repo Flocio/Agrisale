@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../widgets/record_detail_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
@@ -376,6 +377,29 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
         }
       }
     }
+  }
+
+  /// 显示退货记录详情对话框
+  void _showRecordDetail(Map<String, dynamic> returnItem, Map<String, dynamic> customer) async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    if (username == null) return;
+    
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => RecordDetailDialog(
+        entityType: EntityType.return_,
+        entityTypeDisplayName: '退货',
+        entityId: returnItem['id'] as int,
+        userId: userId,
+        entityName: returnItem['productName'],
+        recordData: returnItem,
+        themeColor: Colors.orange,
+      ),
+    );
   }
 
   Future<void> _deleteReturn(Map<String, dynamic> returnItem) async {
@@ -805,7 +829,10 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                         shape: RoundedRectangleBorder(
                           borderRadius: BorderRadius.circular(10),
                         ),
-                        child: Padding(
+                        child: InkWell(
+                          borderRadius: BorderRadius.circular(10),
+                          onTap: () => _showRecordDetail(returnItem, customer),
+                          child: Padding(
                           padding: EdgeInsets.all(8),
                           child: Column(
                             crossAxisAlignment: CrossAxisAlignment.start,
@@ -929,6 +956,7 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
                               SizedBox(height: 4),
                             ],
                           ),
+                        ),
                         ),
                       );
                     },

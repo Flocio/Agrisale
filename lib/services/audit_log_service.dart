@@ -379,4 +379,38 @@ class AuditLogService {
     
     return changes;
   }
+
+  /// 获取特定实体的操作日志历史
+  /// 
+  /// [userId] 用户ID
+  /// [entityType] 实体类型
+  /// [entityId] 实体ID
+  /// 
+  /// 返回该实体的所有操作历史记录，按时间倒序排列
+  Future<List<AuditLog>> getLogsByEntity({
+    required int userId,
+    required EntityType entityType,
+    required int entityId,
+  }) async {
+    try {
+      final db = await _dbHelper.database;
+
+      final result = await db.rawQuery(
+        '''
+        SELECT id, userId, username, operation_type, entity_type, entity_id, entity_name,
+               old_data, new_data, changes, operation_time, note
+        FROM operation_logs
+        WHERE userId = ? AND entity_type = ? AND entity_id = ?
+        ORDER BY operation_time DESC
+        LIMIT 100
+        ''',
+        [userId, entityType.value, entityId],
+      );
+
+      return result.map((row) => AuditLog.fromMap(row)).toList();
+    } catch (e) {
+      print('获取实体日志失败: $e');
+      return [];
+    }
+  }
 }

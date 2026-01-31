@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import 'package:intl/intl.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
+import '../widgets/record_detail_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
@@ -383,6 +384,29 @@ class _SalesScreenState extends State<SalesScreen> {
         }
       }
     }
+  }
+
+  /// 显示销售记录详情对话框
+  void _showRecordDetail(Map<String, dynamic> sale, Map<String, dynamic> customer) async {
+    final prefs = await SharedPreferences.getInstance();
+    final username = prefs.getString('current_username');
+    if (username == null) return;
+    
+    final userId = await DatabaseHelper().getCurrentUserId(username);
+    if (userId == null) return;
+
+    showDialog(
+      context: context,
+      builder: (context) => RecordDetailDialog(
+        entityType: EntityType.sale,
+        entityTypeDisplayName: '销售',
+        entityId: sale['id'] as int,
+        userId: userId,
+        entityName: sale['productName'],
+        recordData: sale,
+        themeColor: Colors.blue,
+      ),
+    );
   }
 
   Future<void> _deleteSale(Map<String, dynamic> sale) async {
@@ -804,7 +828,10 @@ class _SalesScreenState extends State<SalesScreen> {
                           shape: RoundedRectangleBorder(
                             borderRadius: BorderRadius.circular(10),
                           ),
-                          child: Padding(
+                          child: InkWell(
+                            borderRadius: BorderRadius.circular(10),
+                            onTap: () => _showRecordDetail(sale, customer),
+                            child: Padding(
                             padding: EdgeInsets.all(8),
                             child: Column(
                               crossAxisAlignment: CrossAxisAlignment.start,
@@ -928,6 +955,7 @@ class _SalesScreenState extends State<SalesScreen> {
                                 SizedBox(height: 4),
                               ],
                             ),
+                          ),
                           ),
                         );
                       },
