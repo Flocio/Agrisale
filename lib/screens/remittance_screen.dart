@@ -342,6 +342,7 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
             'employeeName': newEmployee['name'],
             'remittanceDate': result['remittanceDate'],
             'amount': result['amount'],
+            'paymentMethod': result['paymentMethod'],
             'note': result['note'],
             'created_at': remittance['created_at'],
             'updated_at': remittance['updated_at'],
