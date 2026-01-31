@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart'; // 确保路径正确
 import '../widgets/entity_detail_dialog.dart';
+import 'product_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
@@ -418,6 +419,16 @@ class _ProductScreenState extends State<ProductScreen> {
     }
   }
 
+  /// 查看产品交易记录
+  void _viewProductRecords(Map<String, dynamic> product) {
+    Navigator.push(
+      context,
+      MaterialPageRoute(
+        builder: (context) => ProductDetailScreen(product: product),
+      ),
+    );
+  }
+
   /// 显示产品详情对话框
   void _showProductDetailDialog(Map<String, dynamic> product) async {
     final prefs = await SharedPreferences.getInstance();
@@ -454,7 +465,14 @@ class _ProductScreenState extends State<ProductScreen> {
         entityName: product['name'] as String,
         recordData: recordData,
         themeColor: Colors.green,
-        actionButtons: [], // 产品没有操作按钮
+        actionButtons: [
+          EntityActionButton(
+            icon: Icons.list_alt,
+            label: '交易记录',
+            color: Colors.blue,
+            onPressed: () => _viewProductRecords(product),
+          ),
+        ],
       ),
     );
   }
