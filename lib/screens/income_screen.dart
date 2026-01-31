@@ -381,6 +381,12 @@ class _IncomeScreenState extends State<IncomeScreen> {
       orElse: () => {'name': '未知客户'},
     );
 
+    // 格式化金额显示：负数显示为 "-¥xx" 而不是 "¥-xx"
+    final amount = income['amount'] as num;
+    final amountStr = amount < 0 
+        ? '-¥${amount.abs().toStringAsFixed(2)}'
+        : '¥${amount.toStringAsFixed(2)}';
+
     showDialog(
       context: context,
       builder: (context) => RecordDetailDialog(
@@ -388,7 +394,7 @@ class _IncomeScreenState extends State<IncomeScreen> {
         entityTypeDisplayName: '进账',
         entityId: income['id'] as int,
         userId: userId,
-        entityName: '¥${income['amount']} (${customer['name']})',
+        entityName: '$amountStr (${customer['name']})',
         recordData: income,
         themeColor: Colors.teal,
       ),

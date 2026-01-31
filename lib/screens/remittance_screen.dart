@@ -378,6 +378,12 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
       orElse: () => {'name': '未知供应商'},
     );
 
+    // 格式化金额显示：负数显示为 "-¥xx" 而不是 "¥-xx"
+    final amount = remittance['amount'] as num;
+    final amountStr = amount < 0 
+        ? '-¥${amount.abs().toStringAsFixed(2)}'
+        : '¥${amount.toStringAsFixed(2)}';
+
     showDialog(
       context: context,
       builder: (context) => RecordDetailDialog(
@@ -385,7 +391,7 @@ class _RemittanceScreenState extends State<RemittanceScreen> {
         entityTypeDisplayName: '汇款',
         entityId: remittance['id'] as int,
         userId: userId,
-        entityName: '¥${remittance['amount']} (${supplier['name']})',
+        entityName: '$amountStr (${supplier['name']})',
         recordData: remittance,
         themeColor: Colors.orange,
       ),
