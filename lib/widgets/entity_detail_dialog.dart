@@ -224,10 +224,7 @@ class _EntityDetailDialogState extends State<EntityDetailDialog> {
         final buttons = widget.actionButtons.map((button) {
           if (showIcons) {
             return OutlinedButton.icon(
-              onPressed: () {
-                Navigator.pop(context);
-                button.onPressed();
-              },
+              onPressed: () => button.onPressed(),
               icon: Icon(button.icon, size: 18, color: button.color),
               label: Text(
                 button.label,
@@ -243,10 +240,7 @@ class _EntityDetailDialogState extends State<EntityDetailDialog> {
           } else {
             // 空间不足时只显示文字
             return OutlinedButton(
-              onPressed: () {
-                Navigator.pop(context);
-                button.onPressed();
-              },
+              onPressed: () => button.onPressed(),
               child: Text(
                 button.label,
                 style: TextStyle(color: button.color),
