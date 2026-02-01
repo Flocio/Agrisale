@@ -551,11 +551,14 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.product['name']}的记录', 
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
-          )
+        title: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Text('${widget.product['name']}的记录', 
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            )
+          ),
         ),
         actions: [
           // 时间排序按钮

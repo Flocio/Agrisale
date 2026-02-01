@@ -619,11 +619,14 @@ class _SupplierTransactionsScreenState extends State<SupplierTransactionsScreen>
       },
       child: Scaffold(
         appBar: AppBar(
-          title: Text(
-            '${widget.supplierName}的往来记录',
-            style: TextStyle(
-              fontWeight: FontWeight.bold,
-              color: Colors.white,
+          title: SingleChildScrollView(
+            scrollDirection: Axis.horizontal,
+            child: Text(
+              '${widget.supplierName}的往来记录',
+              style: TextStyle(
+                fontWeight: FontWeight.bold,
+                color: Colors.white,
+              ),
             ),
           ),
         ),

@@ -786,11 +786,14 @@ class _CustomerTransactionsScreenState extends State<CustomerTransactionsScreen>
       },
       child: Scaffold(
       appBar: AppBar(
-        title: Text(
-          '${widget.customerName}的往来记录',
-          style: TextStyle(
-            fontWeight: FontWeight.bold,
-            color: Colors.white,
+        title: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Text(
+            '${widget.customerName}的往来记录',
+            style: TextStyle(
+              fontWeight: FontWeight.bold,
+              color: Colors.white,
+            ),
           ),
         ),
       ),

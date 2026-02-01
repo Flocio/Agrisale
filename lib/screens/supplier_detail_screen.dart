@@ -430,10 +430,13 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.supplierName}的对账单', style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        )),
+        title: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Text('${widget.supplierName}的对账单', style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          )),
+        ),
         actions: [
           IconButton(
             icon: Icon(_isDescending ? Icons.arrow_downward : Icons.arrow_upward),

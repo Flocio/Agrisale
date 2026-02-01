@@ -320,10 +320,13 @@ class _SupplierRecordsScreenState extends State<SupplierRecordsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.supplierName}的记录', style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        )),
+        title: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Text('${widget.supplierName}的记录', style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          )),
+        ),
         actions: [
           IconButton(
             icon: Icon(_isDescending ? Icons.arrow_downward : Icons.arrow_upward),

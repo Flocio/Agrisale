@@ -340,10 +340,13 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
   Widget build(BuildContext context) {
     return Scaffold(
       appBar: AppBar(
-        title: Text('${widget.customerName}的记录', style: TextStyle(
-          fontWeight: FontWeight.bold,
-          color: Colors.white,
-        )),
+        title: SingleChildScrollView(
+          scrollDirection: Axis.horizontal,
+          child: Text('${widget.customerName}的记录', style: TextStyle(
+            fontWeight: FontWeight.bold,
+            color: Colors.white,
+          )),
+        ),
         actions: [
           IconButton(
             icon: Icon(_isDescending ? Icons.arrow_downward : Icons.arrow_upward),
