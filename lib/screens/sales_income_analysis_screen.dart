@@ -731,14 +731,24 @@ class _SalesIncomeAnalysisScreenState extends State<SalesIncomeAnalysisScreen> {
             ),
             if (_isSummaryExpanded) ...[
               Divider(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSummaryItem('净销售额', _formatMoney(_totalNetSales), Colors.blue),
-                  _buildSummaryItem('实际收款', _formatMoney(_totalActualPayment), Colors.green),
-                  _buildSummaryItem('优惠总额', _formatMoney(_totalDiscount), Colors.orange),
-                  _buildSummaryItem('差值', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.purple),
-                ],
+              Center(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(width: 8),
+                      _buildSummaryItem('净销售额', _formatMoney(_totalNetSales), Colors.blue),
+                      SizedBox(width: 24),
+                      _buildSummaryItem('实际收款', _formatMoney(_totalActualPayment), Colors.green),
+                      SizedBox(width: 24),
+                      _buildSummaryItem('优惠总额', _formatMoney(_totalDiscount), Colors.orange),
+                      SizedBox(width: 24),
+                      _buildSummaryItem('差值', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.purple),
+                      SizedBox(width: 8),
+                    ],
+                  ),
+                ),
               ),
             ],
           ],

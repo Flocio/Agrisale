@@ -664,13 +664,22 @@ class _PurchaseRemittanceAnalysisScreenState extends State<PurchaseRemittanceAna
             ),
             if (_isSummaryExpanded) ...[
               Divider(),
-              Row(
-                mainAxisAlignment: MainAxisAlignment.spaceEvenly,
-                children: [
-                  _buildSummaryItem('净采购额', _formatMoney(_totalPurchases), Colors.blue),
-                  _buildSummaryItem('实际汇款', _formatMoney(_totalRemittances), Colors.orange),
-                  _buildSummaryItem('差值', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.green),
-                ],
+              Center(
+                child: SingleChildScrollView(
+                  scrollDirection: Axis.horizontal,
+                  child: Row(
+                    mainAxisSize: MainAxisSize.min,
+                    children: [
+                      SizedBox(width: 8),
+                      _buildSummaryItem('净采购额', _formatMoney(_totalPurchases), Colors.blue),
+                      SizedBox(width: 24),
+                      _buildSummaryItem('实际汇款', _formatMoney(_totalRemittances), Colors.orange),
+                      SizedBox(width: 24),
+                      _buildSummaryItem('差值', _formatMoney(_totalDifference), _totalDifference >= 0 ? Colors.red : Colors.green),
+                      SizedBox(width: 8),
+                    ],
+                  ),
+                ),
               ),
             ],
           ],
