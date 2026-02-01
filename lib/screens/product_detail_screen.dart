@@ -896,30 +896,30 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
           children: [
             // 产品基本信息和汇总信息标题放在同一行
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
                 // 产品信息
                 Expanded(
-                  child: Row(
-                    children: [
-                      Icon(Icons.inventory_2, color: Colors.green, size: 16),
-                    SizedBox(width: 8),
-                          Flexible(
-                            child: Text(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Icon(Icons.inventory_2, color: Colors.green, size: 16),
+                        SizedBox(width: 8),
+                        Text(
                           _productSupplierName != null
-                              ? '${widget.product['name']} (${widget.product['unit']})    $_productSupplierName'
+                              ? '${widget.product['name']} (${widget.product['unit']})  $_productSupplierName'
                               : '${widget.product['name']} (${widget.product['unit']})',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
                             color: Colors.green[800],
-                      ),
-                              overflow: TextOverflow.ellipsis,
-                            ),
                           ),
-                    ],
+                        ),
+                      ],
+                    ),
                   ),
                 ),
+                SizedBox(width: 8),
                 // 汇总信息标题和折叠按钮
                 InkWell(
                   onTap: () {
@@ -928,6 +928,7 @@ class _ProductDetailScreenState extends State<ProductDetailScreen> {
                     });
                   },
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '汇总信息',

@@ -685,22 +685,27 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
           children: [
             // 供应商信息和汇总信息标题
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.business, color: Colors.blue, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      widget.supplierName,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[800],
-                      ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Icon(Icons.business, color: Colors.blue, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          widget.supplierName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue[800],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
+                SizedBox(width: 8),
                 InkWell(
                   onTap: () {
                     setState(() {
@@ -708,6 +713,7 @@ class _SupplierDetailScreenState extends State<SupplierDetailScreen> {
                     });
                   },
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '汇总信息',

@@ -741,22 +741,27 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
           children: [
             // 客户信息和汇总信息标题
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.person, color: Colors.blue, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      widget.customerName,
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.blue[800],
-                      ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Icon(Icons.person, color: Colors.blue, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          widget.customerName,
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.blue[800],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
+                SizedBox(width: 8),
                 InkWell(
                   onTap: () {
                     setState(() {
@@ -764,6 +769,7 @@ class _CustomerDetailScreenState extends State<CustomerDetailScreen> {
                     });
                   },
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '汇总信息',

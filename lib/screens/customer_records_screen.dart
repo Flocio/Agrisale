@@ -801,22 +801,27 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
           children: [
             // 客户信息和汇总信息标题
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.person, color: Colors.orange, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      '${widget.customerName}    ${_selectedProduct ?? '所有产品'}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.orange[800],
-                      ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Icon(Icons.person, color: Colors.orange, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          '${widget.customerName}  ${_selectedProduct ?? '所有产品'}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.orange[800],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
+                SizedBox(width: 8),
                 InkWell(
                   onTap: () {
                     setState(() {
@@ -824,6 +829,7 @@ class _CustomerRecordsScreenState extends State<CustomerRecordsScreen> {
                     });
                   },
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '汇总信息',

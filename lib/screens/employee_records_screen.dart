@@ -801,22 +801,27 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
           children: [
             // 员工信息和汇总信息标题
             Row(
-              mainAxisAlignment: MainAxisAlignment.spaceBetween,
               children: [
-                Row(
-                  children: [
-                    Icon(Icons.badge, color: Colors.purple, size: 16),
-                    SizedBox(width: 8),
-                    Text(
-                      '${widget.employeeName}    ${_selectedType ?? '所有类型'}',
-                      style: TextStyle(
-                        fontSize: 16,
-                        fontWeight: FontWeight.bold,
-                        color: Colors.purple[800],
-                      ),
+                Expanded(
+                  child: SingleChildScrollView(
+                    scrollDirection: Axis.horizontal,
+                    child: Row(
+                      children: [
+                        Icon(Icons.badge, color: Colors.purple, size: 16),
+                        SizedBox(width: 8),
+                        Text(
+                          '${widget.employeeName}  ${_selectedType ?? '所有类型'}',
+                          style: TextStyle(
+                            fontSize: 16,
+                            fontWeight: FontWeight.bold,
+                            color: Colors.purple[800],
+                          ),
+                        ),
+                      ],
                     ),
-                  ],
+                  ),
                 ),
+                SizedBox(width: 8),
                 InkWell(
                   onTap: () {
                     setState(() {
@@ -824,6 +829,7 @@ class _EmployeeRecordsScreenState extends State<EmployeeRecordsScreen> {
                     });
                   },
                   child: Row(
+                    mainAxisSize: MainAxisSize.min,
                     children: [
                       Text(
                         '汇总信息',
