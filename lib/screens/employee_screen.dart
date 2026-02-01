@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import '../widgets/entity_detail_dialog.dart';
+import '../utils/visual_length_formatter.dart';
 import 'employee_records_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
@@ -674,7 +675,7 @@ class _EmployeeDialogState extends State<EmployeeDialog> {
         child: Column(
           mainAxisSize: MainAxisSize.min,
           children: [
-            TextFormField(
+            TextFormFieldWithCounter(
               controller: _nameController,
               decoration: InputDecoration(
                 labelText: '员工姓名',
@@ -685,6 +686,8 @@ class _EmployeeDialogState extends State<EmployeeDialog> {
                 fillColor: Colors.grey[50],
                 prefixIcon: Icon(Icons.badge, color: Colors.purple),
               ),
+              inputFormatters: [VisualLengthFormatter()],
+              onChanged: (_) => setState(() {}),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return '请输入员工姓名';

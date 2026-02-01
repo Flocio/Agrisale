@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import '../widgets/entity_detail_dialog.dart';
+import '../utils/visual_length_formatter.dart';
 import 'supplier_records_screen.dart';
 import 'supplier_transactions_screen.dart';
 import 'supplier_detail_screen.dart';
@@ -735,8 +736,8 @@ class _SupplierDialogState extends State<SupplierDialog> {
         child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-            TextFormField(
-            controller: _nameController,
+            TextFormFieldWithCounter(
+              controller: _nameController,
               decoration: InputDecoration(
                 labelText: '供应商名称',
                 border: OutlineInputBorder(
@@ -745,7 +746,9 @@ class _SupplierDialogState extends State<SupplierDialog> {
                 filled: true,
                 fillColor: Colors.grey[50],
                 prefixIcon: Icon(Icons.business, color: Colors.blue),
-          ),
+              ),
+              inputFormatters: [VisualLengthFormatter()],
+              onChanged: (_) => setState(() {}),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return '请输入供应商名称';

@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart';
 import '../widgets/entity_detail_dialog.dart';
+import '../utils/visual_length_formatter.dart';
 import 'customer_records_screen.dart';
 import 'customer_transactions_screen.dart';
 import 'customer_detail_screen.dart';
@@ -734,8 +735,8 @@ class _CustomerDialogState extends State<CustomerDialog> {
         child: Column(
         mainAxisSize: MainAxisSize.min,
         children: [
-            TextFormField(
-            controller: _nameController,
+            TextFormFieldWithCounter(
+              controller: _nameController,
               decoration: InputDecoration(
                 labelText: '客户名称',
                 border: OutlineInputBorder(
@@ -744,7 +745,9 @@ class _CustomerDialogState extends State<CustomerDialog> {
                 filled: true,
                 fillColor: Colors.grey[50],
                 prefixIcon: Icon(Icons.person, color: Colors.orange),
-          ),
+              ),
+              inputFormatters: [VisualLengthFormatter()],
+              onChanged: (_) => setState(() {}),
               validator: (value) {
                 if (value == null || value.trim().isEmpty) {
                   return '请输入客户名称';

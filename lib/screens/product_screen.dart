@@ -4,6 +4,7 @@ import 'package:flutter/material.dart';
 import '../database_helper.dart';
 import '../widgets/footer_widget.dart'; // 确保路径正确
 import '../widgets/entity_detail_dialog.dart';
+import '../utils/visual_length_formatter.dart';
 import 'product_detail_screen.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
@@ -1023,8 +1024,8 @@ class _ProductDialogState extends State<ProductDialog> {
         child: Column(
             mainAxisSize: MainAxisSize.min,
           children: [
-              TextFormField(
-              controller: _nameController,
+              TextFormFieldWithCounter(
+                controller: _nameController,
                 decoration: InputDecoration(
                   labelText: '产品名称',
                   border: OutlineInputBorder(
@@ -1033,7 +1034,9 @@ class _ProductDialogState extends State<ProductDialog> {
                   filled: true,
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.shopping_bag, color: Colors.green),
-            ),
+                ),
+                inputFormatters: [VisualLengthFormatter()],
+                onChanged: (_) => setState(() {}),
                 validator: (value) {
                   if (value == null || value.isEmpty) {
                     return '请输入产品名称';
