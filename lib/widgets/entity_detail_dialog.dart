@@ -409,7 +409,7 @@ class _EntityDetailDialogState extends State<EntityDetailDialog> {
     // 特殊字段使用更明确的标签
     switch (fieldKey) {
       case 'id':
-        return '记录ID';
+        return '实体ID';
       case 'userId':
         return '创建者ID';
       default:
