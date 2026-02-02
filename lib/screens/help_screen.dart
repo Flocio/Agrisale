@@ -108,6 +108,33 @@ class HelpScreen extends StatelessWidget {
             SizedBox(height: 24),
             
             _buildSection(
+              title: '数据详情与日志',
+              icon: Icons.history,
+              color: Colors.indigo,
+              children: [
+                _buildSubSection('记录详情', [
+                  _buildParagraph('• 查看详情：点击采购/销售/退货/进账/汇款记录可查看完整数据'),
+                  _buildParagraph('• 操作历史：查看该记录的创建、修改、删除等操作历史'),
+                  _buildParagraph('• 数据追溯：了解数据的完整变更过程，便于问题排查'),
+                ]),
+                _buildSubSection('实体详情', [
+                  _buildParagraph('• 基础信息：点击产品/客户/供应商/员工可查看完整数据和操作历史'),
+                  _buildParagraph('• 快捷导航：详情窗口中集成快捷按钮，可直接跳转到相关记录页面'),
+                  _buildParagraph('• 客户/供应商：可快速查看对账单、往来记录、销售/采购记录'),
+                  _buildParagraph('• 员工：可快速查看员工经手的进账和汇款记录'),
+                  _buildParagraph('• 产品：可快速查看产品的交易记录'),
+                ]),
+                _buildSubSection('操作日志', [
+                  _buildParagraph('• 日志记录：系统自动记录所有数据的创建、修改、删除操作'),
+                  _buildParagraph('• 备份恢复日志：数据导入和备份恢复操作也会被记录'),
+                  _buildParagraph('• 变更追踪：修改操作会记录变更前后的数据对比'),
+                ]),
+              ],
+            ),
+            
+            SizedBox(height: 24),
+            
+            _buildSection(
               title: '报表统计',
               icon: Icons.bar_chart,
               color: Colors.purple,
@@ -185,6 +212,9 @@ class HelpScreen extends StatelessWidget {
                 _buildParagraph('• 日期筛选：在报表中可以使用日期范围筛选，方便查看特定时间段的数据'),
                 _buildParagraph('• 数据导出：定期导出数据备份，防止数据丢失'),
                 _buildParagraph('• AI 助手：使用数据分析助手可以获得专业的业务分析和建议'),
+                _buildParagraph('• 字数限制：名称最多15个汉字，备注最多100个汉字，输入框右下角显示计数'),
+                _buildParagraph('• 长标题查看：对账单等页面标题过长时，可左右滑动查看完整内容'),
+                _buildParagraph('• 数据详情：点击任意记录或基础信息可查看完整数据和操作历史'),
               ],
             ),
             
