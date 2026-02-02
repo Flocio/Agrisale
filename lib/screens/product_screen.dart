@@ -1069,49 +1069,44 @@ class _ProductDialogState extends State<ProductDialog> {
                   ),
                 ),
               // 添加供应商选择
-              Container(
-                padding: EdgeInsets.symmetric(horizontal: 12, vertical: 4),
-                decoration: BoxDecoration(
-                  color: Colors.grey[50],
-                  borderRadius: BorderRadius.circular(8),
-                  border: Border.all(
-                    color: _selectedSupplierId != null ? Colors.black : Colors.grey[400]!,
+              InputDecorator(
+                decoration: InputDecoration(
+                  labelText: '供应商',
+                  border: OutlineInputBorder(
+                    borderRadius: BorderRadius.circular(8),
                   ),
+                  filled: true,
+                  fillColor: Colors.grey[50],
+                  prefixIcon: Icon(Icons.business, color: Colors.green),
+                  contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                 ),
-                child: Row(
-                  children: [
-                    Icon(Icons.business, color: Colors.green, size: 20),
-                    SizedBox(width: 12),
-                    Expanded(
-                      child: DropdownButtonHideUnderline(
-                        child: DropdownButton<String>(
-                          value: _selectedSupplierId,
-                          hint: Text('选择供应商（可选）', style: TextStyle(fontSize: 14)),
-                          isExpanded: true,
-                          icon: Icon(Icons.arrow_drop_down, color: Colors.green),
-                          onChanged: (String? newValue) {
-                            setState(() {
-                              _selectedSupplierId = newValue;
-                              // 用户选择后清除警告
-                              _missingSupplierInfo = null;
-                            });
-                          },
-                          items: [
-                            DropdownMenuItem<String>(
-                              value: null,
-                              child: Text('未分配供应商', style: TextStyle(color: Colors.grey[600])),
-                            ),
-                            ...widget.suppliers.map<DropdownMenuItem<String>>((supplier) {
-                              return DropdownMenuItem<String>(
-                                value: supplier['id'].toString(),
-                                child: Text(supplier['name']),
-                              );
-                            }).toList(),
-                          ],
-                        ),
+                child: DropdownButtonHideUnderline(
+                  child: DropdownButton<String>(
+                    value: _selectedSupplierId,
+                    hint: Text('未分配供应商', style: TextStyle(color: Colors.grey[600], fontSize: 14)),
+                    isExpanded: true,
+                    isDense: true,
+                    icon: Icon(Icons.arrow_drop_down, color: Colors.green),
+                    onChanged: (String? newValue) {
+                      setState(() {
+                        _selectedSupplierId = newValue;
+                        // 用户选择后清除警告
+                        _missingSupplierInfo = null;
+                      });
+                    },
+                    items: [
+                      DropdownMenuItem<String>(
+                        value: null,
+                        child: Text('未分配供应商', style: TextStyle(color: Colors.grey[600])),
                       ),
-                    ),
-                  ],
+                      ...widget.suppliers.map<DropdownMenuItem<String>>((supplier) {
+                        return DropdownMenuItem<String>(
+                          value: supplier['id'].toString(),
+                          child: Text(supplier['name']),
+                        );
+                      }).toList(),
+                    ],
+                  ),
                 ),
               ),
               SizedBox(height: 16),
@@ -1148,30 +1143,34 @@ class _ProductDialogState extends State<ProductDialog> {
                   SizedBox(width: 12),
                   Expanded(
                     flex: 2,
-                    child: Container(
-                      padding: EdgeInsets.symmetric(horizontal: 12),
-                      decoration: BoxDecoration(
-                        color: Colors.grey[50],
-                        borderRadius: BorderRadius.circular(8),
-                        border: Border.all(color: Colors.grey[400]!),
+                    child: InputDecorator(
+                      decoration: InputDecoration(
+                        labelText: '单位',
+                        border: OutlineInputBorder(
+                          borderRadius: BorderRadius.circular(8),
+                        ),
+                        filled: true,
+                        fillColor: Colors.grey[50],
+                        contentPadding: EdgeInsets.symmetric(horizontal: 12, vertical: 8),
                       ),
                       child: DropdownButtonHideUnderline(
                         child: DropdownButton<String>(
-              value: _selectedUnit,
+                          value: _selectedUnit,
                           isExpanded: true,
+                          isDense: true,
                           icon: Icon(Icons.arrow_drop_down, color: Colors.green),
-              onChanged: (String? newValue) {
-                setState(() {
-                  _selectedUnit = newValue!;
-                });
-              },
-              items: <String>['斤', '公斤', '袋', '件', '瓶']
-                  .map<DropdownMenuItem<String>>((String value) {
-                return DropdownMenuItem<String>(
-                  value: value,
-                  child: Text(value),
-                );
-              }).toList(),
+                          onChanged: (String? newValue) {
+                            setState(() {
+                              _selectedUnit = newValue!;
+                            });
+                          },
+                          items: <String>['斤', '公斤', '袋', '件', '瓶']
+                              .map<DropdownMenuItem<String>>((String value) {
+                            return DropdownMenuItem<String>(
+                              value: value,
+                              child: Text(value),
+                            );
+                          }).toList(),
                         ),
                       ),
                     ),
