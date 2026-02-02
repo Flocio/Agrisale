@@ -44,7 +44,7 @@ class DatabaseHelper {
     
     final db = await openDatabase(
       path,
-      version: 14, // 更新版本号 - 添加操作日志表
+      version: 15, // 更新版本号 - 添加数值极限限制
       onCreate: _onCreate,
       onUpgrade: _onUpgrade,
     );
@@ -69,7 +69,7 @@ class DatabaseHelper {
       userId INTEGER NOT NULL,
       name TEXT NOT NULL,
       description TEXT,
-      stock REAL,
+      stock REAL CHECK(stock IS NULL OR ABS(stock) <= 99999999.99),
       unit TEXT NOT NULL CHECK(unit IN ('斤', '公斤', '袋', '件', '瓶')),
       supplierId INTEGER,
       FOREIGN KEY (userId) REFERENCES users (id),
@@ -113,8 +113,8 @@ class DatabaseHelper {
       userId INTEGER NOT NULL,
       incomeDate TEXT NOT NULL,
       customerId INTEGER,
-      amount REAL NOT NULL,
-      discount REAL DEFAULT 0,
+      amount REAL NOT NULL CHECK(ABS(amount) <= 9999999999.99),
+      discount REAL DEFAULT 0 CHECK(discount IS NULL OR ABS(discount) <= 9999999999.99),
       employeeId INTEGER,
       paymentMethod TEXT NOT NULL CHECK(paymentMethod IN ('现金', '微信转账', '银行卡')),
       note TEXT,
@@ -129,7 +129,7 @@ class DatabaseHelper {
       userId INTEGER NOT NULL,
       remittanceDate TEXT NOT NULL,
       supplierId INTEGER,
-      amount REAL NOT NULL,
+      amount REAL NOT NULL CHECK(ABS(amount) <= 9999999999.99),
       employeeId INTEGER,
       paymentMethod TEXT NOT NULL CHECK(paymentMethod IN ('现金', '微信转账', '银行卡')),
       note TEXT,
@@ -143,10 +143,10 @@ class DatabaseHelper {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       userId INTEGER NOT NULL,
       productName TEXT NOT NULL,
-      quantity REAL,
+      quantity REAL CHECK(quantity IS NULL OR ABS(quantity) <= 99999999.99),
       purchaseDate TEXT,
       supplierId INTEGER,
-      totalPurchasePrice REAL,
+      totalPurchasePrice REAL CHECK(totalPurchasePrice IS NULL OR ABS(totalPurchasePrice) <= 9999999999.99),
       note TEXT,
       FOREIGN KEY (userId) REFERENCES users (id),
       FOREIGN KEY (supplierId) REFERENCES suppliers (id)
@@ -158,10 +158,10 @@ class DatabaseHelper {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       userId INTEGER NOT NULL,
       productName TEXT NOT NULL,
-      quantity REAL,
+      quantity REAL CHECK(quantity IS NULL OR ABS(quantity) <= 99999999.99),
       customerId INTEGER,
       saleDate TEXT,
-      totalSalePrice REAL,
+      totalSalePrice REAL CHECK(totalSalePrice IS NULL OR ABS(totalSalePrice) <= 9999999999.99),
       note TEXT,
       FOREIGN KEY (userId) REFERENCES users (id),
       FOREIGN KEY (customerId) REFERENCES customers (id)
@@ -173,10 +173,10 @@ class DatabaseHelper {
       id INTEGER PRIMARY KEY AUTOINCREMENT,
       userId INTEGER NOT NULL,
       productName TEXT NOT NULL,
-      quantity REAL,
+      quantity REAL CHECK(quantity IS NULL OR ABS(quantity) <= 99999999.99),
       customerId INTEGER,
       returnDate TEXT,
-      totalReturnPrice REAL,
+      totalReturnPrice REAL CHECK(totalReturnPrice IS NULL OR ABS(totalReturnPrice) <= 9999999999.99),
       note TEXT,
       FOREIGN KEY (userId) REFERENCES users (id),
       FOREIGN KEY (customerId) REFERENCES customers (id)
@@ -363,6 +363,17 @@ class DatabaseHelper {
       await db.execute('CREATE INDEX IF NOT EXISTS idx_operation_logs_entity_type ON operation_logs(entity_type)');
       
       print('✓ 升级到版本14完成：已添加 operation_logs 表');
+    }
+    
+    if (oldVersion < 15) {
+      // 从版本14升级到15：添加数值极限限制
+      // 注意：由于SQLite的限制，无法直接为现有表添加CHECK约束
+      // 新数据库会在_onCreate中自动包含这些约束
+      // 现有数据库的数据不受影响，但建议用户避免输入极端数值
+      print('升级到版本15: 数值极限限制已在新数据库中启用');
+      print('  - 数量类字段限制: |值| ≤ 99,999,999.99');
+      print('  - 金额类字段限制: |值| ≤ 9,999,999,999.99');
+      print('✓ 升级到版本15完成');
     }
     
     // 无论版本如何，都检查并添加缺失的自动备份字段（修复可能的不完整升级）
