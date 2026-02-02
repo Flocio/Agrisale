@@ -8,6 +8,7 @@ import '../widgets/record_detail_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
+import '../utils/visual_length_formatter.dart';
 
 class ReturnsScreen extends StatefulWidget {
   @override
@@ -1588,8 +1589,10 @@ class _ReturnsDialogState extends State<ReturnsDialog> {
               SizedBox(height: 16),
 
               // 备注（与总退款位置互换：总退款在上，备注在下）
-              TextFormField(
+              TextFormFieldWithCounter(
                 controller: _noteController,
+                maxVisualLength: kMaxNoteVisualLength,
+                maxLines: 2,
                 decoration: InputDecoration(
                   labelText: '备注',
                   border: OutlineInputBorder(
@@ -1599,7 +1602,7 @@ class _ReturnsDialogState extends State<ReturnsDialog> {
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.note, color: Colors.green),
                 ),
-                maxLines: 2,
+                onChanged: (_) => setState(() {}),
               ),
           ],
           ),

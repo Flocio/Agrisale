@@ -757,8 +757,10 @@ class _SupplierDialogState extends State<SupplierDialog> {
               },
             ),
             SizedBox(height: 16),
-            TextFormField(
-            controller: _noteController,
+            TextFormFieldWithCounter(
+              controller: _noteController,
+              maxVisualLength: kMaxNoteVisualLength,
+              maxLines: 2,
               decoration: InputDecoration(
                 labelText: '备注',
                 border: OutlineInputBorder(
@@ -768,8 +770,8 @@ class _SupplierDialogState extends State<SupplierDialog> {
                 fillColor: Colors.grey[50],
                 prefixIcon: Icon(Icons.note, color: Colors.blue),
               ),
-              maxLines: 2,
-          ),
+              onChanged: (_) => setState(() {}),
+            ),
         ],
         ),
       ),

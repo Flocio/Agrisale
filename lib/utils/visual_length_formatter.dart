@@ -4,8 +4,11 @@
 import 'package:flutter/material.dart';
 import 'package:flutter/services.dart';
 
-/// 默认最大视觉长度
+/// 默认最大视觉长度（用于名称，15个汉字/30个字母）
 const int kDefaultMaxVisualLength = 30;
+
+/// 备注/描述最大视觉长度（100个汉字/200个字母）
+const int kMaxNoteVisualLength = 200;
 
 /// 计算字符串的视觉宽度
 /// 中文字符（包括中文标点）算2，其他字符算1
@@ -131,6 +134,9 @@ class TextFormFieldWithCounter extends StatelessWidget {
   final String? Function(String?)? validator;
   final void Function(String)? onChanged;
   final int maxVisualLength;
+  final int maxLines;
+  final int? minLines;
+  final TextInputType? keyboardType;
 
   const TextFormFieldWithCounter({
     Key? key,
@@ -140,6 +146,9 @@ class TextFormFieldWithCounter extends StatelessWidget {
     this.validator,
     this.onChanged,
     this.maxVisualLength = kDefaultMaxVisualLength,
+    this.maxLines = 1,
+    this.minLines,
+    this.keyboardType,
   }) : super(key: key);
 
   @override
@@ -155,6 +164,9 @@ class TextFormFieldWithCounter extends StatelessWidget {
           inputFormatters: inputFormatters ?? [VisualLengthFormatter(maxVisualLength: maxVisualLength)],
           validator: validator,
           onChanged: onChanged,
+          maxLines: maxLines,
+          minLines: minLines,
+          keyboardType: keyboardType,
         ),
         Positioned(
           right: 12,

@@ -756,8 +756,10 @@ class _CustomerDialogState extends State<CustomerDialog> {
               },
             ),
             SizedBox(height: 16),
-            TextFormField(
-            controller: _noteController,
+            TextFormFieldWithCounter(
+              controller: _noteController,
+              maxVisualLength: kMaxNoteVisualLength,
+              maxLines: 2,
               decoration: InputDecoration(
                 labelText: '备注',
                 border: OutlineInputBorder(
@@ -767,8 +769,8 @@ class _CustomerDialogState extends State<CustomerDialog> {
                 fillColor: Colors.grey[50],
                 prefixIcon: Icon(Icons.note, color: Colors.orange),
               ),
-              maxLines: 2,
-          ),
+              onChanged: (_) => setState(() {}),
+            ),
         ],
         ),
       ),

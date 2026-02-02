@@ -8,6 +8,7 @@ import 'package:shared_preferences/shared_preferences.dart';
 import 'package:intl/intl.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
+import '../utils/visual_length_formatter.dart';
 
 class IncomeScreen extends StatefulWidget {
   @override
@@ -1679,8 +1680,10 @@ class _IncomeDialogState extends State<IncomeDialog> {
               SizedBox(height: 16),
               
               // 备注
-              TextFormField(
+              TextFormFieldWithCounter(
                 controller: _noteController,
+                maxVisualLength: kMaxNoteVisualLength,
+                maxLines: 2,
                 decoration: InputDecoration(
                   labelText: '备注',
                   border: OutlineInputBorder(
@@ -1690,7 +1693,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.note, color: Colors.teal),
                 ),
-                maxLines: 2,
+                onChanged: (_) => setState(() {}),
               ),
             ],
           ),

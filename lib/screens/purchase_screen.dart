@@ -8,6 +8,7 @@ import '../widgets/record_detail_dialog.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
+import '../utils/visual_length_formatter.dart';
 
 class PurchaseScreen extends StatefulWidget {
   @override
@@ -1620,8 +1621,10 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
               SizedBox(height: 16),
 
               // iii. 备注
-              TextFormField(
+              TextFormFieldWithCounter(
                 controller: _noteController,
+                maxVisualLength: kMaxNoteVisualLength,
+                maxLines: 2,
                 decoration: InputDecoration(
                   labelText: '备注',
                   border: OutlineInputBorder(
@@ -1631,7 +1634,7 @@ class _PurchaseDialogState extends State<PurchaseDialog> {
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.note, color: Colors.green),
                 ),
-                maxLines: 2,
+                onChanged: (_) => setState(() {}),
               ),
           ],
           ),

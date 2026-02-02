@@ -1179,8 +1179,10 @@ class _ProductDialogState extends State<ProductDialog> {
                 ],
             ),
               SizedBox(height: 16),
-              TextFormField(
-              controller: _descriptionController,
+              TextFormFieldWithCounter(
+                controller: _descriptionController,
+                maxVisualLength: kMaxNoteVisualLength,
+                maxLines: 2,
                 decoration: InputDecoration(
                   labelText: '描述',
                   border: OutlineInputBorder(
@@ -1189,8 +1191,8 @@ class _ProductDialogState extends State<ProductDialog> {
                   filled: true,
                   fillColor: Colors.grey[50],
                   prefixIcon: Icon(Icons.description, color: Colors.green),
-            ),
-                maxLines: 2,
+                ),
+                onChanged: (_) => setState(() {}),
               ),
           ],
           ),

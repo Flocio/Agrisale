@@ -696,8 +696,10 @@ class _EmployeeDialogState extends State<EmployeeDialog> {
               },
             ),
             SizedBox(height: 16),
-            TextFormField(
+            TextFormFieldWithCounter(
               controller: _noteController,
+              maxVisualLength: kMaxNoteVisualLength,
+              maxLines: 2,
               decoration: InputDecoration(
                 labelText: '备注',
                 border: OutlineInputBorder(
@@ -707,7 +709,7 @@ class _EmployeeDialogState extends State<EmployeeDialog> {
                 fillColor: Colors.grey[50],
                 prefixIcon: Icon(Icons.note, color: Colors.purple),
               ),
-              maxLines: 2,
+              onChanged: (_) => setState(() {}),
             ),
           ],
         ),
