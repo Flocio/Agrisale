@@ -406,8 +406,8 @@ class _DataAssistantScreenState extends State<DataAssistantScreen> {
       
       final settings = settingsResult.first;
       final apiKey = (settings['deepseek_api_key'] as String?) ?? '';
-      final temperature = (settings['deepseek_temperature'] as double?) ?? 0.7;
-      final maxTokens = (settings['deepseek_max_tokens'] as int?) ?? 2000;
+      final temperature = (settings['deepseek_temperature'] as double?) ?? 0.4;
+      final maxTokens = (settings['deepseek_max_tokens'] as int?) ?? 4000;
       final model = (settings['deepseek_model'] as String?) ?? 'deepseek-chat';
       
       // 验证API Key是否存在

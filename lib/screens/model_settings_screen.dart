@@ -12,8 +12,8 @@ class ModelSettingsScreen extends StatefulWidget {
 
 class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
   // DeepSeek 模型参数
-  double _temperature = 0.7;
-  int _maxTokens = 2000;
+  double _temperature = 0.4;
+  int _maxTokens = 4000;
   String _selectedModel = 'deepseek-chat';
   String _apiKey = '';
   final _apiKeyController = TextEditingController();
@@ -54,8 +54,8 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
         if (result.isNotEmpty) {
           final settings = result.first;
           setState(() {
-            _temperature = (settings['deepseek_temperature'] as double?) ?? 0.7;
-            _maxTokens = (settings['deepseek_max_tokens'] as int?) ?? 2000;
+            _temperature = (settings['deepseek_temperature'] as double?) ?? 0.4;
+            _maxTokens = (settings['deepseek_max_tokens'] as int?) ?? 4000;
             _selectedModel = (settings['deepseek_model'] as String?) ?? 'deepseek-chat';
             _apiKey = (settings['deepseek_api_key'] as String?) ?? '';
             _apiKeyController.text = _apiKey;
@@ -119,24 +119,6 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
     );
   }
 
-  void _resetModelSettings() {
-    setState(() {
-      _temperature = 0.7;
-      _maxTokens = 2000;
-      _selectedModel = 'deepseek-chat';
-      _apiKey = '';
-      _apiKeyController.clear();
-    });
-    
-    // 重置后自动保存
-    _autoSaveSettings();
-    
-    ScaffoldMessenger.of(context).hideCurrentSnackBar();
-    ScaffoldMessenger.of(context).showSnackBar(
-      SnackBar(content: Text('已重置为默认设置')),
-    );
-  }
-
   @override
   Widget build(BuildContext context) {
     // 如果正在加载，显示加载指示器
@@ -178,25 +160,12 @@ class _ModelSettingsScreenState extends State<ModelSettingsScreen> {
                     child: Column(
                       crossAxisAlignment: CrossAxisAlignment.start,
                       children: [
-                        Row(
-                          mainAxisAlignment: MainAxisAlignment.spaceBetween,
-                          children: [
-                            Text(
-                              'DeepSeek 模型设置',
-                              style: TextStyle(
-                                fontSize: 18,
-                                fontWeight: FontWeight.bold,
-                              ),
-                            ),
-                            TextButton.icon(
-                              icon: Icon(Icons.refresh, size: 16),
-                              label: Text('恢复默认'),
-                              onPressed: _resetModelSettings,
-                              style: TextButton.styleFrom(
-                                foregroundColor: Colors.green[700],
-                              ),
-                            ),
-                          ],
+                        Text(
+                          'DeepSeek 模型设置',
+                          style: TextStyle(
+                            fontSize: 18,
+                            fontWeight: FontWeight.bold,
+                          ),
                         ),
                         Divider(),
                         
