@@ -1,5 +1,6 @@
 // lib/screens/help_screen.dart
 
+import 'dart:io';
 import 'package:flutter/material.dart';
 
 class HelpScreen extends StatelessWidget {
@@ -196,6 +197,9 @@ class HelpScreen extends StatelessWidget {
                   _buildParagraph('• 自动备份：设置自动备份计划，定期备份数据'),
                   _buildParagraph('• 数据恢复：从备份文件恢复数据，保护数据安全'),
                 ]),
+                if (!Platform.isIOS) ...[
+                  _buildSubSection('数据文件存储位置', _dataStorageLocationContent()),
+                ],
               ],
             ),
             
@@ -299,7 +303,7 @@ class HelpScreen extends StatelessWidget {
     );
   }
 
-  Widget _buildParagraph(String text) {
+  Widget _buildParagraph(String text, {bool isMono = false}) {
     return Padding(
       padding: EdgeInsets.only(bottom: 8),
       child: Text(
@@ -308,9 +312,48 @@ class HelpScreen extends StatelessWidget {
           fontSize: 14,
           height: 1.6,
           color: Colors.grey[700],
+          fontFamily: isMono ? 'monospace' : null,
         ),
       ),
     );
+  }
+
+  /// 当前平台的数据存储位置说明（不含 iOS）
+  List<Widget> _dataStorageLocationContent() {
+    if (Platform.isMacOS) {
+      return [
+        _buildParagraph('数据库及备份等数据存放在应用文档目录下的 agrisale 文件夹中。'),
+        _buildParagraph('完整路径通常为：'),
+        _buildParagraph('~/Library/Containers/org.drflo.agrisale/Data/Documents/agrisale/',
+            isMono: true),
+        _buildParagraph('其中数据库文件为 agriculture_management.db。'),
+      ];
+    }
+    if (Platform.isWindows) {
+      return [
+        _buildParagraph('数据库及备份等数据存放在应用文档目录下的 agrisale 文件夹中。'),
+        _buildParagraph('完整路径通常为：'),
+        _buildParagraph(r'C:\Users\您的用户名\Documents\agrisale\',
+            isMono: true),
+        _buildParagraph('其中数据库文件为 agriculture_management.db。'),
+      ];
+    }
+    if (Platform.isLinux) {
+      return [
+        _buildParagraph('数据库及备份等数据存放在应用文档目录下的 agrisale 文件夹中。'),
+        _buildParagraph('完整路径通常为：'),
+        _buildParagraph('~/Documents/agrisale/ 或 ~/.local/share/ 下对应应用目录',
+            isMono: true),
+        _buildParagraph('其中数据库文件为 agriculture_management.db。'),
+      ];
+    }
+    if (Platform.isAndroid) {
+      return [
+        _buildParagraph('数据存储在应用私有存储的 databases 目录中，用户无法直接通过文件管理器访问。'),
+        _buildParagraph('备份与恢复请使用「设置」中的「数据备份」与「数据恢复」功能。'),
+      ];
+    }
+    return [];
   }
 }
 
