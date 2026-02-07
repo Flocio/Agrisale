@@ -11,6 +11,7 @@ import '../services/auto_backup_service.dart';
 import '../services/export_service.dart';
 import '../services/audit_log_service.dart';
 import '../models/audit_log.dart';
+import 'login_screen.dart';
 
 class SettingsScreen extends StatefulWidget {
   @override
@@ -874,6 +875,24 @@ class _SettingsScreenState extends State<SettingsScreen> {
     return value;
   }
   
+  /// 以“向左翻页”的过渡跳转到登录页（仅改 UI 过渡，不改功能）
+  void _navigateToLoginWithBackTransition() {
+    Navigator.of(context).pushReplacement(
+      PageRouteBuilder(
+        pageBuilder: (context, animation, secondaryAnimation) => LoginScreen(),
+        transitionsBuilder: (context, animation, secondaryAnimation, child) {
+          return SlideTransition(
+            position: Tween<Offset>(
+              begin: const Offset(-1.0, 0),
+              end: Offset.zero,
+            ).animate(CurvedAnimation(parent: animation, curve: Curves.easeInOut)),
+            child: child,
+          );
+        },
+      ),
+    );
+  }
+
   // 退出登录
   Future<void> _logout() async {
     final confirm = await showDialog<bool>(
@@ -909,8 +928,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
       final prefs = await SharedPreferences.getInstance();
       await prefs.remove('current_username');
       
-      // 跳转到登录界面
-      Navigator.of(context).pushReplacementNamed('/');
+      // 跳转到登录界面（向左翻页过渡）
+      _navigateToLoginWithBackTransition();
     }
   }
 
@@ -1170,8 +1189,8 @@ class _SettingsScreenState extends State<SettingsScreen> {
         ),
       );
 
-      // 跳转到登录界面
-      Navigator.of(context).pushReplacementNamed('/');
+      // 跳转到登录界面（向左翻页过渡）
+      _navigateToLoginWithBackTransition();
 
     } catch (e) {
       Navigator.of(context).pop(); // 关闭加载对话框
