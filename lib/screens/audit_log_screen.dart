@@ -8,6 +8,7 @@ import '../models/audit_log.dart';
 import '../services/audit_log_service.dart';
 import '../database_helper.dart';
 import '../utils/field_translator.dart';
+import '../widgets/footer_widget.dart';
 
 class AuditLogScreen extends StatefulWidget {
   @override
@@ -520,6 +521,7 @@ class _AuditLogScreenState extends State<AuditLogScreen> {
                         ),
                       ),
           ),
+          FooterWidget(),
         ],
       ),
     );

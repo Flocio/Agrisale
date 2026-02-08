@@ -2,6 +2,7 @@
 
 import 'dart:io';
 import 'package:flutter/material.dart';
+import '../widgets/footer_widget.dart';
 
 class HelpScreen extends StatelessWidget {
   @override
@@ -13,12 +14,15 @@ class HelpScreen extends StatelessWidget {
           color: Colors.white,
         )),
       ),
-      body: SingleChildScrollView(
-        padding: EdgeInsets.all(16),
-        child: Column(
-          crossAxisAlignment: CrossAxisAlignment.start,
-          children: [
-            _buildSection(
+      body: Column(
+        children: [
+          Expanded(
+            child: SingleChildScrollView(
+              padding: EdgeInsets.all(16),
+              child: Column(
+                crossAxisAlignment: CrossAxisAlignment.start,
+                children: [
+                  _buildSection(
               title: '系统简介',
               icon: Icons.info_outline,
               color: Colors.blue,
@@ -237,9 +241,13 @@ class HelpScreen extends StatelessWidget {
               ],
             ),
             
-            SizedBox(height: 32),
-          ],
-        ),
+                  SizedBox(height: 32),
+                ],
+              ),
+            ),
+          ),
+          FooterWidget(),
+        ],
       ),
     );
   }
