@@ -1327,14 +1327,40 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                 },
               ),
               SizedBox(height: 16),
+
+              // 金额提示卡片
+              Container(
+                padding: EdgeInsets.all(8),
+                decoration: BoxDecoration(
+                  color: Colors.blue[50],
+                  borderRadius: BorderRadius.circular(8),
+                  border: Border.all(color: Colors.blue[200]!),
+                ),
+                child: Row(
+                  children: [
+                    Icon(Icons.info_outline, color: Colors.blue[700], size: 16),
+                    SizedBox(width: 8),
+                    Expanded(
+                      child: Text(
+                        '正数表示汇款，负数表示退款',
+                        style: TextStyle(
+                          fontSize: 12,
+                          color: Colors.blue[800],
+                        ),
+                      ),
+                    ),
+                  ],
+                ),
+              ),
+              SizedBox(height: 16),
               
-              // 金额输入
+              // 汇款金额输入
               TextFormField(
                 controller: _amountController,
                 decoration: InputDecoration(
-                  labelText: '金额',
+                  labelText: '汇款金额',
                   floatingLabelBehavior: FloatingLabelBehavior.always,
-                  hintText: '正数表示汇款，负数表示退款',
+                  hintText: '汇款金额',
                   hintStyle: TextStyle(color: Colors.grey[600]),
                   border: OutlineInputBorder(
                     borderRadius: BorderRadius.circular(8),
