@@ -1573,7 +1573,8 @@ class _IncomeDialogState extends State<IncomeDialog> {
                               ? Colors.grey 
                               : Colors.orange
                         ),
-                        errorText: _originalPriceError ? '应不小于实际进账' : null,
+                        errorText: _originalPriceError ? '应不小于实际进账金额' : null,
+                        errorMaxLines: 2,
                       ),
                       keyboardType: TextInputType.numberWithOptions(decimal: true),
                       validator: (value) {
@@ -1588,7 +1589,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                           // 检查优惠前价格是否 >= 实际进账金额
                           final amount = double.tryParse(_amountController.text.trim()) ?? 0.0;
                           if (original < amount) {
-                            return '应不小于实际进账';
+                            return '应不小于实际进账金额';
                           }
                         }
                         return null;
