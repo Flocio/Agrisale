@@ -1198,6 +1198,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
   bool _isUpdatingDiscountFields = false;
   String? _lastEditedDiscountField; // 'discount' | 'original'
   bool _originalPriceError = false; // 优惠前价格错误状态
+  bool _discountNegativeError = false; // 优惠金额为负数错误状态
   String? _missingCustomerInfo; // 记录已删除的客户信息
   String? _missingEmployeeInfo; // 记录已删除的员工信息
   
@@ -1277,6 +1278,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
         _originalPriceController.text = '';
         setState(() {
           _originalPriceError = false;
+          _discountNegativeError = false;
         });
         return;
       }
@@ -1289,6 +1291,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
         // 自动计算的情况下，优惠前价格总是有效的
         setState(() {
           _originalPriceError = false;
+          _discountNegativeError = discount < 0;
         });
       } else if (source == 'original') {
         _lastEditedDiscountField = 'original';
@@ -1526,6 +1529,8 @@ class _IncomeDialogState extends State<IncomeDialog> {
                               ? Colors.grey 
                               : Colors.orange
                         ),
+                        errorText: _discountNegativeError ? '优惠金额不能为负数' : null,
+                        errorMaxLines: 2,
                       ),
                       keyboardType: TextInputType.numberWithOptions(decimal: true),
                       validator: (value) {
