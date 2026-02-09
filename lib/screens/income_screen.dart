@@ -1486,7 +1486,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                       controller: _discountController,
                       enabled: double.tryParse(_amountController.text) == null || double.parse(_amountController.text) >= 0,
                       decoration: InputDecoration(
-                        labelText: '优惠金额',
+                        label: Text('优惠金额', overflow: TextOverflow.visible, softWrap: true),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -1523,7 +1523,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                       controller: _originalPriceController,
                       enabled: double.tryParse(_amountController.text) == null || double.parse(_amountController.text) >= 0,
                       decoration: InputDecoration(
-                        labelText: '优惠前价格',
+                        label: Text('优惠前价格', overflow: TextOverflow.visible, softWrap: true),
                         floatingLabelBehavior: FloatingLabelBehavior.always,
                         hintText: '',
                         border: OutlineInputBorder(
@@ -1619,7 +1619,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                       value: _selectedEmployeeId,
                       isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: '经办人',
+                        label: Text('经办人', overflow: TextOverflow.visible, softWrap: true),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -1654,7 +1654,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                       value: _selectedPaymentMethod,
                       isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: '付款方式',
+                        label: Text('付款方式', overflow: TextOverflow.visible, softWrap: true),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),

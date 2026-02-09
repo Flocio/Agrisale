@@ -1392,7 +1392,7 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                       value: _selectedEmployeeId,
                       isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: '经办人',
+                        label: Text('经办人', overflow: TextOverflow.visible, softWrap: true),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -1427,7 +1427,7 @@ class _RemittanceDialogState extends State<RemittanceDialog> {
                       value: _selectedPaymentMethod,
                       isExpanded: true,
                       decoration: InputDecoration(
-                        labelText: '汇款方式',
+                        label: Text('汇款方式', overflow: TextOverflow.visible, softWrap: true),
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
