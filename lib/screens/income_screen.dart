@@ -1516,6 +1516,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                       enabled: double.tryParse(_amountController.text) == null || double.parse(_amountController.text) >= 0,
                       decoration: InputDecoration(
                         label: Text('优惠金额', overflow: TextOverflow.visible, softWrap: true),
+                        floatingLabelStyle: _discountNegativeError ? TextStyle(color: Colors.red) : null,
                         border: OutlineInputBorder(
                           borderRadius: BorderRadius.circular(8),
                         ),
@@ -1555,6 +1556,7 @@ class _IncomeDialogState extends State<IncomeDialog> {
                       enabled: double.tryParse(_amountController.text) == null || double.parse(_amountController.text) >= 0,
                       decoration: InputDecoration(
                         label: Text('优惠前价格', overflow: TextOverflow.visible, softWrap: true),
+                        floatingLabelStyle: _originalPriceError ? TextStyle(color: Colors.red) : null,
                         floatingLabelBehavior: FloatingLabelBehavior.always,
                         hintText: '',
                         border: OutlineInputBorder(
