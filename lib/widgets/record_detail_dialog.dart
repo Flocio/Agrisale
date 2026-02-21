@@ -275,7 +275,7 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
               SizedBox(width: 8),
               Expanded(
                 child: Text(
-                  _formatValue(entry.value),
+                  _formatValue(entry.value, fieldKey: entry.key),
                   style: TextStyle(
                     color: isSystemField ? Colors.grey[600] : Colors.black87,
                     fontSize: 13,
@@ -419,8 +419,12 @@ class _RecordDetailDialogState extends State<RecordDetailDialog> {
     );
   }
 
-  String _formatValue(dynamic value) {
-    if (value == null) return '-';
+  String _formatValue(dynamic value, {String? fieldKey}) {
+    final showBlankWhenEmpty = fieldKey == 'note' || fieldKey == 'description';
+    if (value == null) return showBlankWhenEmpty ? '' : '-';
+    if (value is String && value.trim().isEmpty) {
+      return showBlankWhenEmpty ? '' : value;
+    }
     if (value is double) {
       // 格式化数字：整数显示为整数，小数保留小数
       if (value == value.floor()) {
@@ -844,8 +848,8 @@ class _LogDetailSubDialog extends StatelessWidget {
       String newValue = '-';
       
       if (change is Map<String, dynamic>) {
-        oldValue = _formatValue(change['old']);
-        newValue = _formatValue(change['new']);
+        oldValue = _formatValue(change['old'], fieldKey: entry.key);
+        newValue = _formatValue(change['new'], fieldKey: entry.key);
       }
       
       return Container(
@@ -900,8 +904,12 @@ class _LogDetailSubDialog extends StatelessWidget {
     }).toList();
   }
 
-  String _formatValue(dynamic value) {
-    if (value == null) return '-';
+  String _formatValue(dynamic value, {String? fieldKey}) {
+    final showBlankWhenEmpty = fieldKey == 'note' || fieldKey == 'description';
+    if (value == null) return showBlankWhenEmpty ? '' : '-';
+    if (value is String && value.trim().isEmpty) {
+      return showBlankWhenEmpty ? '' : value;
+    }
     if (value is double) {
       if (value == value.floor()) {
         return value.toInt().toString();
