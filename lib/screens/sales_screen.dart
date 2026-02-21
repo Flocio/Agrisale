@@ -185,7 +185,12 @@ class _SalesScreenState extends State<SalesScreen> {
         final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
         final customers = await db.query('customers', where: 'userId = ?', whereArgs: [userId]);
         final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
-        final sales = await db.query('sales', where: 'userId = ?', whereArgs: [userId], orderBy: 'id DESC');
+        final sales = await db.query(
+          'sales',
+          where: 'userId = ?',
+          whereArgs: [userId],
+          orderBy: 'saleDate DESC, id DESC',
+        );
         
         setState(() {
           _products = products;

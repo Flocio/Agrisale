@@ -185,7 +185,12 @@ class _ReturnsScreenState extends State<ReturnsScreen> {
         final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
         final customers = await db.query('customers', where: 'userId = ?', whereArgs: [userId]);
         final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
-        final returns = await db.query('returns', where: 'userId = ?', whereArgs: [userId], orderBy: 'id DESC');
+        final returns = await db.query(
+          'returns',
+          where: 'userId = ?',
+          whereArgs: [userId],
+          orderBy: 'returnDate DESC, id DESC',
+        );
         
         setState(() {
           _products = products;

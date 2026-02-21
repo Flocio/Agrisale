@@ -183,7 +183,12 @@ class _PurchaseScreenState extends State<PurchaseScreen> {
         // 只获取当前用户的数据
         final products = await db.query('products', where: 'userId = ?', whereArgs: [userId]);
         final suppliers = await db.query('suppliers', where: 'userId = ?', whereArgs: [userId]);
-        final purchases = await db.query('purchases', where: 'userId = ?', whereArgs: [userId], orderBy: 'id DESC');
+        final purchases = await db.query(
+          'purchases',
+          where: 'userId = ?',
+          whereArgs: [userId],
+          orderBy: 'purchaseDate DESC, id DESC',
+        );
         
         setState(() {
           _products = products;
