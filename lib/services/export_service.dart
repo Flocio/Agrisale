@@ -110,8 +110,9 @@ class ExportService {
       return;
     }
 
-    // 在 macOS 上，需要手动复制文件（Android/iOS 上 saveFile 已经保存了）
-    if (Platform.isMacOS) {
+    // 在桌面平台上，saveFile 只返回路径，不会自动写入文件，需要手动复制
+    // 在 Android/iOS 上，saveFile(bytes) 会直接完成保存
+    if (!Platform.isAndroid && !Platform.isIOS) {
       await tempFile.copy(savePath);
     }
     
@@ -177,6 +178,11 @@ class ExportService {
             context.showSnackBar('已取消保存');
           }
           return;
+        }
+
+        // Windows/Linux 桌面端仅返回路径，需要手动复制文件
+        if (!Platform.isAndroid && !Platform.isIOS) {
+          await tempFile.copy(savePath);
         }
       }
       
@@ -885,8 +891,9 @@ class ExportService {
       return;
     }
 
-    // 在 macOS 上，需要手动复制文件（Android/iOS 上 saveFile 已经保存了）
-    if (Platform.isMacOS) {
+    // 在桌面平台上，saveFile 只返回路径，不会自动写入文件，需要手动复制
+    // 在 Android/iOS 上，saveFile(bytes) 会直接完成保存
+    if (!Platform.isAndroid && !Platform.isIOS) {
       await tempFile.copy(savePath);
     }
     
@@ -899,7 +906,7 @@ class ExportService {
   static Future<void> _shareJSONFile(BuildContext context, File file) async {
     await Share.shareXFiles(
       [XFile(file.path)],
-      text: 'AgrisaleCL数据备份文件',
+      text: 'Agrisale数据备份文件',
     );
   }
 
