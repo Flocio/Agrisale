@@ -1,6 +1,7 @@
 import 'dart:async';
 import 'dart:convert';
 import 'dart:io';
+import 'package:path/path.dart' as p;
 import 'package:path_provider/path_provider.dart';
 import 'package:shared_preferences/shared_preferences.dart';
 import 'package:sqflite/sqflite.dart';
@@ -368,7 +369,7 @@ class AutoBackupService {
             final stat = await file.stat();
             backupList.add({
               'path': file.path,
-              'fileName': file.path.split('/').last,
+              'fileName': p.basename(file.path),
               'modifiedTime': stat.modified,
               'size': stat.size,
               'username': backupUsername,
@@ -808,4 +809,3 @@ class AutoBackupService {
     }
   }
 }
-
