@@ -23,6 +23,46 @@ enum ExportAction {
 }
 
 class ExportService {
+  /// Windows 对文件名有额外限制，这里统一清洗，避免导出失败。
+  static String _sanitizeFileNamePart(String input, {String fallback = 'export'}) {
+    var value = input.trim();
+    value = value.replaceAll(RegExp(r'[<>:"/\\|?*\x00-\x1F]'), '_');
+    value = value.replaceAll(RegExp(r'[. ]+$'), '');
+    if (value.isEmpty) {
+      value = fallback;
+    }
+
+    const reservedNames = <String>{
+      'CON', 'PRN', 'AUX', 'NUL',
+      'COM1', 'COM2', 'COM3', 'COM4', 'COM5', 'COM6', 'COM7', 'COM8', 'COM9',
+      'LPT1', 'LPT2', 'LPT3', 'LPT4', 'LPT5', 'LPT6', 'LPT7', 'LPT8', 'LPT9',
+    };
+    if (reservedNames.contains(value.toUpperCase())) {
+      value = '${value}_file';
+    }
+
+    return value;
+  }
+
+  static String _sanitizeFileNameWithExtension(
+    String fileName, {
+    required String fallbackExtension,
+  }) {
+    final lastDot = fileName.lastIndexOf('.');
+    String baseName = fileName;
+    String extension = fallbackExtension;
+
+    if (lastDot > 0 && lastDot < fileName.length - 1) {
+      baseName = fileName.substring(0, lastDot);
+      extension = fileName.substring(lastDot + 1);
+    }
+
+    final safeBase = _sanitizeFileNamePart(baseName);
+    final safeExt = _sanitizeFileNamePart(extension, fallback: fallbackExtension)
+        .replaceAll('.', '');
+    return '$safeBase.$safeExt';
+  }
+
   /// 对外统一调用的方法
   /// 
   /// [context] - BuildContext，用于显示对话框和提示
@@ -66,7 +106,8 @@ class ExportService {
     final ts =
         '${now.year}${now.month.toString().padLeft(2, '0')}${now.day.toString().padLeft(2, '0')}_'
         '${now.hour.toString().padLeft(2, '0')}${now.minute.toString().padLeft(2, '0')}${now.second.toString().padLeft(2, '0')}';
-    return '${base}_$ts.$extension';
+    final safeBase = _sanitizeFileNamePart(base);
+    return '${safeBase}_$ts.$extension';
   }
 
   /// 创建临时 CSV 文件
@@ -831,16 +872,21 @@ class ExportService {
     required ExportAction action,
   }) async {
     try {
+      final safeFileName = _sanitizeFileNameWithExtension(
+        fileName,
+        fallbackExtension: 'json',
+      );
+
       // 1️⃣ 先生成临时 JSON 文件（绝对安全）
       final tempFile = await _createTempJSON(
         jsonData: jsonData,
-        fileName: fileName,
+        fileName: safeFileName,
       );
 
       // 2️⃣ 根据用户选择执行动作
       switch (action) {
         case ExportAction.saveToLocal:
-          await _saveJSONToLocal(context, tempFile, fileName);
+          await _saveJSONToLocal(context, tempFile, safeFileName);
           break;
         case ExportAction.share:
           await _shareJSONFile(context, tempFile);
